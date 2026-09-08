@@ -1,0 +1,90 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-3338d48cf6aaaab9fed70d3999c4eef3",
+  "AELLO-CANARY-59f56b16c9be9274bfe9c2f55513d4ee",
+  "AELLO-CANARY-3f73f40ec5070d2d02b1d437e606d45b",
+  "AELLO-CANARY-d1e3166e80845b74480c81931491d895"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "A forecast array is written to the declared submission path.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "forecast_lands",
+   "judgment": "EFFECT: /submission/forecast.npy exists and loads as a real-valued numpy array; an object dtype, a missing file or an unreadable one scores zero with reason submission_malformed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No forecast consumed an observation at or after its own origin.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "forecast_origin_causality",
+   "judgment": "EFFECT: The run record's declared maximum consumed index for each forecast origin is strictly below that origin. This is red line 1 and it is checked against the record the run produced, never against a post-hoc scan.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Forecast values sit inside the envelope the shipped history makes plausible.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "forecast_within_observed_envelope",
+   "judgment": "EFFECT: Every forecast value is finite and lies within the min/max of the agent-visible training channel widened by its own standard deviation; a forecast outside that envelope is a degenerate or mis-scaled submission rather than a weak one.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The forecast covers exactly the graded forecast origins at the bound horizon.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "horizon_grid_alignment",
+   "judgment": "EFFECT: The flattened forecast length equals the number of graded targets the verifier holds; a short array cannot be padded and a long one cannot be truncated to fit.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent declares its own lookback and split budget for the graded run.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "lookback_budget_declared",
+   "judgment": "EFFECT: The run record carries an agent-authored declaration naming the lookback window and the total leaf-split budget used. The declaration is graded, not the harness's own measurement, so the check cannot be satisfied by a field the harness writes.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The skill score against persistence clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "persistence_skill_ramp",
+   "judgment": "EFFECT: 1 - MAE(model)/MAE(persistence) over the private future window, mapped through the floor-to-knee ramp. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The validation policy the agent declares respects time order.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "time_order_split_declared",
+   "judgment": "EFFECT: The declared split policy names an ordered holdout and no shuffled or randomly permuted fold. CTL-LEAK targets exactly this and must be rejected: a shuffled split is a red line scoring zero, not a lever with a bounded worth.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  }
+ ]
+}

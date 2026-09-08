@@ -1,0 +1,212 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-f52bbbe19703ede56d5674eb4c5d7dc3",
+  "AELLO-CANARY-23a009b98bd344917e87ef548b584156",
+  "AELLO-CANARY-3c8086a68a27b36b1f2ae16874efe9da",
+  "AELLO-CANARY-90b0dc8de7fd77d4eb5b7482318e3440"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "agent_reward_log",
+  "delivered_carry_store",
+  "harness_attempt_record",
+  "proposed_carry_store",
+  "submitted_program"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The store the agent submits carries no freshness stamp anywhere in it.",
+   "dimension": "carry_store",
+   "evaluation_target": "proposed_carry_store",
+   "id": "agent_store_writes_no_last_confirmed_stamp",
+   "judgment": "ABSENCE: No entry of the submitted carry/notes.json carries a last_confirmed field, at any depth. The stamp is the one field only the verifier writes, and only for a configuration this attempt actually graded and whose bar it actually cleared; an agent-written stamp would let a table assert its own freshness and would make the eight-attempt expiry unenforceable from inside. Any last_confirmed in the submitted store scores the attempt exactly 0 with reason carry_stamp_forged.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The mean bar-gated wall clock over the attempt's graded configurations, mapped through the published descending ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "harness_attempt_record",
+   "id": "bar_gated_wallclock_ramp_over_the_scored_attempt",
+   "judgment": "VALUE: Per graded configuration c, the wall-clock seconds T_c the harness measured from that run's first read of the private data directory to the completion of its export write, taken as the mean over the attempt's graded configurations -- three for attempts one through forty-nine, the eight oldest-visited at the scored attempt fifty, which is the scored one because final selection is last. A configuration whose gate did not clear contributes the ramp's slow anchor rather than its own elapsed, so speed bought by missing the bar, exceeding the ceiling, breaking the sibling gap or exporting something inadmissible cannot move the axis; the reward map's informative sub-band below the bar is a property of r_c and is not this axis. Fewer seconds is better, so the ramp descends: S_outcome = clamp((floor - T) / (floor - knee), 0, 1), and the item passes when T is at or below the dichotomizing threshold, which is a time on this axis and not a score. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them on the grading host.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "Every carry entry is one configuration's six named scalars plus the one-bit src field and an optional short encoder tag, and nothing else.",
+   "dimension": "carry_store",
+   "evaluation_target": "proposed_carry_store",
+   "id": "carry_entries_carry_the_six_named_scalars_and_nothing_else",
+   "judgment": "INVARIANT: Each entry is keyed by a config_id of the live thirty-two-configuration family and carries exactly the six published scalar fields -- flip, rho, ofs, scale, chan, amb -- each a finite number rather than a list, object or string; a src field that is exactly 0 for observed or 1 for predicted; and at most one optional tag of at most 32 bytes. flip is a bit, ofs is the packed crop-offset lattice index in 0..255, and scale lies inside the published band. No unknown key, no array field and no base64 field is admitted. The closed schema is what keeps the memory channel a calibration table rather than a weight store or an unbounded scratchpad: without it the 2,048-byte cap could be spent on a serialized tensor and the whole memory pressure the slot is built on would dissolve. Violation scores the attempt exactly 0 with reason carry_store_invalid.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The carry lifecycle ran in the bound order, and the expired identifiers reported back equal the ones the expiry rule selects.",
+   "dimension": "carry_lifecycle",
+   "evaluation_target": "harness_attempt_record",
+   "id": "carry_lifecycle_validates_stamps_expires_persists_then_reports",
+   "judgment": "INVARIANT: The recorded lifecycle trace is exactly validate, stamp, expire, persist, report, in that order with no step missing, repeated or transposed, and the reported expired-identifier set equals the recomputation over the incoming store's stamps at the eight-attempt time to live. The order is load-bearing rather than decorative: stamping after expiry would revive an entry the rule had just dropped, and persisting before expiry would carry it forward anyway. The reported set is the agent's only feedback about what it lost, which is why it is checked against a recomputation rather than taken from the report. Any inversion or mismatch scores the attempt exactly 0 with reason carry_lifecycle_violation.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The submitted carry store is at most 2,048 bytes of valid UTF-8 JSON, and an oversize store fails loudly rather than being truncated.",
+   "dimension": "carry_store",
+   "evaluation_target": "proposed_carry_store",
+   "id": "carry_store_fits_the_two_kilobyte_channel",
+   "judgment": "INVARIANT: carry/notes.json, when present, is at most 2,048 bytes on disk, decodes as UTF-8, parses as a JSON object and carries at most one entry per configuration in the thirty-two-entry family. An absent store is admissible and is not a failure -- the first attempt has none, and the NC-AMNESIC control runs with none deliberately -- but a present one is capped. Thirty-two entries against 2,048 bytes leaves 64 bytes an entry, so the full table does not fit as raw JSON floats and the agent must choose an encoding rather than accumulate; that is what control CTL-NAIVE-DUMP measures. Violation scores the attempt exactly 0 with reason carry_store_invalid and the previous valid store is what carries forward.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "What the previous attempt's verifier persisted is byte-for-byte what this attempt was handed.",
+   "dimension": "carry_lifecycle",
+   "evaluation_target": "delivered_carry_store",
+   "id": "delivered_store_is_byte_identical_to_the_persisted_one",
+   "judgment": "EFFECT: The sha256 of the delivered carry/notes.json equals the digest the harness recorded when it persisted the validated, stamped, expiry-filtered store at the end of the previous attempt. The first attempt of a run is delivered no store and records no previous digest, and that case passes. The canonical store lives outside the agent's writable workspace, so this is the one check that verifies the memory channel itself rather than what the agent put in it: every other item in this bundle is meaningless if what compounds between attempts is not what was saved. A mismatch scores the attempt exactly 0 with reason carry_delivery_mismatch.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Re-running one graded configuration under the verifier's second init seed produces different parameters that still clear the bar.",
+   "dimension": "seed_dependence",
+   "evaluation_target": "harness_attempt_record",
+   "id": "exported_parameters_move_with_the_verifier_supplied_seed",
+   "judgment": "INVARIANT: At the scored attempt the harness re-runs one of the graded configurations with a distinct verifier-supplied init seed; the two exports must differ in digest, their parameter tensors must differ in mean absolute value beyond the published epsilon, and both runs must clear that configuration's bar. Attempts before the scored one record no re-run and the check reports that rather than inventing a failure. Identical parameters across two distinct seeds mean the program did not train -- it emitted something it was carrying -- and that scores the attempt exactly 0 with reason seed_independent_parameters. This is the bind that makes a smuggled checkpoint a wrong deliverable rather than a fast one.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Each configuration's recorded gate outcome is the one its own accuracies imply, on both the published bar and the sibling gap.",
+   "dimension": "shard_agreement",
+   "evaluation_target": "harness_attempt_record",
+   "id": "gate_outcomes_recompute_from_the_shard_accuracies",
+   "judgment": "INVARIANT: For every graded configuration the recorded balanced accuracies on private_A(c) and private_B(c) are in the unit interval, their absolute difference is at most 0.015, and the recorded gate agrees with the recomputation: a gap above 0.015 must be recorded as sibling_gap_violation and nothing else, an accuracy below that configuration's published bar b_c must be recorded as below_bar unless a harder gate fired first, and a configuration recorded as cleared must clear both. The two private shards are image-disjoint draws of the same configuration, so a gap between them is a model fitted to one draw rather than to the configuration; and a gate outcome that its own numbers contradict is the one way a fast run that missed its bar could still be timed on the ramp.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The attempt was graded on the configurations the published schedule selects, and the scored attempt on the eight whose last scheduled visit is oldest.",
+   "dimension": "configuration_schedule",
+   "evaluation_target": "harness_attempt_record",
+   "id": "graded_roster_is_the_published_schedule_and_the_eight_oldest_at_the_last_attempt",
+   "judgment": "INVARIANT: The graded roster is recomputed here from the published rule -- configurations (7t + o) mod 32 for o in 0, 11, 19 at attempt t, three per attempt for attempts one through forty-nine -- and at attempt fifty from the eight configurations whose last scheduled visit is oldest, ties broken by ascending config_id. It is compared against the roster the harness recorded, never taken from it. The rule is published in full and its consequence is not: under it the final eight were last visited at attempts 29 through 36, so at attempt fifty every one of them is at least fourteen attempts stale against an eight-attempt time to live. An agent that refreshes the configurations it has just seen arrives at the scored attempt with exactly the wrong half of the table live.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "A configuration identifier written into the program's own source is backed by an observed carry entry for that configuration.",
+   "dimension": "submitted_program",
+   "evaluation_target": "submitted_program",
+   "id": "hardcoded_per_configuration_constants_are_provenanced",
+   "judgment": "ABSENCE: Every live config_id appearing as a string literal in train.py, whether as a dict key or a comparison, has an entry in the submitted carry store marked src=observed. This is checker C17-CONST, which seed/contract.yaml names in control CTRL-PCAM-JOIN and then omits from its own checker roster. It closes the route where per-configuration geometry is recovered outside the graded run -- by hash-joining the served crops against a public archive in the egress-enabled sandbox, or by mining the shipped decoy logs -- and pasted into the source to bypass the 2,048-byte channel entirely. Hardcoding constants the run actually observed stays admissible; asserting constants no run of this attempt's history ever measured does not, and scores the attempt exactly 0 with reason constants_unprovenanced.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded run wrote nothing into the grading tree, the private shards or the harness-private canonical carry state, opened no socket and saw one GPU.",
+   "dimension": "isolation",
+   "evaluation_target": "harness_attempt_record",
+   "id": "heldout_shards_and_canonical_carry_state_unwritten",
+   "judgment": "ABSENCE: No path under tests/, tests/heldout/, the private data root or the harness-private canonical carry state was created or modified during the graded run -- read from the harness's own record of touched paths and corroborated by the run's own declaration, never from a post-hoc scan -- the digests of the held-out shards and of the canonical carry state are unchanged across the run, no socket syscall was observed inside the network-isolated verifier environment, and exactly one GPU was visible. The canonical carry state is named here explicitly because it is the one guarded object that is not a corpus: an agent that could write it could stamp its own table. Violation scores the attempt exactly 0 with reason grading_tree_mutated or isolation_violation.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "An entry marked observed names a configuration this run has graded, and its constants match what the verifier measured on the configurations this attempt graded.",
+   "dimension": "carry_store",
+   "evaluation_target": "proposed_carry_store",
+   "id": "observed_entries_name_configurations_this_run_graded",
+   "judgment": "INVARIANT: Every src=observed entry names a config_id in the harness-recorded graded history of this run, and for each configuration this attempt graded, each stored scalar lies inside the published per-field tolerance of the verifier's own measurement -- flip and ofs exact, scale 0.01, rho 0.05, chan 0.02, amb 0.05. Entries marked src=predicted are exempt from both arms by construction, so generalizing across the latent family is a legitimate and rewarded route and only the provenance claim is policed. This is what separates a memory that compounds from one that is confidently wrong: mining the shipped decoy corpus, or resolving a configuration by majority vote over records of the retired parameterization, produces exactly the entries this check rejects. Violation scores the attempt exactly 0 with reason carry_fabricated.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The program accepts the five flags the launcher passes, and the recorded launch of every graded configuration passed all five with the configuration's own identifier.",
+   "dimension": "submitted_program",
+   "evaluation_target": "submitted_program",
+   "id": "program_consumes_every_flag_the_verifier_passes",
+   "judgment": "INVARIANT: The submitted source names each of --data, --out, --init-seed, --config-id and --carry, and for every graded configuration the harness-recorded argv carries all five, its --config-id equals that block's config_id and its --carry equals the published carry path. A program that ignores --config-id trains the same model on thirty-two differently parameterized configurations; a program that ignores --init-seed reproduces identical parameters across the verifier's two seeds and trips C4-SEED; a program that ignores --carry has no memory and pays the discovery probe inside the timed region on every run, which is what NC-AMNESIC measures.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent declares its budget in this task's own terms: configurations graded, seconds each, and how many attempts went to refreshing rather than exploiting.",
+   "dimension": "budget_accounting",
+   "evaluation_target": "harness_attempt_record",
+   "id": "refresh_and_exploit_budget_declared_per_configuration",
+   "judgment": "EFFECT: The run record carries an agent-authored declaration naming graded_configurations, seconds_per_configuration, attempts_spent_refreshing and attempts_spent_exploiting, each a non-negative number, with graded_configurations equal to the number of configurations this attempt actually graded and the two attempt counts summing to at most the current attempt index. The declaration is what is graded, not the harness's own measurement, so it cannot be satisfied by a field the harness writes. The refresh-versus-exploit split is asked for because it is the choice this slot is actually about: an attempt spent re-observing a configuration whose entry is about to expire buys nothing this attempt and is the only thing that keeps the scored one from being graded on re-derivation.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "What the run wrote to its own reward log matches what the harness measured, inside the published tolerances.",
+   "dimension": "reporting_integrity",
+   "evaluation_target": "agent_reward_log",
+   "id": "reward_log_agrees_with_the_harness_within_the_published_tolerances",
+   "judgment": "INVARIANT: reward_log.jsonl carries one line for each configuration this attempt graded, and each line's claimed balanced accuracy is within 0.05 of the harness measurement and its claimed elapsed seconds within 10 percent of the harness elapsed. The log is the agent's own record and the harness's is the graded one, so this check exists to make the two agree rather than to grade the log: a run whose self-reported elapsed drifts from the host clock is either mis-measuring its own timed region, which will cost it the ramp, or reporting a number it did not measure, which scores the attempt exactly 0 with reason log_fabrication.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The submitted source is a program, not a serialized model wearing one.",
+   "dimension": "submitted_program",
+   "evaluation_target": "submitted_program",
+   "id": "source_tree_carries_no_smuggled_weights",
+   "judgment": "ABSENCE: The submitted source is at most 128 KB, decodes as text, and its syntax tree carries no numeric literal array above 1,024 elements and no base64-shaped string literal above 4 KB. Both bounds are recomputed here from the delivered bytes rather than read from a declaration. A 6.5M-parameter net will not fit, but a distilled few-thousand-parameter head would, and it would convert a task about training fast into a task about pasting a checkpoint. Violation scores the attempt exactly 0 with reason source_payload_violation.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every stamp in the delivered store names an attempt at which that configuration was graded and cleared its bar, and no stamp is more than eight attempts old.",
+   "dimension": "carry_lifecycle",
+   "evaluation_target": "delivered_carry_store",
+   "id": "stamps_are_verifier_written_and_expire_after_eight_attempts",
+   "judgment": "INVARIANT: In the store delivered to this attempt, every last_confirmed is an integer attempt index at or before the current one, appears in the harness's record of the attempts at which that configuration cleared its bar, and is at most eight attempts old. Every observed entry carries a stamp and every unstamped entry is marked predicted: an unstamped prediction has no observation to go stale and survives, an observation that is not being refreshed does not. That asymmetry is the decay rule the whole slot turns on, and under the published schedule every one of the final attempt's eight configurations was last visited at attempt 29 through 36, so none of them can still be live as an observation at attempt 50 by the schedule alone.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Each configuration's clock opens at that run's first read of its private data directory and closes at that run's export write, and the graded seconds are the difference.",
+   "dimension": "timing_boundary",
+   "evaluation_target": "harness_attempt_record",
+   "id": "timer_opens_at_the_first_private_data_read",
+   "judgment": "INVARIANT: For every graded configuration the recorded timer_open stamp coincides with the first read of that configuration's private data directory within the published epsilon, the timer_close stamp is at or after the export write, the recorded elapsed equals close minus open within the same epsilon, and every stage the run declares before the clock opens -- decoding the carry store, importing torch, creating the CUDA context -- is stamped before that first read rather than after it. Setup before the first private-data read is legitimate and is stated as such in instruction.md; what is not legitimate is reading the private data before the clock that is supposed to be timing that read. Inversion scores the attempt exactly 0 with reason timer_order_violation.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The program the verifier is asked to execute lands at the declared path, decodes as text and parses as Python.",
+   "dimension": "submitted_program",
+   "evaluation_target": "submitted_program",
+   "id": "train_program_lands_and_compiles",
+   "judgment": "EFFECT: /submission/train.py exists, decodes as UTF-8 and compiles under the Python compiler. This is the one deliverable in this batch that is executed rather than read: a program that will not parse is not a slow trainer, it is no trainer at all, and it fails every graded configuration of the attempt at once rather than one of them. Absent or unparseable scores zero with reason no_submission.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  }
+ ]
+}

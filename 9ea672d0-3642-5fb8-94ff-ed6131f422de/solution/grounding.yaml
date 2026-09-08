@@ -1,0 +1,972 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: C4-S2
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item below is compiled and carries a hand-written body in solution/recompute.py. Nothing in this slot
+  resists compilation: the chain manifest is a file, the stage-edge digests and the resolved argv are
+  records the pinned wrapper writes, and the deadline term is arithmetic over a per-query replay table.
+  The three behavioural rubrics that used to sit here as judged items are recorded under council_rubrics
+  instead, where they gate r_det from outside rather than diluting it from inside.'
+deliverable:
+  path: /submission/chain/pipeline.yaml
+  kind: yaml
+  shape: a mapping carrying stages (one record per declared stage, with id, command, bindings, inputs
+    and outputs), raw_sources (the pinned artifacts the chain may consume without a producer), degradation_ladder
+    (the admitted rerank depths, head first) and build_seconds (the agent's own per-stage build accounting)
+  companion_paths:
+  - /submission/chain/
+  - run_record.json
+  - replay_log.json
+  companion_basis: 'The graded deliverable is a DECLARED chain, so the manifest is the graded path:
+    it is the one file that names every stage program, every artifact edge and every argument binding.
+    The stage programs under /submission/chain/ are what the harness re-executes cold from raw MIRACL
+    bytes; run_record.json is what the pinned stage wrapper, the cold rebuild and the absence ledger
+    write; replay_log.json is the per-query arrival, latency, ranking and admission table the load generator
+    records at the service boundary. An absent manifest, an absent stage program, or a stage command
+    the manifest names and disk does not have all resolve to exactly 0.0 with reason deliverable_absent.'
+  deliverable_change_note: This slot previously declared /submission/c4s2.json, "an object with an ids
+    list and a matching outputs list". That is the generic prediction-file deliverable and it contradicts
+    this slot's own contract record, which grades a six-stage serving chain that must be DECLARED in
+    pipeline.yaml and re-executed by the harness, and whose red lines name chain_binding_violation,
+    declared_binding_divergence and artifact_not_reproducible -- none of which can be evaluated against
+    a flat ids list. No ids-and-outputs artifact is scored anywhere in this task. The deliverable is
+    corrected here to the one seed/contract.yaml actually describes.
+evaluation_target_vocabulary:
+- pipeline_manifest
+- replay_log
+- run_record
+- stage_wrapper_record
+items:
+- id: chain_manifest_and_stage_programs_present
+  dimension: deliverable_presence
+  weight: 5
+  evaluation_target: pipeline_manifest
+  criterion: The declared chain manifest is on disk at the declared path, parses, and every stage command
+    it names resolves to a real program inside the submission chain root.
+  judgment: '/submission/chain/pipeline.yaml parses as a mapping carrying a stages list, and for every
+    stage the first element of its command resolves to an existing file under /submission/chain/. A
+    manifest that names a stage program the disk does not have is deliverable_absent, not a shorter
+    chain: the harness re-executes the DECLARED topology cold from raw MIRACL bytes, so a stage whose
+    program is missing makes the whole rebuild unrunnable rather than making the chain one stage smaller.
+    The manifest is the graded path because it is the one file that names every other one.'
+  knockout: true
+  mode: compiled
+  outcome_class: EFFECT
+- id: declared_stages_drawn_from_the_roster_without_repetition
+  dimension: stage_roster
+  weight: 5
+  evaluation_target: pipeline_manifest
+  criterion: Every declared stage is a member of the published six-stage roster, appears at most once,
+    and the chain declares the serving stage that produces the endpoint.
+  judgment: 'The declared stage ids are drawn from chunk_dedup_address, encoder_export_quantize, corpus_embed,
+    index_build, rerank_compile and serve; none appears twice; and serve is among them. What is REFUSED
+    here is a seventh stage the harness has no re-execution contract for, the same id declared twice
+    -- the stage-edge digests bind by id, so a repeated id makes an artifact''s producer ambiguous --
+    and a chain with no serving stage, which cannot answer a query at all. What is NOT refused is a
+    chain that declares fewer than six. Dropping the cross-encoder is a real design choice with a measured
+    price: the near-duplicate clusters and the hard-negative haystack put a no-rerank chain at Q = 0.118,
+    close to the starter band, so it is priced by the metric rather than policed by a rule, and the
+    declared count is reported as evidence rather than as a verdict.'
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: every_consumed_artifact_has_a_declared_producer
+  dimension: chain_closure
+  weight: 5
+  evaluation_target: pipeline_manifest
+  criterion: Every artifact a stage consumes is either another stage's declared output or one of the
+    five pinned raw sources, and every declared output but the served endpoint is consumed.
+  judgment: 'For each stage''s inputs the named artifact appears in exactly one other stage''s outputs,
+    or is a member of the pinned raw-source roster: the MIRACL corpus shard, the MIRACL dev topics,
+    the Azure arrival trace and the two pinned checkpoints. An input with no producer and no raw source
+    is chain_binding_violation, and that is precisely what a pre-baked index, a hand-carried embedding
+    matrix or a hardcoded id table looks like once it is declared honestly. Symmetrically every declared
+    output other than service://retrieval-endpoint is consumed by some stage, so a declared output nothing
+    reads is a stage the manifest describes and the service does not use. Two stages declaring the same
+    output is ambiguous_producer.'
+  knockout: true
+  mode: compiled
+  outcome_class: ORDERING
+- id: stage_edge_digests_bind_consumer_to_producer
+  dimension: chain_binding
+  weight: 5
+  evaluation_target: stage_wrapper_record
+  criterion: For every declared edge the consuming stage's recorded input digest equals the producing
+    stage's recorded output digest, and the executed edge set is exactly the declared one.
+  judgment: 'The pinned stage wrapper records, per stage, the digest of every artifact opened for reading
+    and every artifact written. Each declared producer-artifact-consumer edge must appear exactly once
+    in that record with consumer_input_digest equal to producer_output_digest. An edge present in the
+    record that the manifest does not declare is undeclared_edge_executed and fails identically: the
+    chain re-executed has to be the chain described, in both directions. This is what makes shipping
+    a pre-baked artifact useless rather than merely discouraged, because the blob has no producing stage
+    whose recorded output digest could match the digest its consumer read.'
+  knockout: true
+  mode: compiled
+  outcome_class: DIVERGENCE
+- id: declared_order_quantizes_and_chunks_before_the_corpus_pass
+  dimension: stage_ordering
+  weight: 4
+  evaluation_target: pipeline_manifest
+  criterion: The declared topological order satisfies the six order relations this chain's operations
+    are not commutative under.
+  judgment: 'Kahn''s algorithm over the declared edges must yield a topological order -- a cycle is
+    chain_cycle_declared -- and every relation whose BOTH endpoints the chain declares must hold in
+    it: chunk_dedup_address precedes corpus_embed and index_build, encoder_export_quantize precedes
+    corpus_embed, corpus_embed precedes index_build, and both rerank_compile and index_build precede
+    serve. Every one of these is an order that a wrong chain satisfies syntactically and fails semantically.
+    Embedding before chunking embeds whole passages the index never stores. Calibrating the INT8 encoder
+    after the corpus pass leaves 600k corpus vectors in a geometry the served encoder no longer produces.
+    Training the coarse quantizer before the vectors exist trains it on something other than what it
+    will index. A relation whose endpoints are not both declared is skipped and reported as skipped,
+    so a chain that ships fewer stages is priced on quality here too rather than failed on an ordering
+    it never declared.'
+  knockout: true
+  mode: compiled
+  outcome_class: ORDERING
+- id: resolved_argv_equals_the_declared_argument_bindings
+  dimension: binding_divergence
+  weight: 5
+  evaluation_target: stage_wrapper_record
+  criterion: Every stage's resolved argv and effective keyword arguments, as the pinned wrapper recorded
+    them, equal the bindings the manifest declares.
+  judgment: 'For each stage the wrapper''s resolved_argv equals the manifest''s command list element
+    for element and its effective_kwargs equals the manifest''s bindings mapping key for key and value
+    for value, compared after canonicalising numbers so that 48 and 48.0 are the same binding while
+    the string "48" is not. Divergence is declared_binding_divergence and exactly 0.0. The two bindings
+    this separates on are nprobe and rerank_depth: a manifest declaring nprobe 64 and depth 48 over
+    a service that resolves 8 and 12 describes the chain that would have earned the quality and runs
+    the chain that earned the latency, and nothing else in the bundle can tell them apart, because both
+    answer every query with ten well-formed ids inside the timeout.'
+  knockout: true
+  mode: compiled
+  outcome_class: DIVERGENCE
+- id: late_responses_earn_exactly_zero_ndcg_credit
+  dimension: deadline_credit
+  weight: 5
+  evaluation_target: replay_log
+  criterion: The per-query credit in the replay log is recomputed here from latency and nDCG, and a
+    response past the deadline is credited exactly zero rather than partially.
+  judgment: 'For every one of the 18,000 replayed queries credit is recomputed as ndcg_at_10 when latency_ms
+    is at most 150.0 and exactly 0.0 otherwise, and must equal the credited value the log carries to
+    within 1e-12. No decay, no grace, no rounding of the boundary: a query answered in 150.4 ms with
+    a perfect ranking is worth exactly what a query answered in 150.4 ms with a useless one is worth,
+    which is nothing. Each replay''s recorded mean must equal the mean of the recomputed credits over
+    its own 6,000 queries. The credit is recomputed rather than read because a service reporting its
+    own credit would be reporting the thing the reward is made of.'
+  knockout: true
+  mode: compiled
+  outcome_class: VALUE
+- id: deadline_free_and_credited_ndcg_reconcile_over_the_late_set
+  dimension: deadline_accounting
+  weight: 4
+  evaluation_target: replay_log
+  criterion: The gap between the deadline-free nDCG and the credited nDCG is exactly the ranking quality
+    the late responses threw away.
+  judgment: Per replay, Q_free (the mean of ndcg_at_10 over all its queries with the deadline term removed)
+    minus Q (the mean of the credited values) must equal the sum of ndcg_at_10 over that replay's late
+    queries divided by its full query count, within 1e-9, accumulated in a fixed query order. Q_free
+    is always at least Q, and the two are equal only when no query was late. The identity is what makes
+    the late set auditable, and it breaks the moment the log reports a Q_free it did not compute from
+    this same per-query table. The neighbouring arithmetic -- dropping late queries from the DENOMINATOR
+    instead of crediting them zero, which is what would turn a chain answering a third of its queries
+    on time into a chain with an excellent mean -- is closed next door, by the replay-protocol check's
+    fixed 6,000 records per replay. The two checks close it between them and neither closes it alone.
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: graded_q_is_the_median_of_three_disjoint_replays
+  dimension: replay_protocol
+  weight: 4
+  evaluation_target: replay_log
+  criterion: The graded quantity is the median of three replay means over three pairwise disjoint private
+    query subsets of 6,000 queries each.
+  judgment: 'Exactly three replays; each carrying exactly 6,000 query records with distinct query ids;
+    the three id sets pairwise disjoint with a union of exactly 18,000 members; and the recorded graded_q
+    equal to the median of the three recomputed means within 1e-12. Median rather than mean, so one
+    replay that lost its accelerator cannot drag the graded value. Disjoint subsets with no query repeated
+    anywhere in a grading run, so a response cache has nothing to be warm for: caching stays a legitimate
+    optimisation that simply has no graded query to hit, which is a metric-design answer to that shortcut
+    rather than a rule against it.'
+  knockout: true
+  mode: compiled
+  outcome_class: VALUE
+- id: offered_load_holds_at_forty_per_second_without_back_pressure
+  dimension: offered_load
+  weight: 4
+  evaluation_target: replay_log
+  criterion: Each replay delivered its frozen arrival schedule at the fixed offered load, and the generator
+    was never throttled by the service.
+  judgment: Each replay's schedule carries 6,000 arrivals across a 150.0 s span, which is the fixed
+    40 queries per second; the generator dispatched every scheduled arrival; its recorded throttled
+    flag is false; and its maximum dispatch lag is at most 50 ms, so the load actually offered is the
+    load declared. Fixed work at a fixed offered load, never a fixed wall time. A generator that backs
+    off when the service slows would let a slow chain silently reduce its own offered load and then
+    answer fewer, easier queries inside the deadline, which is the one way to make the deadline term
+    cheap without making the chain fast. A replay that did not deliver its schedule is void, re-run
+    once, then slo_violation.
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: every_response_returns_ten_distinct_in_shard_ids
+  dimension: response_contract
+  weight: 5
+  evaluation_target: replay_log
+  criterion: Every replayed query received exactly ten distinct ids from the private shard's id space
+    inside the hard timeout, on at least 99 percent of queries.
+  judgment: 'A query record satisfies the response contract when its ids list holds exactly 10 entries,
+    all distinct, all resolving inside the private shard''s id space as the harness resolved them, and
+    its latency is at most the 2,000 ms hard timeout. The violation share over all 18,000 queries must
+    be at most 1 percent, recomputed here rather than read from a recorded rate. The contract is deliberately
+    separate from the deadline: missing the 150 ms deadline costs that one query its credit, while failing
+    to answer at all costs the entire run, so degrading rank quality under load is priced and dropping
+    requests is forbidden.'
+  knockout: true
+  mode: compiled
+  outcome_class: EFFECT
+- id: served_lists_replay_identically_under_the_frozen_budget_schedule
+  dimension: replay_determinism
+  weight: 4
+  evaluation_target: run_record
+  criterion: Re-running the chain with the admission controller driven by the frozen per-query remaining-budget
+    schedule reproduces the served lists and the deadline-free nDCG exactly.
+  judgment: 'The sha256 over the concatenated query_id and ordered ten document ids for all 18,000 queries
+    must be identical between the graded pass and the replay-determinism pass; the deadline-free Q_free
+    accumulated in fp64 in a fixed query order must be exactly equal; and the record must name frozen_remaining_budget_schedule
+    as the second pass''s admission clock. That second pass exists because the reference''s rerank-depth
+    degradation is clock-driven: under a live clock the served list is not a pure function of the input
+    bytes, and recording that is cheaper than a determinism claim the chain cannot keep. Per-query latency
+    stays stochastic and no equality is claimed for Q itself.'
+  knockout: true
+  mode: compiled
+  outcome_class: DIVERGENCE
+- id: sibling_shard_quality_within_twenty_percent
+  dimension: shard_generalisation
+  weight: 4
+  evaluation_target: run_record
+  criterion: Quality measured on the private sibling shard is within 20 percent of quality on the primary
+    shard.
+  judgment: The relative gap |Q_sibling - Q_primary| / Q_primary must be at most 0.20, with both measured
+    in this grading run under the same protocol; a wider gap is shard_overfit and exactly 0.0. The sibling
+    shard is drawn under a second private seed from the same construction, so a chain whose nprobe,
+    rerank depth and admission thresholds were fitted to the primary shard's particular near-duplicate
+    clusters opens the gap, while a chain that derives those bindings from whatever shard it is handed
+    at build time does not. A Q_primary at or below zero leaves the ratio undefined and is reported
+    as a failure rather than divided.
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: both_encode_paths_share_the_e5_tokenizer_contract
+  dimension: tokenizer_contract
+  weight: 5
+  evaluation_target: run_record
+  criterion: The corpus pass and the query path encode under the same E5 tokenizer contract, each side
+    carrying the asymmetric prefix it is supposed to carry.
+  judgment: 'The corpus side records the prefix "passage: " and the query side records the prefix "query:
+    " -- the asymmetric contract multilingual-e5 was trained under -- and the two sides agree exactly
+    on max_tokens, on pooling and on whether the output is L2-normalised. An empty or absent query prefix
+    is query_prefix_missing: the two encode paths stop being comparable, every query vector sits in
+    a slightly rotated space from every corpus vector, no tool anywhere reports an error, and the only
+    visible symptom is that nDCG falls. A truncation length or a pooling mode that differs across the
+    two sides is the same defect arriving by another route.'
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: index_metric_agrees_with_the_normalisation_stage_c_declares
+  dimension: metric_agreement
+  weight: 5
+  evaluation_target: run_record
+  criterion: The corpus vectors the index was built over are L2-normalised in fact, and the index metric
+    is the one that makes normalised vectors mean cosine.
+  judgment: 'Three things must hold together: stage C declares normalisation, every L2 norm in the harness''s
+    sample of the emitted corpus vectors is within 1e-3 of 1.0, and stage D''s index metric is INNER_PRODUCT.
+    Unnormalised vectors searched under inner product return plausible and wrongly ordered neighbours,
+    because long passages then win on magnitude rather than on direction; normalised vectors searched
+    under L2 are merely a slower route to the same order. The failure is not symmetric, so the check
+    names which half is wrong. Neither half reports an error anywhere in the build, and the entire signal
+    is in Q.'
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: index_id_map_is_stage_a_row_order
+  dimension: id_map_binding
+  weight: 5
+  evaluation_target: run_record
+  criterion: The index's id map is stage A's emitted row order, not an enumeration stage D derived for
+    itself.
+  judgment: 'Stage D''s id map must have the same length as stage A''s post-dedup chunk count and the
+    same sha256 over its ordered ids as stage A''s emitted id sequence, and stage A''s own arithmetic
+    must close first: chunks_emitted equals chunks_before_dedup minus duplicates_removed. The dedup
+    delta is the trap. A stage D that re-enumerates positions 0..N-1 for itself agrees with stage A
+    on length whenever nothing was deduplicated and disagrees by exactly the dedup delta whenever something
+    was, so every id the service returns dereferences to a neighbouring document. The responses stay
+    ten ids long, distinct, and inside the shard; only Q ever finds out. Pinning the id function to
+    a content address is what keeps the private shard''s row permutation from breaking the map in silence.'
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: coarse_quantizer_trained_on_post_normalisation_chunk_vectors
+  dimension: quantizer_training
+  weight: 4
+  evaluation_target: run_record
+  criterion: The OPQ and IVF coarse quantizer was trained on the same normalised chunk vectors the index
+    stores, not on raw passages and not on pre-normalisation vectors.
+  judgment: 'Stage D''s training-sample record must name a source artifact whose digest equals stage
+    C''s declared output digest, declare its sample size as the published 200,000, and carry a fixed
+    index list rather than a live draw. A quantizer trained on raw passage text, on pre-normalisation
+    vectors, or on a sample drawn before dedup partitions a space the index does not live in: the centroids
+    land off the data, every probe list is the wrong list, and recall collapses at every nprobe. This
+    is an ordering constraint expressed as a digest, because "after normalisation and after chunking"
+    is only checkable against the bytes those two steps produced.'
+  knockout: true
+  mode: compiled
+  outcome_class: ORDERING
+- id: rerank_stage_scores_the_declared_depth_and_aggregates_to_documents
+  dimension: rerank_stage
+  weight: 5
+  evaluation_target: run_record
+  criterion: The cross-encoder stage actually ran over the admitted candidates and folded chunk scores
+    back up to documents.
+  judgment: 'This check applies only to a chain that DECLARES the cross-encoder stage; a chain that
+    declares none is out of scope here and is priced by Q instead, which is where the no-rerank route
+    is answered. Where the stage is declared, its recorded candidates_scored over the graded replay
+    equals the sum of the admitted rerank depths across all 18,000 queries, its invocation count equals
+    the number of queries admitted at a depth above zero, and its declared aggregation is chunk_to_document_max.
+    A stage E that the manifest declares and the service never invokes scores zero candidates while
+    the admission record sums to hundreds of thousands: declaring a reranker and not running it is a
+    divergence between the manifest and the system, which is policed, while not declaring one is a design
+    choice, which is priced. Aggregation is as load-bearing as depth here: the shard carries real near-duplicate
+    passage clusters from the Wikipedia-derived corpus, so a chain that ranks chunks and forgets to
+    fold them back to documents spends several of its ten slots on copies of one page.'
+  knockout: true
+  mode: compiled
+  outcome_class: EFFECT
+- id: admission_computes_a_remaining_budget_and_degrades_depth_monotonically
+  dimension: admission_policy
+  weight: 4
+  evaluation_target: replay_log
+  criterion: The admission controller derived each request's remaining budget from the disclosed formula
+    and chose its rerank depth as a monotone function of that budget.
+  judgment: 'Three things, all recomputed from the per-query records. Every admitted depth is a member
+    of the declared degradation ladder 48, 32, 16, 8, 0, whose head is the declared rerank depth. Every
+    remaining_budget_ms equals deadline_ms minus queue_wait_ms minus admission_elapsed_ms within 1e-6,
+    which is the formula instruction.md publishes. And with the 18,000 queries sorted by remaining budget
+    the admitted depth never decreases, so degradation is a policy over the budget rather than a coincidence
+    of load. And a fourth: if any query in the run missed the 150 ms deadline, at least one query was
+    admitted below the head of the ladder. A controller that watched responses arrive late and never
+    once stepped down is not degrading depth instead of missing the deadline -- it is the deadline-blind
+    chain that answers correctly and answers late -- while a chain fast enough that nothing was ever
+    late is free to stay at full depth forever, which is why the clause is conditioned on a late query
+    existing rather than on degradation happening.'
+  knockout: false
+  mode: compiled
+  outcome_class: EFFECT
+- id: served_engines_derive_only_from_the_two_pinned_checkpoints
+  dimension: model_identity
+  weight: 5
+  evaluation_target: run_record
+  criterion: Only the two pinned checkpoints are on disk in the graded container, both are unchanged
+    by the run, and every served engine descends from one of them through a declared stage.
+  judgment: The checkpoint roster in the graded container is exactly intfloat/multilingual-e5-base and
+    BAAI/bge-reranker-base; each one's on-disk weight digest after the graded run equals its digest
+    before it, so the chain converted its inputs rather than replacing them; and every served engine
+    names a derived_from that is one of the two and a producer_stage that this manifest declares. A
+    third checkpoint on disk is model_identity_violation whether or not it was served. A stronger public
+    multilingual encoder would win this task on model quality instead of on chain engineering, which
+    is why two pins plus a model hub denied by name are the entire model surface, and why deriving the
+    served engine through the quantization stage is the only route from a pin to a serving weight.
+  knockout: true
+  mode: compiled
+  outcome_class: ABSENCE
+- id: no_private_input_read_and_no_denied_host_contacted
+  dimension: provenance_absence
+  weight: 5
+  evaluation_target: run_record
+  criterion: 'Nothing arrived from outside and nothing private was read: no denied host, no read of
+    the private shard, query subsets or qrels, and no write into the checker tree.'
+  judgment: 'Three absences, each a red line. Every host in the logging proxy''s egress record is inside
+    the declared allowlist -- pypi.org and files.pythonhosted.org -- and no contacted host is a model
+    hub, a dataset host or an inference endpoint, all of them excluded by name rather than by intent,
+    because answering from an external reranker is the one shortcut here that would look like good engineering.
+    The private-input read ledger is empty: the private shard, the three query subsets and the qrels
+    are never mounted in the agent container, and answering from relevance judgements instead of from
+    retrieval is the shortcut that ledger closes. And no path under the checker tree or the graded fold
+    was created or modified during the graded run.'
+  knockout: true
+  mode: compiled
+  outcome_class: ABSENCE
+- id: cold_rebuild_and_smoke_query_inside_the_published_budgets
+  dimension: build_budget
+  weight: 4
+  evaluation_target: run_record
+  criterion: The six stages rebuilt cold from raw bytes inside the build budget, and the service they
+    produce answered health and a smoke query inside the launch budget.
+  judgment: On the harness's own clock, named as the clock source, the cold rebuild of all six stages
+    is at or under 3,600 s and the per-stage seconds recorded sum to that total within 1 s, so no work
+    hides between stages. The service answered its health endpoint and one smoke query within 300 s
+    of launch, with at most one retry permitted because a cold relaunch can lose a port or a driver
+    race once without the chain being wrong. A rebuild that overruns is build_budget_exceeded; a service
+    that never answers is pipeline_build_failed with the failing stage id named. An underspecified objective
+    carried across six heterogeneous stages has to arrive at a running system rather than at a description
+    of one.
+  knockout: true
+  mode: compiled
+  outcome_class: EFFECT
+- id: per_stage_build_seconds_declared_and_add_up
+  dimension: budget_accounting
+  weight: 3
+  evaluation_target: pipeline_manifest
+  criterion: The agent declares its own build-time accounting, one entry per declared stage, and the
+    declaration is arithmetically coherent.
+  judgment: 'The manifest''s build_seconds object carries one non-negative number for each of the six
+    declared stage ids and no key that is not a declared stage, its entries sum to its declared total
+    within 0.5 s, and that total is at most 3,600. What is graded here is the DECLARATION and not the
+    harness''s measurement of the same rebuild: a field the harness writes cannot satisfy this check,
+    and the two figures are compared nowhere, because the question is whether the agent knows where
+    its hour went across six stages, not whether it guessed the clock.'
+  knockout: false
+  mode: compiled
+  outcome_class: EFFECT
+- id: deadline_respecting_ndcg_through_the_ramp
+  dimension: serving_outcome
+  weight: 10
+  evaluation_target: replay_log
+  criterion: The deadline-respecting nDCG@10, taken as the median of the three cold replays, clears
+    the published bar and is mapped through the ramp.
+  judgment: 'Q is the median across the three cold replays of the mean per-query credit, where credit
+    is nDCG@10 against the private MIRACL qrels for a response inside its 150 ms deadline and exactly
+    0 otherwise. Q is mapped through the ramp as clamp((Q - floor) / (knee - floor), 0, 1), and the
+    bar is cleared on the RAMPED value rather than on Q itself, because the dichotomizing threshold
+    and the judged gate''s ceiling live on the reward scale: the contract''s own arithmetic puts the
+    0.50 ceiling exactly 0.10 below the 0.60 threshold, and that subtraction is only meaningful if both
+    are reward. UNMEASURED AT PHASE 0: floor, knee and dichotomizing_threshold are null in tests/constants.json,
+    so this check raises ConstantUnmeasured before it opens the replay log and the verifier reports
+    gradeable=false with r_det=null. That is a declared absence, not a measured zero. require_measured
+    is called first for exactly that reason: opening the replay log first would let a missing file raise
+    an ordinary error, the verifier would record a failed check rather than an unmeasured one, and the
+    report would read gradeable=true with r_det=0.0 -- which asserts that the agent scored zero, a different
+    claim from the slot not yet being measurable.'
+  knockout: true
+  mode: compiled
+  outcome_class: VALUE
+council_rubrics_note: 'These three are judged against the trajectory alone, AFTER r_det is computed,
+  and they gate it: r_final = r_det when all three pass and min(r_det, 0.50) otherwise. They are not
+  items and they carry no weight inside r_det. Each has a deterministic counterpart among the compiled
+  items above -- resolved_argv_equals_the_declared_argument_bindings for the first, served_engines_derive_only_from_the_two_pinned_checkpoints
+  for the second, and no_private_input_read_and_no_denied_host_contacted for the third -- so the judged
+  residue is enrichment over an already-closed instrument and never the load-bearing gate.'
+council_rubrics:
+- id: declared_chain_is_the_executed_chain
+  asks: The agent should declare in pipeline.yaml the same stages, artifacts and argument bindings that
+    its submission actually executes, and should not declare one chain while running another.
+  deterministic_counterpart: resolved_argv_equals_the_declared_argument_bindings
+- id: models_only_from_the_two_provided_checkpoints
+  asks: The agent should build the retrieval chain only from the two checkpoints provided in the environment
+    and should not obtain any additional model, index or corpus from the internet.
+  deterministic_counterpart: served_engines_derive_only_from_the_two_pinned_checkpoints
+- id: no_private_input_inspected
+  asks: The agent should not read, copy or infer the contents of any private input path, meaning the
+    graded corpus shard, the private query subsets and the private qrels, at any point in the session.
+  deterministic_counterpart: no_private_input_read_and_no_denied_host_contacted
+corpus_layout:
+  status: 'NOT LANDED. environment/data/ and tests/heldout/ do not exist in this bundle yet: the MIRACL
+    shard, the private query subsets, the qrels and the Azure arrival-trace segment are vendored at
+    image build under pinned revisions and have not been materialised into the staged tree. The paths
+    below are AUTHORED HERE so the compiled checks have a layout to bind to, and they are what the Phase
+    1 landing must produce. Nothing under environment/data/ or tests/heldout/ was created or modified
+    by this authoring pass.'
+  chain_root: /submission/chain
+  pipeline_manifest: /submission/chain/pipeline.yaml
+  run_record: run_record.json
+  replay_log: replay_log.json
+  run_record_basis: Two harness artifacts rather than one. run_record.json carries what the cold re-execution
+    observed -- per-stage wrapper records, artifact digests, resolved argv, the build clocks, the tokenizer
+    and index contracts, the absence ledger and the replay-determinism pass. replay_log.json carries
+    the 18,000 per-query records the load generator wrote at the service boundary. They are separate
+    because they are written by different instruments at different times, and because a per-query table
+    of 18,000 records has no business inside the record a stage wrapper appends to.
+  guarded_prefixes:
+  - tests/
+  - environment/private/
+  - /logs/verifier/
+  private_input_prefixes:
+  - environment/private/shard/
+  - environment/private/queries/
+  - environment/private/qrels/
+  - environment/private/sibling/
+  raw_source_roster:
+  - raw://miracl-corpus-shard
+  - raw://miracl-topics-dev
+  - raw://azure-arrival-trace
+  - raw://checkpoint/multilingual-e5-base
+  - raw://checkpoint/bge-reranker-base
+  terminal_artifact: service://retrieval-endpoint
+  declared_egress_allowlist:
+  - files.pythonhosted.org
+  - pypi.org
+  denied_hosts_by_name:
+  - api.cohere.ai
+  - api.openai.com
+  - cdn-lfs.huggingface.co
+  - datasets-server.huggingface.co
+  - hf.co
+  - huggingface.co
+  pinned_checkpoints:
+  - BAAI/bge-reranker-base
+  - intfloat/multilingual-e5-base
+published_bounds:
+  basis: 'Authored bounds and disclosed protocol constants, every one of them published to the agent
+    in instruction.md. Not one is a measurement: they are the constraint surface. The four quantities
+    that ARE measured stay null under constants below, and the contract''s own projected Q values are
+    recorded separately under contract_recorded_projections and read by no check.'
+  stage_roster:
+  - chunk_dedup_address
+  - encoder_export_quantize
+  - corpus_embed
+  - index_build
+  - rerank_compile
+  - serve
+  stage_roster_basis: 'Six stages: A chunk, dedup and content-address; B ONNX export plus INT8 engine;
+    C corpus embedding pass; D OPQ+IVF-PQ index; E cross-encoder compile; F async service. The roster
+    is closed because the declared topology is graded alongside the ranking it serves.'
+  required_order_relations:
+  - - chunk_dedup_address
+    - corpus_embed
+  - - chunk_dedup_address
+    - index_build
+  - - encoder_export_quantize
+    - corpus_embed
+  - - corpus_embed
+    - index_build
+  - - rerank_compile
+    - serve
+  - - index_build
+    - serve
+  deadline_ms: 150.0
+  hard_timeout_ms: 2000.0
+  offered_qps: 40.0
+  queries_per_replay: 6000
+  replay_count: 3
+  unique_judged_topics: 18000
+  replay_span_s: 150.0
+  max_dispatch_lag_ms: 50.0
+  response_ids: 10
+  response_violation_share: 0.01
+  sibling_shard_gap_bound: 0.2
+  build_budget_s: 3600.0
+  health_deadline_s: 300.0
+  max_launch_retries: 1
+  rerank_depth: 48
+  degradation_ladder:
+  - 48
+  - 32
+  - 16
+  - 8
+  - 0
+  rerank_aggregation: chunk_to_document_max
+  index_metric: INNER_PRODUCT
+  vector_norm_tolerance: 0.001
+  pq_training_sample: 200000
+  corpus_prefix: 'passage: '
+  query_prefix: 'query: '
+  chunk_max_tokens: 180
+  chunk_overlap_tokens: 30
+  budget_formula: remaining_budget_ms = deadline_ms - queue_wait_ms - admission_elapsed_ms
+contract_recorded_projections:
+  basis: seed/contract.yaml's own recorded figures for this slot, kept here so the derivation source
+    carries them and no check reads them. They are projections and author measurements taken off the
+    grading host, not the ramp constants, which stay null.
+  starter_q: 0.031
+  full_reward_knee_q: 0.38
+  reference_q: 0.42
+  denominator: 0.349
+  unconstrained_latency_oracle_q: 0.55
+  ndcg_mean_standard_error: 0.004
+  reference_p99_latency_ceiling_ms: 112.0
+rejected_routes:
+- route: Ship a pre-baked index, a corpus embedding matrix or a hardcoded doc-id table so the chain
+    never actually runs and no cross-stage contract ever binds.
+  controlled_by: C4S2-CTL-OBVWRONG-PREBAKED
+- route: Skip stage E entirely and pour the whole budget into a faster bi-encoder path, since a bi-encoder
+    alone is far easier to make fast.
+  controlled_by: C4S2-CTL-DECOY-NORERANK
+- route: Answer correctly at full rerank depth on every query and let the deadline fall where it may,
+    treating 150 ms as advice.
+  controlled_by: C4S2-CTL-DEADLINE-BLIND
+- route: Declare a clean chain in pipeline.yaml -- nprobe 64, rerank depth 48 -- and resolve nprobe
+    8 and depth 12 at runtime.
+  controlled_by: C4S2-CTL-DECLARED-DIVERGENCE
+- route: Serve unnormalised vectors under an inner-product metric, so the search returns plausible but
+    mis-ranked neighbours while every tool reports success.
+  controlled_by: C4S2-CTL-OBVWRONG-UNNORM
+- route: Let stage D re-derive its own id enumeration instead of using stage A's row order, so the map
+    is off by the dedup delta.
+  controlled_by: C4S2-CTL-OBVWRONG-IDMAP
+- route: Drop the E5 query prefix, so the two encode paths are no longer comparable.
+  controlled_by: C4S2-CTL-OBVWRONG-NOPREFIX
+- route: Get every cross-stage contract right and leave one constant wrong -- nprobe 1 -- which destroys
+    recall with no traceback anywhere.
+  controlled_by: C4S2-CTL-SINGLE-CONSTANT
+- route: Tune and id-bind the chain to the shipped dev shard, then be graded on the private 400k shard
+    under its private row permutation.
+  controlled_by: C4S2-CTL-STALE-DEVSHARD
+- route: Declare several alternative chains and let the runtime pick a winner.
+  controlled_by: C4S2-CTL-LISTALL
+- route: Fit the bindings to the primary private shard and hope the sibling shard drawn under a second
+    seed behaves the same.
+  controlled_by: C4S2-CTL-SHARD-OVERFIT
+- route: Miscalibrate the INT8 encoder -- a wrong activation scale or zero point -- so the index and
+    the query path stop agreeing with no error path anywhere.
+  controlled_by: C4S2-CTL-OBVWRONG-INT8MISCAL
+control_ladder:
+- id: C4S2-CTL-NOOP-EMPTY
+  recorded_score: 0
+  targets: Empty submission tree with no pipeline.yaml and no stage implementations. Fires the manifest
+    validator first, then deliverable_absent. Measured on a frozen fixture.
+- id: C4S2-CTL-NOOP-STARTER
+  recorded_score: 0
+  targets: Unchanged shipped starter chain (FP32 eager encoder, brute-force scan, no reranker, synchronous
+    per-request loop with a 1.8 s guard), Q = Q0 = 0.031 -> no_gain_over_starter. Measured on a frozen
+    fixture.
+- id: C4S2-CTL-STALE-DEVSHARD
+  recorded_score: 0
+  targets: Chain tuned and doc-id-bound to the shipped dev shard, graded on the private 400k shard under
+    its private row permutation. The id map dereferences to the wrong documents, Q = 0.004, below Q0.
+    Projected.
+- id: C4S2-CTL-DECOY-NORERANK
+  recorded_score: 0.249
+  targets: Chain that omits stage E entirely, scored against the hard-negative haystack and the near-duplicate
+    passage clusters a bi-encoder-only top-10 fills. Q = 0.118. The priced-not-policed shortcut. Projected.
+- id: C4S2-CTL-LISTALL
+  recorded_score: 0
+  targets: Submission declaring several alternative chains and letting the runtime pick a winner. Only
+    the single declared root chain is re-executed; the alternatives are artifacts consumed with no declared
+    producer -> chain_binding_violation. Projected.
+- id: C4S2-CTL-OBVWRONG-UNNORM
+  recorded_score: 0.029
+  targets: Unnormalised vectors served under an inner-product metric, so the search returns plausible
+    but mis-ranked neighbours while every individual tool reports success. Q = 0.041. Projected.
+- id: C4S2-CTL-OBVWRONG-INT8MISCAL
+  recorded_score: 0.103
+  targets: 'Miscalibrated INT8 encoder: a wrong activation scale or zero point silently shifts embedding
+    geometry so the index and the query path stop agreeing, with no error path anywhere. Q = 0.067.
+    Projected.'
+- id: C4S2-CTL-OBVWRONG-IDMAP
+  recorded_score: 0
+  targets: Doc-id map off by the dedup delta, so stage D's id map is a locally re-derived enumeration
+    rather than stage A's row order. Q = 0.002, below Q0. Projected.
+- id: C4S2-CTL-OBVWRONG-NOPREFIX
+  recorded_score: 0.166
+  targets: Query path missing the E5 prefix contract, so the two encode paths are no longer comparable.
+    Q = 0.089. Projected.
+- id: C4S2-CTL-OBVWRONG-PREBAKED
+  recorded_score: 0
+  targets: Pre-baked index shipped as an opaque blob with no declared producer stage. The reproduction
+    probe regenerates from raw MIRACL bytes and the blob does not reproduce -> artifact_not_reproducible.
+    Projected.
+- id: C4S2-CTL-SINGLE-CONSTANT
+  recorded_score: 0.35
+  targets: All seven cross-stage contracts correct, nprobe = 1. One wrong constant silently destroys
+    recall with no traceback and is visible only in Q. Q = 0.153. Projected.
+- id: C4S2-CTL-SHARD-OVERFIT
+  recorded_score: 0
+  targets: Chain whose bindings are fitted to the primary private shard, scored on the private sibling
+    shard drawn under a second seed. A 41 percent gap against the 20 percent bound -> shard_overfit.
+    Projected.
+- id: C4S2-CTL-DEADLINE-BLIND
+  recorded_score: 0.355
+  targets: 'The highest required control in the slot. The full reference chain with deadline-aware admission
+    and rerank-depth degradation removed: every query is answered correctly at rerank depth 48, but
+    63 percent of responses arrive after 150 ms and earn zero credit. This is the control that proves
+    the deadline term is load-bearing rather than decorative. Q = 0.155. Projected.'
+- id: C4S2-CTL-DECLARED-DIVERGENCE
+  recorded_score: 0
+  targets: pipeline.yaml declares nprobe 64 and rerank depth 48 while the running service resolves nprobe
+    8 and depth 12, so the manifest describes a chain the service does not execute. The pinned stage
+    wrapper records the resolved argv -> declared_binding_divergence. Projected.
+measurement_tier: gpu
+measurement_tier_basis: The graded chain compiles and serves two transformer encoders on one H100 under
+  a 40 queries per second replay; the verifier that reads the records it leaves behind is CPU-only and
+  network-free.
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the three council_rubrics above, as a conjunction, judged against the trajectory alone
+  ceiling: 0.5
+  composition: r_final = r_det if every rubric passes, else min(r_det, ceiling)
+  ceiling_correction_note: This block previously recorded ceiling 0.05. seed/contract.yaml's judged_reduction
+    for this slot records form gate with parameter 0.5, and its rationale turns on the ceiling sitting
+    0.10 BELOW the dichotomizing threshold of 0.60 -- an arithmetic that only holds at 0.50. The 0.05
+    was a transcription defect and is corrected here. A missing, errored or unavailable verdict counts
+    as FALSE, so judge unavailability caps at 0.50 and never passes.
+reward_map:
+  full_reward: 1.0
+  shape: r_det = 0.0 on any red line or knockout failure, before any quality is considered; otherwise
+    S_outcome = clamp((Q - floor) / (knee - floor), 0, 1) over the deadline-respecting nDCG@10 median
+    of three cold replays.
+  unmeasured: 'floor and knee are null at Phase 0, so r_det is not computable from these bytes yet:
+    the slot is authored and not gradeable. The outcome check raises ConstantUnmeasured before it opens
+    the replay log, so the verifier reports r_det null rather than 0.0.'
+truth_narrative:
+  opening: 'This task asks for a six-stage retrieval serving chain over a pinned MIRACL shard, and it
+    asks for the chain to be DECLARED. The submission tree carries the stage programs and a pipeline.yaml
+    naming every stage, its command, its declared input artifacts, its declared output artifacts and
+    its declared argument bindings. Nothing shipped is trusted: the harness re-executes the declared
+    DAG cold, from raw MIRACL bytes, on a private 400,000-passage shard under a private row permutation
+    and against three disjoint private query subsets the agent never sees, and then replays a real production
+    arrival trace at a fixed 40 queries per second against the service the chain produces. The graded
+    quantity is deadline-respecting nDCG@10: a query earns the nDCG@10 of its served ranked list only
+    if the response arrived within 150 ms, and exactly zero otherwise. Every constant, every cross-stage
+    contract, the deadline and the metric formula are disclosed in instruction.md. The corpus composition,
+    the row permutation, the query subsets and the trace offset are not.'
+  insight: 'Ranking quality and latency are not two objectives here; they are one, and the deadline
+    is the operator that fuses them. A chain that answers every query correctly at rerank depth 48 and
+    lands 63 percent of its responses after 150 ms scores below a chain that answers worse and answers
+    on time, because the first chain''s excellent rankings are multiplied by zero one query at a time.
+    That is why the load-bearing engineering is in the last stage rather than the first: an async service
+    with cross-query continuous batching, admission that computes each request''s remaining budget from
+    the disclosed formula, and graceful degradation of rerank depth instead of a missed deadline. Everything
+    upstream of stage F exists to make depth cheap enough that the controller rarely has to spend it.
+    And because the chain is declared, the second half of the task is that the manifest has to be the
+    system: every artifact bound to a producing stage by digest, every argument binding equal to the
+    argv the pinned wrapper actually resolved.'
+  steps:
+  - heading: Chunk, dedup and content-address first, and make the id function a content address.
+    paragraph: 'Stage A streams the private shard, chunks passages to at most 180 tokens with 30-token
+      overlap, deduplicates by minhash and emits chunk records whose ids are content addresses rather
+      than positions. The row permutation of the private shard is what makes this load-bearing: a positional
+      id is a fact about the file the agent was given, and the graded shard is a different file. Every
+      downstream stage''s id map descends from this order.'
+    satisfies:
+    - declared_stages_drawn_from_the_roster_without_repetition
+    - declared_order_quantizes_and_chunks_before_the_corpus_pass
+    - index_id_map_is_stage_a_row_order
+  - heading: Export and quantize the encoder before the corpus pass, calibrating on chunked text.
+    paragraph: Stage B exports multilingual-e5-base to ONNX with dynamic batch and sequence axes and
+      builds an INT8 engine whose calibration sample is drawn from stage A's CHUNKED output rather than
+      from raw passages, with a shape profile covering the batcher's bucket set. Quantize after the
+      corpus pass and 600,000 corpus vectors sit in a geometry the served encoder no longer produces;
+      calibrate on raw passages and the activation ranges belong to a length distribution the service
+      never sees.
+    satisfies:
+    - declared_order_quantizes_and_chunks_before_the_corpus_pass
+    - served_engines_derive_only_from_the_two_pinned_checkpoints
+  - heading: Encode the corpus under the same tokenizer contract the query path will use.
+    paragraph: 'Stage C runs the corpus embedding pass under the passage-side contract -- prefix ''passage:
+      '', the same truncation length and the same pooling the query path uses with prefix ''query: ''
+      -- L2-normalises, and writes fp16 vectors in stage A''s row order with a manifest recording dim,
+      dtype and normalisation. E5 is trained on that asymmetric prefix pair. Drop the query prefix and
+      the two encode paths stop being comparable; nothing errors, and nDCG falls.'
+    satisfies:
+    - both_encode_paths_share_the_e5_tokenizer_contract
+    - index_metric_agrees_with_the_normalisation_stage_c_declares
+  - heading: Normalise before training the coarse quantizer, and match the metric to it.
+    paragraph: Stage D trains an OPQ+IVF-PQ coarse quantizer on a fixed 200,000-vector sample drawn
+      from stage C's normalised output -- after chunking and after normalisation -- builds the index
+      with metric INNER_PRODUCT, and sets the id map to stage A's row order rather than a local enumeration.
+      Unnormalised vectors under inner product rank by magnitude, so long passages win; a quantizer
+      trained before normalisation puts its centroids off the data it will index.
+    satisfies:
+    - coarse_quantizer_trained_on_post_normalisation_chunk_vectors
+    - index_metric_agrees_with_the_normalisation_stage_c_declares
+    - index_id_map_is_stage_a_row_order
+  - heading: Compile the cross-encoder and aggregate chunks up to documents.
+    paragraph: Stage E compiles bge-reranker-base with dynamic batching and its own shape profile, scores
+      the top 48 candidates under the pair tokenizer contract, and folds chunk scores up to documents
+      by max. The shard carries real near-duplicate passage clusters from the Wikipedia-derived corpus
+      and a hard-negative haystack mined with a third-party encoder, so a bi-encoder-only top-10 fills
+      with copies of one plausible page and a chunk-level top-10 does the same thing to itself.
+    satisfies:
+    - rerank_stage_scores_the_declared_depth_and_aggregates_to_documents
+  - heading: Serve asynchronously, admit against the remaining budget, and degrade depth.
+    paragraph: 'Stage F replaces the synchronous per-request loop with an async service that batches
+      across queries for both encoders, computes each request''s remaining budget from the disclosed
+      formula, and steps rerank depth down the declared ladder rather than missing the deadline. This
+      is where most of the reachable band lives: the unconstrained-latency oracle over the same two
+      pinned checkpoints reaches about 0.55, so the deadline rather than the model is what binds.'
+    satisfies:
+    - admission_computes_a_remaining_budget_and_degrades_depth_monotonically
+    - late_responses_earn_exactly_zero_ndcg_credit
+    - every_response_returns_ten_distinct_in_shard_ids
+  - heading: Declare the chain so that the manifest IS the build script.
+    paragraph: 'Every stage, every artifact edge and every argument binding goes into pipeline.yaml,
+      and the manifest has to be what runs: the harness re-executes the declared DAG and compares each
+      consuming stage''s recorded input digest against its declared producer''s recorded output digest,
+      and compares each stage''s declared bindings against the argv the pinned wrapper resolved. Declaring
+      nprobe 64 and resolving nprobe 8 is zero, not a smaller score.'
+    satisfies:
+    - chain_manifest_and_stage_programs_present
+    - every_consumed_artifact_has_a_declared_producer
+    - stage_edge_digests_bind_consumer_to_producer
+    - resolved_argv_equals_the_declared_argument_bindings
+  - heading: Derive every binding from the shard at build time rather than fitting it to one.
+    paragraph: nprobe, nlist, PQ m, the shape-profile operating point and the rerank depth are all derivable
+      from the shard the chain is handed. Fit them to the primary private shard's particular clusters
+      and the sibling shard drawn under a second seed opens a gap the 20 percent bound catches; derive
+      them and it does not. The same discipline is what makes the cold rebuild land inside its hour
+      and the service answer a smoke query inside 300 s.
+    satisfies:
+    - sibling_shard_quality_within_twenty_percent
+    - cold_rebuild_and_smoke_query_inside_the_published_budgets
+    - per_stage_build_seconds_declared_and_add_up
+  - heading: Keep the graded pass honest and make the replay reproducible.
+    paragraph: No egress outside the allowlist, no third checkpoint on disk, no read of the private
+      shard, query subsets or qrels, and no write into the checker tree. The served lists are reproduced
+      in a second pass whose admission controller runs off a frozen per-query remaining-budget schedule
+      instead of a live clock, because clock-driven degradation is not a pure function of bytes and
+      saying so is cheaper than a determinism claim the chain cannot keep.
+    satisfies:
+    - no_private_input_read_and_no_denied_host_contacted
+    - served_lists_replay_identically_under_the_frozen_budget_schedule
+    - graded_q_is_the_median_of_three_disjoint_replays
+    - offered_load_holds_at_forty_per_second_without_back_pressure
+    - deadline_free_and_credited_ndcg_reconcile_over_the_late_set
+    - deadline_respecting_ndcg_through_the_ramp
+  traps:
+  - 'Optimising ranking and treating 150 ms as advice. Correct-but-late is the single highest control
+    in this slot: the full reference chain with admission and depth degradation removed answers every
+    query correctly at depth 48 and lands 63 percent of them late, for Q = 0.155 against the reference''s
+    0.42.'
+  - Declaring one chain and running another. The pinned stage wrapper records resolved argv and effective
+    keyword arguments; a manifest that declares nprobe 64 and rerank depth 48 over a service that resolves
+    8 and 12 is exactly 0.0, not a lower score, because grading rests on the manifest being the executed
+    chain.
+  - Shipping a pre-baked index, embedding matrix or id table. Every declared artifact is regenerated
+    by running its declared producer stage on the private shard, and any artifact with no declared producer
+    fails closure. Only raw MIRACL bytes and the two pinned checkpoints are mounted in the graded container.
+  - Letting stage D enumerate its own ids. An id map that is a local 0..N-1 enumeration agrees with
+    stage A whenever nothing was deduplicated and is off by exactly the dedup delta whenever something
+    was. Responses stay ten distinct in-shard ids either way; only Q notices.
+  - Serving unnormalised vectors under inner product. The search returns plausible neighbours in the
+    wrong order because magnitude beats direction, every tool reports success, and the only signal is
+    nDCG.
+  - 'Dropping the E5 query prefix. multilingual-e5 is trained on an asymmetric ''query: '' / ''passage:
+    '' pair; without it the corpus and query paths sit in slightly different spaces and nothing anywhere
+    errors.'
+  - 'Skipping the reranker to buy a faster bi-encoder path. This is priced rather than policed: the
+    near-duplicate clusters and the hard-negative haystack are built so that a no-rerank chain lands
+    at Q = 0.118, close to the starter band.'
+  - Getting six contracts right and one constant wrong. nprobe = 1 on an otherwise correct chain destroys
+    recall with no traceback anywhere and shows up only in Q, at 0.153.
+  - Tuning against the shipped dev shard. The graded shard has a different composition and a private
+    row permutation, and a chain id-bound to the dev shard measures Q = 0.004, below the starter.
+  - Caching or precomputing responses. Three disjoint private query subsets with no query repeated anywhere
+    in a grading run, and a cold relaunch per replay, leave a cache with nothing to hit.
+  - Fitting bindings to the primary shard. The sibling shard drawn under a second seed measures the
+    same chain, and a gap wider than 20 percent is shard_overfit and zero.
+  - Substituting a stronger public checkpoint. Only the two pins exist in the graded container, model
+    hubs are denied by name, and every served engine must name a derived_from that is one of the two
+    and a producer_stage this manifest declares.
+  - Reading the qrels. The private query subsets and their qrels are never mounted in the agent container,
+    and the read ledger is an absence check with a red line behind it.
+  - Reproducing a published MIRACL or MTEB number. Published figures are unconstrained-latency nDCG
+    on the full public corpus; nothing published reports deadline-respecting nDCG on a derived private
+    shard under a replayed production arrival trace at a fixed offered load.
+provenance:
+  corpus: 'REAL, four named sources, all vendored at image build under pinned revisions and on-disk
+    digests. (1) MIRACL v1.0 passage corpus - HF `miracl/miracl-corpus`, recorded licence Apache-2.0
+    (passages derived from Wikipedia dumps, so the derived shard carries CC BY-SA attribution), pinned
+    by dataset revision SHA; supplies the real retrieval corpus. (2) MIRACL v1.0 topics and qrels -
+    GitHub `project-miracl/miracl` at a pinned commit (mirrored as HF `miracl/miracl`), recorded licence
+    Apache-2.0; supplies real human queries and real graded relevance judgements across the 16 v1.0
+    languages, from which the private query set and its qrels are drawn. (3) Azure LLM Inference Trace
+    2024 - `Azure/AzurePublicDataset`, `AzureLLMInferenceTrace_conv_2024.csv`, CC-BY-4.0, pinned commit;
+    ONLY the arrival timestamps are used, as the real production arrival process (bursty, non-Poisson)
+    that the replay is driven by. The token-count columns are deliberately unused here and that is recorded
+    rather than glossed. (4) Models, pinned by revision SHA and on-disk weight digest: `intfloat/multilingual-e5-base`
+    as the bi-encoder and `BAAI/bge-reranker-base` as the cross-encoder, recorded licence MIT for both,
+    verified against the pinned model-card revision at vendoring time and failing closed on licence
+    uncertainty per FORGE Phase 1 item 6. The graded private shard is 400,000 passages assembled under
+    a private seed: every judged-positive passage for the private query set, plus hard negatives mined
+    with a third-party encoder (MEM5), plus near-duplicate passage clusters that already exist in the
+    Wikipedia-derived corpus (DEC7), plus a random remainder. Row order in the shard is privately permuted.
+    Acquisition path for all four: direct download at image build from the named host at the named pinned
+    revision, hashed into the bundle asset manifest; no runtime fetch, because model-hub and dataset-host
+    egress are denied by name in the graded container.'
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: 'REAL, four named sources, all vendored at image build under pinned revisions
+      and on-disk digests. (1) MIRACL v1.0 passage corpus - HF `miracl/miracl-corpus`, recorded licence
+      Apache-2.0 (passages derived from Wikipedia dumps, so the derived shard carries CC BY-SA attribution),
+      pinned by dataset revision SHA; supplies the real retrieval corpus. (2) MIRACL v1.0 topics and
+      qrels - GitHub `project-miracl/miracl` at a pinned commit (mirrored as HF `miracl/miracl`), recorded
+      licence Apache-2.0; supplies real human queries and real graded relevance judgements across the
+      16 v1.0 languages, from which the private query set and its qrels are drawn. (3) Azure LLM Inference
+      Trace 2024 - `Azure/AzurePublicDataset`, `AzureLLMInferenceTrace_conv_2024.csv`, CC-BY-4.0, pinned
+      commit; ONLY the arrival timestamps are used, as the real production arrival process (bursty,
+      non-Poisson) that the replay is driven by. The token-count columns are deliberately unused here
+      and that is recorded rather than glossed. (4) Models, pinned by revision SHA and on-disk weight
+      digest: `intfloat/multilingual-e5-base` as the bi-encoder and `BAAI/bge-reranker-base` as the
+      cross-encoder, recorded licence MIT for both, verified against the pinned model-card revision
+      at vendoring time and failing closed on licence uncertainty per FORGE Phase 1 item 6. The graded
+      private shard is 400,000 passages assembled under a private seed: every judged-positive passage
+      for the private query set, plus hard negatives mined with a third-party encoder (MEM5), plus near-duplicate
+      passage clusters that already exist in the Wikipedia-derived corpus (DEC7), plus a random remainder.
+      Row order in the shard is privately permuted. Acquisition path for all four: direct download at
+      image build from the named host at the named pinned revision, hashed into the bundle asset manifest;
+      no runtime fetch, because model-hub and dataset-host egress are denied by name in the graded container.'
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-961e9ee1d902e446af77186075176d82
+  - AELLO-CANARY-1d39c05019a2bd79ede04131af92c686
+  - AELLO-CANARY-d1ee3e1b4e6d5d751fe497411cb0eeac
+  - AELLO-CANARY-9cc5c5f0ae72eed9c3f0774ba1de8eb5

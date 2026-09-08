@@ -1,0 +1,811 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S3
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled.
+  Every item below is compiled, so the compiled weight share the generator computes is exactly 1.0
+  and meets the floor rather than sitting under it. The judged residue that used to stand here was
+  thirteen obligation lookups reading a run-record key nothing writes; a lookup that consults nothing
+  is not a judgment that resisted compilation, it is a check that was never written.'
+deliverable:
+  path: /submission/recipe.py
+  kind: python_module
+  shape: 'a Python module defining build(pool_index, out_dir), which the verifier CALLS: it reads the
+    served pool index and writes a training shard plus its manifest under out_dir. The graded object
+    is the selection recipe, never a model and never a prediction array -- the trainer is frozen, so
+    the recipe reaches the score only through which images it puts in the shard.'
+evaluation_target_vocabulary:
+- emitted_shard
+- graded_predictions
+- run_record
+- submitted_artifact
+- submitted_source
+items:
+- id: recipe_exposes_build_pool_index_out_dir
+  dimension: deliverable
+  weight: 5
+  evaluation_target: submitted_artifact
+  criterion: The graded deliverable is a callable selection recipe, not a model and not a prediction array.
+  judgment: /submission/recipe.py parses as Python and defines a module-level function named build whose
+    positional parameters are exactly pool_index and out_dir, in that order. The verifier CALLS build(pool_index,
+    out_dir), so a module that only selects under an "if __name__" guard, a build that takes a different
+    signature, or a submitted checkpoint scores zero with reason recipe_contract_unmet. The signature
+    is read off the parsed source and never by importing the module, because importing agent code to discover
+    its interface runs the recipe inside the verifier.
+  knockout: true
+  mode: compiled
+  outcome_class: INVARIANT
+- id: emitted_shard_manifest_admissible
+  dimension: deliverable
+  weight: 5
+  evaluation_target: emitted_shard
+  criterion: build() left behind a shard the frozen trainer can actually consume.
+  judgment: out_dir carries shard_manifest.json, it parses, its samples list is non-empty, and every sample
+    row carries source_id, label and path. A manifest that is absent, unparseable, empty, or missing any
+    one of those three fields fails loudly with reason shard_unreadable rather than being graded down
+    quietly -- the frozen trainer is the shard's only consumer and it reads exactly these fields under
+    a published contract the recipe may not renegotiate.
+  knockout: true
+  mode: compiled
+  outcome_class: EFFECT
+- id: c3_leak
+  dimension: integrity
+  weight: 5
+  evaluation_target: emitted_shard
+  criterion: No frame captured at or after the declared boundary reached the shard.
+  judgment: 'Every source_id in the emitted manifest resolves in the verifier-held capture-timestamp table
+    and carries a timestamp strictly earlier than the declared boundary instant. An id the table cannot
+    resolve counts as a violation and not as a pass, because an unresolvable id is exactly how a post-boundary
+    frame enters unnoticed. This is red line 1: any hit scores exactly 0 with reason temporal_leakage,
+    and the timestamps are re-derived verifier-side rather than read back from whatever the recipe wrote
+    into its own manifest.'
+  knockout: true
+  mode: compiled
+  outcome_class: ABSENCE
+- id: c1_bal
+  dimension: selection
+  weight: 4
+  evaluation_target: emitted_shard
+  criterion: The shard can support a macro-average over all twelve classes.
+  judgment: Each of the twelve label ids in the published species vocabulary -- eleven Serengeti species
+    plus empty -- appears at least once among the manifest's sample rows. The graded metric divides by
+    twelve whatever the shard happens to contain, so dropping one rare class caps balanced accuracy at
+    eleven twelfths however well the other eleven are learned. This is the check that separates the graded
+    macro-average from overall accuracy, which the very filtering that discards rare classes raises.
+  knockout: false
+  mode: compiled
+  outcome_class: VALUE
+- id: c2_budget
+  dimension: process
+  weight: 5
+  evaluation_target: run_record
+  criterion: The recipe's own seconds and the trainer's seconds are charged against one envelope.
+  judgment: 'The run record carries harness-measured recipe_elapsed_seconds and trainer_elapsed_seconds,
+    both present and both strictly positive, and their sum is at most the declared joint envelope. A record
+    naming only the trainer''s number, or reporting the recipe''s decode, filter, dedup and rebalance
+    stage as zero seconds, fails as an unaccounted envelope rather than passing on the trainer''s figure
+    alone: the whole point of a joint budget is that a second spent selecting is a second the trainer
+    does not get. Exceeding scores exactly 0 with reason budget_exceeded.'
+  knockout: true
+  mode: compiled
+  outcome_class: VALUE
+- id: burst_dedup_precedes_rebalance_in_executed_ops
+  dimension: selection
+  weight: 4
+  evaluation_target: run_record
+  criterion: Deduplication runs before rebalancing, not after it.
+  judgment: In the op sequence the harness observed build() execute, both burst_dedup and class_rebalance
+    appear and burst_dedup sits at a strictly smaller index. Rebalancing first counts the three near-identical
+    frames of one camera trigger as three distinct samples and then upsamples them, so the emitted row
+    count looks correct while the rare-class diversity a macro-average depends on collapses. The order
+    is read from what the harness watched, never from what the manifest claims about itself.
+  knockout: false
+  mode: compiled
+  outcome_class: ORDERING
+- id: dedup_filters_the_index_before_any_decode
+  dimension: selection
+  weight: 3
+  evaluation_target: run_record
+  criterion: Burst deduplication is applied to the pool index, ahead of the decode it would otherwise
+    pay for.
+  judgment: The observed op sequence places burst_dedup strictly before decode. Deduplicating after decode
+    pays full decode cost for frames the recipe is about to throw away, and decode cost sits inside the
+    same wall-clock envelope as training; this single ordering is what separates a recipe that leaves
+    the trainer most of the envelope from one that starves it while emitting the same shard.
+  knockout: false
+  mode: compiled
+  outcome_class: ORDERING
+- id: at_most_one_frame_per_burst_id
+  dimension: selection
+  weight: 4
+  evaluation_target: emitted_shard
+  criterion: No camera trigger contributes two different frames to the shard.
+  judgment: 'Mapping each distinct source_id in the manifest through the served pool index''s burst_id
+    field yields no burst id claimed by two different source ids. One trigger fires three frames seconds
+    apart at one site, so two frames of one burst are the same picture twice: they spend the sample cap
+    and the decode envelope while teaching nothing, and they are what makes a random internal split report
+    a number the later season cannot reproduce.'
+  knockout: false
+  mode: compiled
+  outcome_class: ABSENCE
+- id: night_ir_statistics_computed_before_augmentation
+  dimension: process
+  weight: 4
+  evaluation_target: run_record
+  criterion: Per-channel statistics are computed on un-augmented pixels and keep the two illumination
+    regimes apart.
+  judgment: The observed op sequence places normalization_statistics strictly before both geometry_augment
+    and photometric_augment, and the recorded statistics carry two populations keyed daylight and night_infrared
+    rather than one pooled triple. Statistics taken after photometric augmentation, or pooled across both
+    regimes, fold daylight statistics onto the roughly forty percent of frames that are monochrome infrared
+    and erase the channel structure separating several nocturnal species. Nothing raises when this is
+    wrong; only the later-season score moves.
+  knockout: false
+  mode: compiled
+  outcome_class: ORDERING
+- id: declared_op_sequence_equals_the_observed_one
+  dimension: process
+  weight: 3
+  evaluation_target: run_record
+  criterion: The composition order the manifest declares is the order the harness watched run.
+  judgment: The op sequence written into the emitted manifest equals, element for element and in order,
+    the sequence the harness recorded while build() executed. Composition order is a graded property of
+    this recipe rather than a claim about it, so a manifest declaring dedup-then-rebalance while the harness
+    watched the reverse is a mismatch and scores zero; an absent declaration is a mismatch too, because
+    a recipe that declares no order cannot be graded against one.
+  knockout: false
+  mode: compiled
+  outcome_class: DIVERGENCE
+- id: selected_sites_span_the_served_camera_roster
+  dimension: selection
+  weight: 3
+  evaluation_target: emitted_shard
+  criterion: The selection spans camera sites instead of concentrating on a handful of them.
+  judgment: The distinct site ids behind the manifest's source_ids cover at least half the site ids present
+    in the served pool index, and no single site contributes more than a fifth of the sample rows. A correlated
+    run of bursts from one clearing is not the same information as the same count drawn across the roster,
+    and the later-season shard is drawn across sites the recipe never gets to choose. Both fractions are
+    AUTHORED structural bounds, not measurements, and are named for Phase 2 re-derivation in corpus_layout.
+  knockout: false
+  mode: compiled
+  outcome_class: VALUE
+- id: internal_validation_holds_out_latest_preboundary_window
+  dimension: process
+  weight: 4
+  evaluation_target: run_record
+  criterion: The recipe's own validation split is ordered in time, the way the graded one is.
+  judgment: The declared split policy names an ordered pre-boundary holdout and names no shuffled, random
+    or k-fold split, and every capture timestamp on the validation side is later than every capture timestamp
+    on the training side. A random split puts the other frames of one burst on both sides at once and
+    returns a confident local number the later season cannot reproduce, which is how a recipe gets selected
+    precisely for losing.
+  knockout: false
+  mode: compiled
+  outcome_class: ORDERING
+- id: class_histogram_traced_to_the_served_index_not_literals
+  dimension: integrity
+  weight: 4
+  evaluation_target: submitted_source
+  criterion: Class priors and site rosters are derived from the pool index that was served, not carried
+    as constants in the source.
+  judgment: The recipe source holds no literal numeric sequence longer than sixty-four elements and no
+    dict literal keyed by species name or by site id, and the run record names the served pool index as
+    the source of the class histogram the recipe rebalanced against. Later-season class priors and site
+    rosters are publicly downloadable and the authoring sandbox has egress, so a constant table buys a
+    score the selection did not earn; it scores zero with reason priors_unprovenanced.
+  knockout: false
+  mode: compiled
+  outcome_class: ABSENCE
+- id: rebalancing_sized_from_pool_index_not_dataset_card
+  dimension: integrity
+  weight: 3
+  evaluation_target: submitted_source
+  criterion: The authoritative class distribution is the served pool index, not the shipped dataset card.
+  judgment: The recipe source opens no path under environment/pool/DATASET_CARD.md and names no constant
+    lifted from it. The card's class distribution and site roster deliberately contradict the index, instruction.md
+    declares the index authoritative, and a recipe sized from the card over-samples classes the actual
+    pool has few of while starving the ones a macro-average rewards most.
+  knockout: false
+  mode: compiled
+  outcome_class: ABSENCE
+- id: selection_keyed_to_index_fields_not_row_offsets
+  dimension: integrity
+  weight: 3
+  evaluation_target: submitted_source
+  criterion: The recipe addresses the pool by its named fields, not by row position.
+  judgment: The recipe source reads the pool index through its named fields -- image_id, capture_timestamp,
+    site_id, burst_id, label -- and carries no positional row slice or literal row-offset list standing
+    in for them. The served pool is a run-indexed rotated subsample of the shipped one with the same size
+    and class support, so an offset-keyed recipe selects a different set of images than it believes it
+    is selecting, and it fails loudly as shard_unreadable rather than being graded down in silence.
+  knockout: false
+  mode: compiled
+  outcome_class: ABSENCE
+- id: emitted_row_count_within_cap_counting_repeats
+  dimension: selection
+  weight: 3
+  evaluation_target: emitted_shard
+  criterion: The shard's size is counted in rows, with every upsampled repeat counted separately.
+  judgment: The manifest's total sample-row count, counting each repeat of an upsampled rare-class image
+    as its own row, is at most the declared cap of four hundred thousand. The count is taken over rows
+    and never over distinct source ids, so a recipe that upsamples the rare classes tenfold cannot report
+    its deduplicated size and call itself within cap. Exceeding scores exactly 0 with reason shard_cap_exceeded.
+  knockout: false
+  mode: compiled
+  outcome_class: VALUE
+- id: frozen_trainer_digests_unchanged_across_the_recipe
+  dimension: integrity
+  weight: 4
+  evaluation_target: run_record
+  criterion: The emitted shard is the recipe's only channel to the frozen trainer.
+  judgment: The SHA-256 digests the harness recorded for the trainer tree, the model definition, the optimizer
+    configuration and the step count are identical before build() ran and after it returned; the harness
+    recorded no write under the frozen trainer tree or under tests/heldout/; and the recipe source imports
+    no module from the frozen trainer package. Every lever in this task acts through which images are
+    selected, so a recipe reaching the trainer by any other route scores zero with reason trainer_modified.
+  knockout: false
+  mode: compiled
+  outcome_class: INVARIANT
+- id: sibling_shard_gap_within_bound
+  dimension: generalisation
+  weight: 3
+  evaluation_target: graded_predictions
+  criterion: The two matched later-season sibling shards agree on what the recipe taught.
+  judgment: The absolute difference between the harness-measured macro-average on private_A and the one
+    on private_B is at most the declared sibling bound. The two shards are class-stratified and matched
+    at the same rarest-class support, so a gap wider than the bound is a recipe fitted to one later window
+    rather than to the later season, and it scores exactly 0 with reason sibling_gap_violation.
+  knockout: false
+  mode: compiled
+  outcome_class: DIVERGENCE
+- id: replay_reproduces_shard_and_prediction_digests
+  dimension: process
+  weight: 3
+  evaluation_target: run_record
+  criterion: A replayed graded run reproduces the shard and the model it trained, byte for byte.
+  judgment: The replay digests the harness recorded for the emitted shard manifest, for the post-step-6000
+    parameter tensor and for the private_A prediction vector each equal the corresponding first-run digest.
+    The decode path is pinned and the trainer is byte-frozen at six thousand steps of batch two hundred
+    fifty-six, so the graded quantity is an exact rational over fixed per-class supports rather than a
+    noisy estimate; a divergence means something in the recipe read wall clock, thread order or an unseeded
+    generator.
+  knockout: false
+  mode: compiled
+  outcome_class: INVARIANT
+- id: c10_log
+  dimension: process
+  weight: 3
+  evaluation_target: run_record
+  criterion: The agent's own reward_log.jsonl agrees with what the harness measured.
+  judgment: 'The last reward_log.jsonl record''s balanced_accuracy sits within 0.05 of the harness-measured
+    macro-average over private_A, and its elapsed_seconds sits within ten percent of the harness-measured
+    recipe-plus-trainer sum. A missing, unparseable or back-filled record scores exactly 0 with reason
+    log_fabrication: the agent''s own number is graded against the harness''s measurement and is never
+    substituted for it.'
+  knockout: false
+  mode: compiled
+  outcome_class: DIVERGENCE
+- id: balanced_accuracy_over_twelve_classes_ramp
+  dimension: outcome
+  weight: 10
+  evaluation_target: graded_predictions
+  criterion: Macro-averaged balanced accuracy over the twelve classes on private_A, mapped through the
+    published ramp.
+  judgment: 'Mean per-class recall over the twelve species classes on private_A, computed verifier-side
+    from the frozen trainer''s prediction vectors after exactly six thousand steps at batch two hundred
+    fifty-six, and mapped through the floor-to-knee ramp in tests/constants.json. UNMEASURED AT PHASE
+    0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured BEFORE
+    it reads any prediction rather than returning a score. Reading first would let a missing prediction
+    file report as a failure and collapse "this slot is not yet measurable" into "the recipe scored zero".'
+  knockout: true
+  mode: compiled
+  outcome_class: VALUE
+corpus_layout:
+  status: AUTHORED, NOT LANDED. Neither environment/data/ nor tests/heldout/ exists in this bundle yet,
+    so every path below is the path this slot's checks will read once the corpus lands. The checks are
+    written against these paths and report a named absence rather than crashing when a file is missing,
+    so nothing here silently passes.
+  pool_index: environment/data/pool_index.csv
+  pool_index_fields:
+  - image_id
+  - capture_timestamp
+  - site_id
+  - burst_id
+  - label
+  pool_index_basis: Agent-visible. The SERVED index is a run-indexed rotated subsample of the shipped
+    200,000-image pool with the same size and class support, which is why selection_keyed_to_index_fields_not_row_offsets
+    grades field access rather than row position.
+  dataset_card: environment/pool/DATASET_CARD.md
+  dataset_card_basis: Agent-visible DECOY. Its class distribution and site roster deliberately contradict
+    the pool index, and instruction.md declares the index authoritative. rebalancing_sized_from_pool_index_not_dataset_card
+    is the check that measures the decoy.
+  class_vocabulary: environment/data/class_vocabulary.json
+  classes:
+  - empty
+  - wildebeest
+  - zebra
+  - gazelleThomsons
+  - buffalo
+  - elephant
+  - impala
+  - hartebeest
+  - giraffe
+  - hyenaSpotted
+  - warthog
+  - guineaFowl
+  classes_basis: 'The twelve-class remap done at authoring: eleven Serengeti species plus empty. Phase
+    1 must confirm this roster against the metadata actually served with the archive and fail closed on
+    a mismatch rather than trusting this list.'
+  emitted_shard_manifest_name: shard_manifest.json
+  manifest_sample_fields:
+  - source_id
+  - label
+  - path
+  manifest_declared_op_key: declared_op_sequence
+  run_record: ../run_record.json
+  run_record_keys:
+    out_dir: the directory the verifier passed to build() as out_dir
+    emitted_shard_manifest: absolute path of the manifest build() wrote
+    observed_op_sequence: the op names the harness watched build() execute, in order
+    recipe_elapsed_seconds: harness-measured wall clock for build() alone
+    trainer_elapsed_seconds: harness-measured wall clock for the frozen trainer alone
+    normalization_statistics: the per-channel statistics the recipe recorded, keyed by regime
+    split_policy: the internal validation split policy the recipe declared
+    split_timestamps: train and validation capture timestamps as the recipe split them
+    class_histogram_source: what the recipe rebalanced its class histogram against
+    frozen_digests_before: trainer tree, model, optimizer and step-count digests before build()
+    frozen_digests_after: the same four digests after build() returned
+    guarded_paths_touched: paths under the frozen trainer tree or tests/heldout/ the run wrote
+    replay_digests: shard manifest, post-step-6000 parameter and private_A prediction digests
+    first_run_digests: the same three digests from the first graded run
+    balanced_accuracy_private_a: harness-measured macro-average on private_A
+    balanced_accuracy_private_b: harness-measured macro-average on private_B
+    reward_log: path of the agent-written reward_log.jsonl
+  capture_times: tests/heldout/pool_capture_times.csv
+  capture_times_basis: VERIFIER-HELD. C3-LEAK re-derives every emitted source id's capture timestamp from
+    this table rather than reading the timestamp the recipe wrote into its own manifest, so a recipe cannot
+    pass the boundary check by mislabelling its own rows.
+  boundary_declaration: tests/heldout/capture_boundary.json
+  private_a_labels: tests/heldout/private_A_labels.npy
+  private_a_predictions: tests/heldout/private_A_predictions.npy
+  guarded_prefixes:
+  - tests/
+  - tests/heldout/
+  - environment/trainer/
+  frozen_trainer_package: frozen_trainer
+  op_names:
+    dedup: burst_dedup
+    decode: decode
+    rebalance: class_rebalance
+    statistics: normalization_statistics
+    geometry: geometry_augment
+    photometric: photometric_augment
+  augmentation_ops:
+  - geometry_augment
+  - photometric_augment
+  required_op_precedences:
+  - - burst_dedup
+    - decode
+  - - burst_dedup
+    - class_rebalance
+  - - normalization_statistics
+    - geometry_augment
+  - - normalization_statistics
+    - photometric_augment
+  required_op_precedences_basis: 'Only the RELATIONS are bound, not a total order. These four are the
+    ones seed/contract.yaml makes load-bearing: dedup before decode is what takes the reference recipe
+    stage from about 700 s to about 470 s, dedup before rebalance is the ORDER-SENSITIVITY control, and
+    statistics before augmentation is the NC-NORM control.'
+  illumination_regimes:
+  - daylight
+  - night_infrared
+  illumination_basis: Roughly forty percent of camera-trap frames fire the infrared flash and are monochrome.
+    One pooled per-channel triple folds daylight statistics onto them, which is a wrong answer that raises
+    nothing.
+  joint_envelope_seconds: 3300
+  joint_envelope_basis: DISCREPANCY RECORDED, NOT SILENTLY PICKED. seed/contract.yaml raises the C2-BUDGET
+    Stage-1 gate from 2,700 s to 3,300 s in reward.reward_changes, while its own target_metric field and
+    this bundle's instruction.md still carry 2,700 s. The check uses 3,300 because that is the number
+    a run is zeroed against; Phase 2 must reconcile the prose.
+  sample_cap_rows: 400000
+  sibling_gap_bound: 0.04
+  sibling_gap_basis: Re-sized from 0.02 to 0.04 in seed/contract.yaml with declared per-class support
+    (rarest class 900, 20,000 per shard, class-stratified matched siblings). The 0.02 figure still standing
+    in target_metric and instruction.md is the pre-resize value.
+  trainer_steps: 6000
+  trainer_batch: 256
+  class_count: 12
+  log_balanced_accuracy_tolerance: 0.05
+  log_elapsed_tolerance_fraction: 0.1
+  site_coverage_floor: 0.5
+  max_single_site_share: 0.2
+  site_bounds_basis: AUTHORED STRUCTURAL BOUNDS, NOT MEASUREMENTS. Neither fraction is a measured worth
+    and neither enters the ramp; they are the shape of "the selection did not collapse onto a few cameras".
+    Phase 2 must re-derive both against the served site roster and replace them, the way the four ramp
+    constants are replaced.
+  literal_prior_max_elements: 64
+  literal_prior_basis: C13-PRIORS. A numeric literal sequence longer than this, or a dict literal keyed
+    by species name or site id, is a downloaded later-season prior table wearing a costume.
+measurement_tier: gpu
+measurement_tier_basis: trains over a camera-trap image corpus
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome = clamp((metric
+    - floor) / (knee - floor), 0, 1) through the published ramp.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+truth_narrative:
+  opening: the trainer is frozen and you may not modify it. Your deliverable is recipe.py exposing build(pool_index,
+    out_dir), which the verifier EXECUTES on the shipped pool and which must emit a training shard; the
+    verifier then runs the frozen trainer for exactly 6,000 steps at batch 256 on one H100 and scores
+    the resulting model's macro-averaged (balanced) accuracy over 12 species classes on a private held-out
+    shard drawn from a strictly later capture season. Your recipe's own execution time and the trainer's
+    time share one wall-clock envelope, so every second you spend decoding, filtering, deduplicating,
+    rebalancing or augmenting is a second the trainer does not get. Every image whose capture timestamp
+    falls at or after the declared boundary is out of bounds and including one scores exactly zero. The
+    graded artifact is a Python module at /submission/recipe.py, not a prediction array and not a checkpoint.
+  insight: 'The graded object is a DATA SELECTION RECIPE, and the trainer that consumes it cannot be touched.
+    Every lever you have acts through one channel only -- which images end up in the shard -- so the questions
+    that decide the score are which frames, in what proportion, from which sites and seasons, and in what
+    order the selection ops compose. Two structural facts about camera-trap data do most of the work:
+    a trigger fires a burst of near-identical frames, so a random validation split leaks a frame''s own
+    twin into training and hands you a confident wrong measurement; and the metric is a macro-average
+    over twelve classes, so it divides by twelve regardless of what the shard contains and the rare classes
+    weigh as much as the common ones. On top of those sits a budget the recipe itself spends: decode time
+    and training time come out of one envelope, so the cheapest correct filter is the one applied to the
+    index before any pixel is read.'
+  steps:
+  - heading: Burst-aware dedup applied to the pool INDEX, before decode
+    paragraph: 'One camera trigger writes three frames seconds apart at one site. Group the index by burst_id
+      and keep one frame per burst BEFORE anything is decoded: the frames you drop are frames you never
+      pay to decode, and decode time is charged to the same envelope as training. Doing this on the index
+      rather than on decoded pixels is what takes the reference recipe stage from about 700 s to about
+      470 s. Its worth is measured on the Phase 2 ladder, never asserted here.'
+  - heading: Time-ordered internal validation on the latest pre-boundary weeks
+    paragraph: Hold out the most recent pre-boundary weeks rather than a random sample, so your own signal
+      is ordered the way the graded one is. A random split places the other two frames of a burst on both
+      sides at once and returns a confident number the later season cannot reproduce; this is the measurement
+      error that selects the losing recipe, and it is upstream of every other choice.
+  - heading: Recency and rare-class reweighting with capped repeats
+    paragraph: The metric is a macro-average over twelve classes, so it divides by twelve whatever the
+      shard contains and the rare classes carry as much of it as wildebeest does. Reweight toward the
+      latest seasons and toward the rare classes, and cap the repeats so upsampling does not eat the row
+      cap. Size the reweighting from the SERVED pool index, never from the shipped dataset card.
+  - heading: Daylight and night-infrared statistics computed before augmentation
+    paragraph: About forty percent of the frames fired the infrared flash and are monochrome. Compute
+      per-channel statistics separately for the two illumination regimes and compute them on un-augmented
+      pixels. Pooling the regimes, or taking the statistics after photometric augmentation, erases the
+      channel structure several nocturnal species are separated by, and nothing raises when you do it.
+  - heading: 'Op order: dedup, decode, rebalance, statistics, geometry, photometric'
+    paragraph: 'Composition order is graded here, not recipe length. Rebalancing before dedup counts the
+      three frames of one trigger as three samples and then multiplies them, so the row count looks right
+      while rare-class diversity collapses. Declare the order in the manifest and execute the order you
+      declared: the harness watches the sequence and compares.'
+  - heading: Spending the envelope so the trainer gets most of it
+    paragraph: Recipe seconds and trainer seconds come out of one budget. Batched GPU decode at a resolution
+      you choose, applied only to the frames that survived the index-level dedup, leaves the frozen trainer
+      most of the envelope for its six thousand steps. A single-threaded decode of the whole pool spends
+      the budget on images the shard was never going to keep.
+  - heading: Selecting across the camera roster rather than down one clearing
+    paragraph: Site is a field you can select on and the later-season shard is drawn across the roster.
+      A correlated run of bursts from one clearing is not the same information as the same row count drawn
+      across many sites, however good it looks on a split that shares those sites.
+  traps:
+  - Pools all seasons uniformly and validates on a random split, so burst near-duplicates inflate the
+    local measurement and the selected recipe loses on the later season.
+  - Includes post-boundary images after reasoning that more data is better, scoring exactly zero on temporal_leakage.
+  - Deduplicates after rebalancing, so upsampled rare classes multiply near-identical burst frames and
+    the effective rare-class diversity collapses while the count looks correct.
+  - Computes normalization statistics after augmentation, silently destroying the night-infrared statistics
+    that separate several nocturnal species.
+  - Spends most of the joint envelope decoding the full pool with a single-threaded PIL path and starves
+    the trainer, scoring zero on budget_exceeded or landing in the sub-band.
+  - Sizes the class rebalancing from the shipped dataset card rather than the authoritative pool index.
+  - Optimizes overall accuracy while the graded metric is macro-averaged, so the rare classes that dominate
+    the balanced score are dropped by the very filtering that raises overall accuracy.
+  - 'Lookup shortcut: Snapshot Serengeti has published deep-learning results (Norouzzadeh et al. 2018
+    and successors) and public WILDS-style domain-shift recipes, and the agent has open internet egress.
+    Mitigation: Published work reports model accuracy from long unconstrained training with pretrained
+    backbones on overall accuracy over the common species. This slot freezes the model, the optimizer
+    and the step count, grades a macro-averaged metric over 12 classes including rare ones on a strictly
+    later season, and puts the recipe''s own execution cost inside the same envelope. The graded object
+    is a budget-constrained data recipe, which no public repository publishes; a published model recipe
+    cannot be pasted in because the trainer is byte-frozen and the deliverable is not a model.'
+  - 'Data-recipe benchmarks (DataComp-LM style) and their published filtering heuristics could be transplanted.
+    Mitigation: Those heuristics are text-corpus filters with no temporal boundary, no burst structure
+    and no decode-cost accounting; transplanting them produces a shard that either exceeds the envelope
+    or leaves the burst leakage untouched. The order-sensitivity binding (C5-ORDER) is the part no published
+    heuristic list encodes, and NOV2''s projected frontier target composes against order sensitivity rather
+    than recipe length precisely for this reason.'
+  - 'Fitting the recipe to one graded season across attempts by hardcoding camera sites or class priors
+    observed to work. Mitigation: The graded later-season window rotates deterministically across a bound
+    family of later windows keyed by the run index, C6-SIB zeroes a sibling gap above 0.02, and the STALE
+    control requires a site-hardcoded recipe to fall below the dichotomizing threshold once the window
+    rotates.'
+  - 'Smuggling label information by encoding predictions or an ordering into the emitted shard rather
+    than curating it. Mitigation: The trainer is frozen and consumes only images and labels under a published
+    contract, C-STAGES rejects any shard outside that contract loudly, C8-COUNT caps the emitted shard
+    size, and the labels the recipe may attach are restricted to the pool index''s own labels, which C3-LEAK
+    re-derives verifier-side.'
+truth_annex: 'Ordered path through instruction.md, with the compiled check each step satisfies. The order
+  is the order the recipe must do the work in, not alphabetical: every entry names a fact about THIS task''s
+  selection contract, and none of them would mean anything on a slot that grades a model instead of the
+  data it was fed.
+
+
+  1. `recipe_exposes_build_pool_index_out_dir` (compiled, weight 5, knockout) -- The graded deliverable
+  is a callable selection recipe, not a model and not a prediction array.
+
+
+  2. `selection_keyed_to_index_fields_not_row_offsets` (compiled, weight 3) -- The recipe addresses the
+  pool by its named fields, not by row position.
+
+
+  3. `dedup_filters_the_index_before_any_decode` (compiled, weight 3) -- Burst deduplication is applied
+  to the pool index, ahead of the decode it would otherwise pay for.
+
+
+  4. `at_most_one_frame_per_burst_id` (compiled, weight 4) -- No camera trigger contributes two different
+  frames to the shard.
+
+
+  5. `internal_validation_holds_out_latest_preboundary_window` (compiled, weight 4) -- The recipe''s own
+  validation split is ordered in time, the way the graded one is.
+
+
+  6. `c3_leak` (compiled, weight 5, knockout) -- No frame captured at or after the declared boundary reached
+  the shard.
+
+
+  7. `burst_dedup_precedes_rebalance_in_executed_ops` (compiled, weight 4) -- Deduplication runs before
+  rebalancing, not after it.
+
+
+  8. `rebalancing_sized_from_pool_index_not_dataset_card` (compiled, weight 3) -- The authoritative class
+  distribution is the served pool index, not the shipped dataset card.
+
+
+  9. `class_histogram_traced_to_the_served_index_not_literals` (compiled, weight 4) -- Class priors and
+  site rosters are derived from the pool index that was served, not carried as constants in the source.
+
+
+  10. `c1_bal` (compiled, weight 4) -- The shard can support a macro-average over all twelve classes.
+
+
+  11. `selected_sites_span_the_served_camera_roster` (compiled, weight 3) -- The selection spans camera
+  sites instead of concentrating on a handful of them.
+
+
+  12. `night_ir_statistics_computed_before_augmentation` (compiled, weight 4) -- Per-channel statistics
+  are computed on un-augmented pixels and keep the two illumination regimes apart.
+
+
+  13. `declared_op_sequence_equals_the_observed_one` (compiled, weight 3) -- The composition order the
+  manifest declares is the order the harness watched run.
+
+
+  14. `emitted_shard_manifest_admissible` (compiled, weight 5, knockout) -- build() left behind a shard
+  the frozen trainer can actually consume.
+
+
+  15. `emitted_row_count_within_cap_counting_repeats` (compiled, weight 3) -- The shard''s size is counted
+  in rows, with every upsampled repeat counted separately.
+
+
+  16. `frozen_trainer_digests_unchanged_across_the_recipe` (compiled, weight 4) -- The emitted shard is
+  the recipe''s only channel to the frozen trainer.
+
+
+  17. `c2_budget` (compiled, weight 5, knockout) -- The recipe''s own seconds and the trainer''s seconds
+  are charged against one envelope.
+
+
+  18. `replay_reproduces_shard_and_prediction_digests` (compiled, weight 3) -- A replayed graded run reproduces
+  the shard and the model it trained, byte for byte.
+
+
+  19. `c10_log` (compiled, weight 3) -- The agent''s own reward_log.jsonl agrees with what the harness
+  measured.
+
+
+  20. `sibling_shard_gap_within_bound` (compiled, weight 3) -- The two matched later-season sibling shards
+  agree on what the recipe taught.
+
+
+  21. `balanced_accuracy_over_twelve_classes_ramp` (compiled, weight 10, knockout) -- Macro-averaged balanced
+  accuracy over the twelve classes on private_A, mapped through the published ramp.
+
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - Lookup shortcut: Snapshot Serengeti has published deep-learning results (Norouzzadeh et al. 2018 and
+  successors) and public WILDS-style domain-shift recipes, and the agent has open internet egress. --
+  controlled by: Published work reports model accuracy from long unconstrained training with pretrained
+  backbones on overall accuracy over the common species. This slot freezes the model, the optimizer and
+  the step count, grades a macro-averaged metric over 12 classes including rare ones on a strictly later
+  season, and puts the recipe''s own execution cost inside the same envelope. The graded object is a budget-constrained
+  data recipe, which no public repository publishes; a published model recipe cannot be pasted in because
+  the trainer is byte-frozen and the deliverable is not a model.
+
+  - Data-recipe benchmarks (DataComp-LM style) and their published filtering heuristics could be transplanted.
+  -- controlled by: Those heuristics are text-corpus filters with no temporal boundary, no burst structure
+  and no decode-cost accounting; transplanting them produces a shard that either exceeds the envelope
+  or leaves the burst leakage untouched. The order-sensitivity binding (C5-ORDER) is the part no published
+  heuristic list encodes, and NOV2''s projected frontier target composes against order sensitivity rather
+  than recipe length precisely for this reason.
+
+  - Fitting the recipe to one graded season across attempts by hardcoding camera sites or class priors
+  observed to work. -- controlled by: The graded later-season window rotates deterministically across
+  a bound family of later windows keyed by the run index, C6-SIB zeroes a sibling gap above 0.02, and
+  the STALE control requires a site-hardcoded recipe to fall below the dichotomizing threshold once the
+  window rotates.
+
+  - Smuggling label information by encoding predictions or an ordering into the emitted shard rather than
+  curating it. -- controlled by: The trainer is frozen and consumes only images and labels under a published
+  contract, C-STAGES rejects any shard outside that contract loudly, C8-COUNT caps the emitted shard size,
+  and the labels the recipe may attach are restricted to the pool index''s own labels, which C3-LEAK re-derives
+  verifier-side.
+
+
+  Deliverable manifest: /submission/recipe.py (python_module) exposing build(pool_index, out_dir), which
+  the verifier CALLS; it writes the training shard and shard_manifest.json under out_dir. The graded object
+  is the selection, not a model.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTRL-NOOP-EMPTY` targets no recipe.py present / unchanged environment; recorded score 0.
+
+  - `CTRL-NOOP-NAIVE` targets the shipped naive recipe unchanged (uniform sampling, resize plus horizontal
+  flip only); it lands exactly at the a_lo anchor 0.5200, so the ramp term is exactly 0 and r_det is the
+  sub-band ceiling; recorded score 0.05.
+
+  - `CTRL-STALE-POOL` targets REPLACES the inert window-rotation stale control. The pre-boundary pool
+  handed to the graded run rotates across a bound family of three draws whose SEASON MIX and SITE ROSTER
+  differ substantially (P1 weights S1-S3, P2 weights S4-S6, P3 mixes). This control hardcodes the camera-site
+  roster and class priors observed under a previously served draw, so it sizes its rebalancing against
+  a roster largely absent under another and the macro-average collapses on the rare classes; projected
+  a = 0.598. The magnitude is NOT bounded by the C6-SIB red line, because C6-SIB constrains the two matched
+  later-season HELD-OUT shards, not the pool composition.; recorded score 0.4859.
+
+  - `CTRL-STALE-OFFSET` targets a recipe keyed to exact pool-index row offsets rather than to fields;
+  the run-indexed rotated subsample makes the offsets wrong and it fails loudly with shard_unreadable
+  rather than being silently graded down; recorded score 0.
+
+  - `DECOY-CARD` targets decoy/distractor: sizing rebalancing from environment/pool/DATASET_CARD.md, whose
+  class distribution and site roster contradict the pool index that instruction.md declares authoritative;
+  it over-samples classes rare in the actual pool and under-samples the ones that dominate a macro-average;
+  projected a = 0.571; recorded score 0.335.
+
+  - `CTRL-LIST-ALL` targets decoding and emitting the whole pool with every augmentation applied; trips
+  C8-COUNT (400,000 sample cap) or C2-BUDGET, so breadth is not a route; recorded score 0.
+
+  - `CTRL-OBVIOUS-SINGLECLASS` targets a recipe emitting a single-class shard; macro-averaged accuracy
+  about 1/12 = 0.083, deep in the sub-band 0.05*(0.083/0.520); recorded score 0.008.
+
+  - `CTRL-OBVIOUS-POSTBOUNDARY` targets a recipe that includes post-boundary images; C3-LEAK zeroes it
+  on temporal_leakage; recorded score 0.
+
+  - `NC-NORM` targets the invariant-17 rejecting half for PRC1: the reference recipe with per-channel
+  normalization statistics computed AFTER augmentation rather than before, which silently folds daylight
+  statistics onto the roughly 40 percent night-infrared frames; projected a = 0.612; recorded score 0.5641.
+
+  - `ORDER-SENSITIVITY` targets NOV2''s order proof doubling as a control: the reference with dedup and
+  rebalance swapped, so rebalancing counts burst duplicates as distinct samples; projected a = 0.634,
+  a reward drop of 0.313 from 1.0, which exceeds NOV2''s required 0.15; recorded score 0.6871.
+
+  - `CTRL-EGRESS-PRIORS` targets NEW, closes the review-flagged shortcut: learning the graded window''s
+  class priors and site roster from publicly downloadable LILA BC later-season metadata in the egress-enabled
+  sandbox and hardcoding them in recipe.py. The new C13-PRIORS checker allows no numeric literal array
+  above 64 elements and no per-site or per-class constant table, and requires the emitted shard''s class
+  histogram to be derivable from the served pool index by the declared, executed op sequence C5-ORDER
+  already records; a hardcoded prior table zeroes with reason priors_unprovenanced. The pool-draw rotation
+  of CTRL-STALE-POOL is the second layer.; recorded score 0.
+
+  - `FEAS-JDG-FLIP` targets buying r_det by a route the rubrics forbid (external later-season metadata,
+  trainer interference, fabricated logs): the reference at r_det = 1.0 with exactly one rubric flipped
+  reports min(1.0, 0.40) = 0.400; recorded score 0.4.
+
+  '
+provenance:
+  corpus: 'Snapshot Serengeti (Swanson, Kosmala, Lintott, Simpson, Smith, Packer; Scientific Data 2015),
+    the Serengeti camera-trap corpus with per-image capture timestamps, camera site identifiers, season
+    identifiers S1 through S11 and burst grouping. Licence: CC0 1.0 Universal at the original Dryad release
+    (doi:10.5061/dryad.5pt92); the LILA BC mirror republishes it under CDLA-Permissive-1.0. Both permit
+    redistribution with the derivation recorded, and Phase 1 must fetch and digest the licence bytes actually
+    served with the archive rather than relying on this note, failing closed on any uncertainty per PRD
+    5.2. Acquisition: pinned fetch of the LILA BC season archives and the metadata CSVs at image build
+    time, URLs and sha256 recorded in environment/Dockerfile and the asset manifest. Split derivation
+    done by us at authoring: a 200,000-image pool over 12 classes (11 species plus empty) drawn from seasons
+    S1 through S6, shipped as JPEG with a pool index carrying image id, capture timestamp, site id and
+    burst id; the private held-out shards private_A (20,000) and private_B (20,000) are drawn from a strictly
+    later season and live only under tests/heldout/, with their timestamps and burst ids held verifier-side.'
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or a
+      task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with this
+      named reason rather than accepting the declaration on trust. Gap F05.
+    attestation_state: attestation-unavailable
+    base_commit_sha: null
+    canonical_repository_identity: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    fork_ancestry_snapshot_digest: null
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build time.
+      Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as the task-generating
+      event and never inherits the upstream freeze date, so authoring a date here before the derivation
+      runs would assert a fact no byte supports.
+    source_kind: public_repository
+    task_generating_event_timestamp: null
+    upstream_identity: 'Snapshot Serengeti (Swanson, Kosmala, Lintott, Simpson, Smith, Packer; Scientific
+      Data 2015), the Serengeti camera-trap corpus with per-image capture timestamps, camera site identifiers,
+      season identifiers S1 through S11 and burst grouping. Licence: CC0 1.0 Universal at the original
+      Dryad release (doi:10.5061/dryad.5pt92); the LILA BC mirror republishes it under CDLA-Permissive-1.0.
+      Both permit redistribution with the derivation recorded, and Phase 1 must fetch and digest the licence
+      bytes actually served with the archive rather than relying on this note, failing closed on any uncertainty
+      per PRD 5.2. Acquisition: pinned fetch of the LILA BC season archives and the metadata CSVs at image
+      build time, URLs and sha256 recorded in environment/Dockerfile and the asset manifest. Split derivation
+      done by us at authoring: a 200,000-image pool over 12 classes (11 species plus empty) drawn from
+      seasons S1 through S6, shipped as JPEG with a pool index carrying image id, capture timestamp, site
+      id and burst id; the private held-out shards private_A (20,000) and private_B (20,000) are drawn
+      from a strictly later season and live only under tests/heldout/, with their timestamps and burst
+      ids held verifier-side.'
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-ad0326b653051bf3fff9b3d0f400c264
+  - AELLO-CANARY-16319a20be1c38a127ad5533a33025a5
+  - AELLO-CANARY-7b2bbeeef9a8c1bf504167a51fdb9fb3
+  - AELLO-CANARY-a13aa21e8dec1742842ba8b70712bb43

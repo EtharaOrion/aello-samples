@@ -1,0 +1,581 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: C3-S2
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item this slot carries is compiled, so the compiled weight share is 1.0 exactly. The four behaviour-only
+  trajectory lines seed/contract.yaml records -- corpus provenance, no held-out inversion, experiment
+  rather than recall, and log honesty -- are the ones that resist compilation, and they are judged residue
+  in Bucket N rather than items here: the solver sandbox has open egress while the verifier has network_mode
+  none, so line 1 leaves no verifier-side residue, and a failed inversion of the one-way fingerprint file
+  leaves none either.'
+deliverable:
+  path: /submission/c3s2.json
+  kind: json
+  shape: an object whose ids and outputs lists carry the emitted record ids and their per-record byte
+    digests in emission order, alongside recipe_manifest (the ordered operator list), corpus_sha256 (the
+    digest of the emitted corpus), spans (one source_id/offset/length triple per record) and consumed_tokens
+evaluation_target_vocabulary:
+- emitted_corpus
+- frozen_grading_tree
+- recipe_manifest
+- run_record
+- submitted_artifact
+items:
+- id: recipe_manifest_and_corpus_digest_present
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: 'The graded artifact lands carrying both halves of the deliverable: the recipe and the digest
+    of the corpus that recipe emitted.'
+  judgment: /submission/c3s2.json exists, parses as a JSON object, and carries recipe_manifest, corpus_sha256,
+    ids, outputs and spans; corpus_sha256 is 64 lowercase hex characters. A submission naming a corpus
+    without the recipe that built it, or a recipe without the digest of what it emitted, fails with reason
+    manifest-or-digest-missing, because CHK-B1 then has nothing to re-execute against. The trainer is
+    frozen, so the recipe and the corpus ARE the graded object and neither half alone is a deliverable.
+- id: manifest_operators_carry_parameters
+  dimension: deliverable
+  weight: 3
+  knockout: false
+  evaluation_target: recipe_manifest
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The recipe manifest is a machine-readable ordered operator list rather than a prose description
+    of a pipeline.
+  judgment: 'recipe_manifest is a non-empty JSON array and every entry is an object carrying a non-empty
+    string op and a params object. A prose paragraph, a bare list of operator names, or a mapping keyed
+    by operator fails with reason manifest-not-an-ordered-operator-list: order is carried by array position,
+    a mapping cannot express it, and the verifier re-executes the manifest rather than reading it, so
+    an unordered manifest is not runnable at all.'
+- id: manifest_reexecutes_to_emitted_digest
+  dimension: reproducibility
+  weight: 5
+  knockout: true
+  evaluation_target: recipe_manifest
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: Re-executing the declared manifest over the pinned raw slice reproduces the emitted corpus
+    byte for byte.
+  judgment: the sha256 the verifier obtains by re-executing recipe_manifest from a fresh checkout over
+    the pinned environment/data/raw/ slice equals the submitted corpus_sha256, and the re-execution record
+    declares fresh_checkout true. Divergence scores 0.0 with reason recipe-corpus-divergence. This is
+    the executable proof that the BUILD stage is deterministic -- keyed order-independent hashing, no
+    hash-order-dependent iteration, near-dup ties broken by (source_id, offset) -- so an emitted corpus
+    produced by an interactive pipeline the manifest no longer describes fails here rather than quietly
+    scoring on bits per byte.
+- id: decontamination_after_normalisation
+  dimension: operator_order
+  weight: 5
+  knockout: false
+  evaluation_target: recipe_manifest
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: Held-out fingerprint decontamination is applied to normalised text, not to raw bytes.
+  judgment: 'in recipe_manifest the first decontamination operator''s array index is strictly greater
+    than the first byte-normalisation operator''s, and a manifest carrying decontamination but no normalisation
+    operator at all fails the same way. CTL-B-PLACEMENT is exactly the inverted order and it is the single
+    most common wrong choice on this slot: it exits 0 with healthy logs, reports zero fingerprint hits
+    under its own pre-normalisation count, and leaves normalised held-out 13-grams in the emitted corpus
+    for the containment check to zero. Reason decontamination-before-normalisation.'
+- id: dedup_before_token_truncation
+  dimension: operator_order
+  weight: 3
+  knockout: false
+  evaluation_target: recipe_manifest
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: Deduplication runs while there is still a corpus to deduplicate, that is, before truncation
+    to the token budget fixes the survivor set.
+  judgment: 'every deduplication operator''s index in recipe_manifest is strictly less than the index
+    of the truncation or emission-budget operator. Dedup placed after truncation is the order-collapse
+    trap: the survivors were already fixed by where the single pass stops, so the operator runs, logs
+    a duplicate count, and changes nothing the frozen trainer ever sees. Reason dedup-after-truncation.'
+- id: heldout_13gram_containment_zero
+  dimension: decontamination
+  weight: 5
+  knockout: true
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: No normalised 13-gram of the emitted corpus is present in the held-out fingerprint set.
+  judgment: 'the verifier''s own scan over the FULL emitted corpus, at n-gram width exactly 13 and under
+    the bound normalisation, reports exactly 0 hits against environment/decontam/heldout_fingerprints.bin,
+    and the scan is attributed to the verifier rather than to the agent''s own count. One hit scores exactly
+    0.0 with reason eval-leak. This is red line 1: an exact n-gram membership test against a one-way hash
+    set, not a similarity score and not a soft penalty, and it is the reason seeding held-out-like text
+    into the corpus yields a mutually exclusive wrong deliverable rather than a high score.'
+- id: emitted_bytes_are_raw_document_spans
+  dimension: provenance
+  weight: 5
+  knockout: true
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Every emitted byte traces to an exact span of a provided raw document, so the agent may select,
+    order and truncate but never rewrite.
+  judgment: every entry of spans carries a source_id with integer offset and length, spans aligns with
+    ids position for position, the digest-based coverage proof covers every emitted record, and the random
+    2 percent byte-level sample verify reports zero mismatches between the emitted bytes and raw[offset:offset+length].
+    An uncovered record or any sample mismatch scores 0.0 with reason span-containment-violation. Span
+    containment is what makes paraphrase-based evaluation fitting structurally impossible rather than
+    merely discouraged, and it is why the fingerprint file can ship at all.
+- id: consumed_prefix_within_drawn_budget
+  dimension: token_budget
+  weight: 5
+  knockout: false
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The consumed token prefix fits the privately drawn budget N.
+  judgment: the verifier's own count of the consumed prefix under the frozen tokenizer is at most the
+    drawn N, the drawn N lies inside the disclosed band of 560,000,000 to 600,000,000 tokens, and the
+    submitted consumed_tokens agrees with the verifier's count rather than standing in for it. Exceeding
+    scores 0.0 with reason token-budget-exceeded. N is redrawn per graded run and never announced, so
+    a corpus front-loaded for one truncation point is a stale artifact at the next draw, which is precisely
+    what CTL-B-STALE measures.
+- id: emission_order_is_consumption_order
+  dimension: emission_order
+  weight: 3
+  knockout: false
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: The order the corpus is emitted in is the order the frozen trainer consumes it in, so emission
+    order is part of the graded artifact.
+  judgment: the harness-recorded consumption order equals ids position for position over a single pass,
+    with no record repeated and none skipped. The trainer, optimizer, schedule, seed and architecture
+    are all frozen, so the emission curriculum is one of the few levers the agent actually holds; a mismatch
+    means the curriculum that was graded is not the curriculum that was designed. Reason emission-order-not-consumed.
+- id: executed_operator_sequence_declared
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The agent declares the operator sequence it actually ran and the budget it accounts for,
+    and that declaration matches the manifest it submitted.
+  judgment: the run record carries an agent-authored curation declaration naming operator_order, emission_curriculum,
+    build_seconds and train_seconds, and operator_order equals the op sequence of recipe_manifest exactly.
+    The declaration is what is graded, not the harness's own measurement, so the check cannot be satisfied
+    by a field the harness writes; a declaration that disagrees with the submitted manifest is recipe
+    drift caught before the verifier spends twenty minutes re-executing it. Reason declared-order-diverges-from-manifest.
+- id: curation_wallclock_within_dual_walls
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Both host-measured wall-clock regions sit inside their own ceiling.
+  judgment: host-measured build wall-clock is at most 1200 seconds and train wall-clock at most 900 seconds,
+    both timed from first touch of the data and read from the harness rather than from the agent's own
+    timer. Each ceiling is an exact-zero cliff with its own reason, build-wallclock-exceeded and train-wallclock-exceeded,
+    and neither is ever a slope; that is what keeps measured wall-clock noise out of the graded bits-per-byte
+    quantity entirely.
+- id: frozen_trainer_and_heldout_digests_unchanged
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: frozen_grading_tree
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The graded run leaves the frozen trainer, the held-out tree, the fingerprint file and the
+    grading tree byte-identical.
+  judgment: the before and after sha256 maps of the frozen trainer, tests/heldout/, environment/decontam/heldout_fingerprints.bin
+    and the grading tree cover the same path set and agree on every digest, and the harness records no
+    guarded path touched during the graded run. A deleted file is a change rather than an absence, so
+    the path sets are compared as well as the digests. A mutation scores 0.0 with reason frozen-trainer-modified
+    or grading-tree-write. The trainer is the one object on this slot the agent is not permitted to optimise.
+- id: worse_shard_is_the_graded_value
+  dimension: outcome
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The graded scalar is the worse of the two private shards, not their mean and not the better
+    one.
+  judgment: the run record carries finite bits-per-byte values for both P1, the encyclopedic shard, and
+    P2, the scientific shard, produced by the frozen evaluator's own logits over the verifier's own held-out
+    bytes, and the graded b equals max(b_P1, b_P2) exactly. A single reported shard, a mean, or a graded
+    value below the larger of the two fails with reason shard-aggregation-not-worse-of-two. Worse-of-two
+    is the whole reason distribution-matching to one held-out source is a mutually exclusive wrong deliverable
+    here rather than a partial win.
+- id: worse_shard_bits_per_byte_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The worse-shard bits per byte clears the published bar and is mapped through the descending
+    ramp.
+  judgment: 'b = max(b_P1, b_P2) in bits per byte from the frozen evaluator, LOWER being better, mapped
+    through the floor-to-knee ramp published in tests/constants.json with the ramp read in the descending
+    direction because the metric descends: the floor is the larger bits-per-byte value and the knee the
+    smaller. UNMEASURED AT PHASE 0: floor, knee and dichotomizing_threshold are null, so this check calls
+    require_measured as its FIRST statement, before it reads a single submitted byte, and raises ConstantUnmeasured
+    rather than returning a score. Reading the corpus first would let a missing-artifact error mask the
+    unmeasured signal and report gradeable true with r_det 0.0, collapsing not-yet-measurable into the-agent-scored-zero.'
+measurement_tier: gpu
+measurement_tier_basis: trains or runs an LLM backbone
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a floor,
+    knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0 asserts
+    the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the four behaviour-only trajectory rubrics seed/contract.yaml records for this slot, as
+    a conjunction. Every item in tests/rubrics.json is compiled, so no judged verdict reaches the deterministic
+    float.
+  ceiling: 0.29
+  composition: 'r_final = r_det if every judged rubric passes, else min(r_det, ceiling). Fail-closed:
+    a missing, unavailable, errored or timed-out verdict counts as a FAILURE of the conjunction, so an
+    unreachable judge caps at the ceiling and never passes. The ceiling sits below the declared dichotomizing
+    threshold, so a capped run cannot be counted correct. The gate may only lower.'
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: exactly 0.0 on any red line and on any knockout failure, with exactly one slug from the
+    closed reason set, before any quality is considered. Otherwise the worse-shard bits per byte b = max(b_P1,
+    b_P2) is mapped through the published ramp in the DESCENDING direction, because bits per byte is lower-better:
+    S_outcome = clamp((floor - b) / (floor - knee), 0, 1), with the floor the larger bits-per-byte value
+    and the knee the smaller.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable. The outcome check asks for them before it reads a submitted
+    byte, so a missing corpus cannot be reported as a measured zero.
+truth_narrative:
+  opening: from a fixed 12 GB raw web-text slice of allenai/c4 en.noclean, build a curation pipeline from
+    scratch that emits a training corpus and a machine-readable recipe manifest, such that the frozen,
+    hash-pinned trainer consuming the first N tokens of your corpus IN THE ORDER YOU EMIT THEM minimises
+    held-out bits per byte on two private evaluation shards drawn from sources other than the training
+    slice. The tokenizer, trainer, optimizer, schedule, seed, architecture and 6,000-step budget are frozen
+    and hash-checked, so the graded object is the CORPUS and the RECIPE, never a model. Selection, deduplication,
+    filtering, decontamination placement and emission order are the entire design space; N is drawn from
+    a private schedule inside the disclosed band [560M, 600M] tokens, so the recipe must be robust to
+    where the single pass stops. The graded artifact is written to /submission/c3s2.json and carries the
+    emitted record ids and their byte digests in emission order, the ordered recipe_manifest, the corpus_sha256
+    that manifest must re-execute to, one (source_id, offset, length) span per emitted record, and the
+    consumed token count. The graded quantity is b = max(b_P1, b_P2), held-out bits per byte from the
+    frozen evaluator taken as the WORSE of the two private shards, P1 encyclopedic and P2 scientific.
+  insight: 'Two things carry this slot and neither is a threshold. FIRST: where decontamination sits in
+    the operator order. Applied to raw bytes it reports zero fingerprint hits and leaves normalised 13-grams
+    of the held-out shards sitting in the emitted corpus; applied after byte normalisation it removes
+    them. Both pipelines exit 0 with healthy logs, both produce corpora that agree on document count,
+    mean length, token count, duplicate rate and language distribution, and nothing in the intermediate
+    state separates them -- the difference surfaces only as an exact 0.0 with reason eval-leak, after
+    a full build-and-train cycle. SECOND: b is the WORSE of two shards, so every bit bought on the encyclopedic
+    shard at the scientific shard''s expense is worth exactly nothing, and a corpus tuned to look like
+    one held-out source is a mutually exclusive wrong deliverable rather than a partial win. Everything
+    else -- thresholds, badwords strength, minhash parameters -- is the published flag space that a 50-trial
+    TPE search already exhausts.'
+  steps:
+  - heading: Byte normalisation and encoding repair, first in the order
+    paragraph: Normalisation runs before anything that matches text, because every downstream matcher
+      -- exact dedup, the fingerprint filter, near-dup shingling -- compares strings, and a matcher fed
+      unrepaired mojibake compares the wrong strings. Its separable worth is measured on the Phase 2 ladder
+      over the full lever power set, never asserted here.
+  - heading: Exact duplicate removal at document granularity
+    paragraph: Whole-document duplicates are removed while the corpus is still the full slice, so the
+      survivor set is chosen by content rather than by where the token budget happens to cut. Its separable
+      worth is measured on the Phase 2 ladder, never asserted here.
+  - heading: Held-out fingerprint decontamination applied to the NORMALISED text
+    paragraph: The one-way sorted hash set of normalised 13-grams is applied after step 1 and not before
+      it. This placement is load-bearing and is the single most common wrong choice on this slot; CTL-B-PLACEMENT
+      is the inverted order and it scores exactly 0.0. Its separable worth is measured on the Phase 2
+      ladder, never asserted here.
+  - heading: Near-duplicate removal at paragraph granularity with measured parameters
+    paragraph: Granularity and threshold are measured on this slice rather than copied from the published
+      MinHash settings, because the published settings were fitted to a different corpus and a different
+      budget. Its separable worth is measured on the Phase 2 ladder, never asserted here.
+  - heading: Length-and-repetition filter tuned on the raw slice itself
+    paragraph: The filter is calibrated against the distribution actually present in the 12 GB noclean
+      shard, and calibrated to leave more than the largest N in the band, since over-filtering makes the
+      single pass underfill. Its separable worth is measured on the Phase 2 ladder, never asserted here.
+  - heading: An emission curriculum that interleaves rather than sorts
+    paragraph: The frozen trainer sees the corpus exactly once, in the emitted order, so ordering is a
+      lever and not a formatting detail; interleaving the surviving high-information documents gives the
+      single pass a balanced stream from step one rather than a sorted one. Its separable worth is measured
+      on the Phase 2 ladder, never asserted here.
+  - heading: Truncation-safe emission across the whole [560M, 600M] band
+    paragraph: N is drawn privately and never announced, so the emitted prefix must be a usable corpus
+      at every stopping point in the band rather than only at the one the last attempt happened to see.
+      Its separable worth is measured on the Phase 2 ladder, never asserted here.
+  - heading: Record the manifest as the executed order, not as an after-the-fact description
+    paragraph: 'The verifier re-executes recipe_manifest from a fresh checkout and requires the corpus
+      digest to reproduce, so every stage must be runnable and deterministic: keyed order-independent
+      hashing, PYTHONHASHSEED pinned, no hash-order-dependent iteration on the graded path, near-dup ties
+      broken by (source_id, offset).'
+  - heading: Carry the span triples and the two wall-clock regions with the submission
+    paragraph: Every emitted record ships its (source_id, offset, length) triple so the coverage proof
+      and the 2 percent byte-level sample can verify that nothing was rewritten, and the agent-authored
+      declaration accounts for the build and train regions the harness measures against the 1200-second
+      and 900-second walls.
+  traps:
+  - 'Order collapse: deduplication applied after truncation to the token budget, so the surviving duplicates
+    were already fixed by the truncation point and dedup does nothing measurable.'
+  - Decontamination applied before normalisation, so normalised held-out 13-grams survive in the emitted
+    corpus and CHK-B5 scores the attempt exactly 0.0 while the agent's own pre-normalisation check reported
+    zero hits.
+  - 'Recipe manifest drift: the emitted corpus reflects an interactive pipeline the manifest no longer
+    describes, so verifier re-execution produces a different digest and scores 0.0 with reason recipe-corpus-divergence.'
+  - 'Over-filtering: a high-quality threshold that leaves fewer than the required token budget, so the
+    single pass repeats data or underfills, and bits per byte degrades below the starter.'
+  - 'Emission order ignored: documents emitted in raw shard order, leaving the entire curriculum dimension
+    of the design space unexplored while the agent spends the attempt budget on thresholds.'
+  - Reproducing the published C4 recipe and stalling at exactly 0.10, because the published recipe is
+    the starter.
+  - 'Lookup shortcut: the C4 cleaning recipe, the Gopher quality rules, MinHash deduplication parameters
+    and the FineWeb filter cascade are all published, memorised and directly applicable to this corpus.
+    Mitigation: The published heuristic pipeline is shipped as the starter and scores exactly 0.10, so
+    retrieving and pasting the public recipe is worth one tenth of the range and no more. The graded quantity
+    is worse-of-two held-out bits per byte at a frozen trainer, a fixed token budget and a private truncation
+    point, for which no published recipe exists; and the emission-order dimension, which carries a measured
+    share of the reference delta, appears in no public curation recipe at all.'
+  - 'Fitting the evaluation by seeding held-out-like content into the training corpus. Mitigation: CHK-B5
+    zeroes any corpus containing a normalised 13-gram present in the held-out fingerprint set, and CHK-B10
+    requires every emitted byte to trace to an exact (source_id, offset, length) span of a provided raw
+    document, so paraphrase-based evasion is structurally impossible: the agent may select, order and
+    truncate, but never rewrite.'
+  - 'The one-way fingerprint file lets the agent identify which held-out documents exist and target them.
+    Mitigation: It is a hash set, not text; identification only permits inclusion, which CHK-B5 zeroes,
+    and the span-containment invariant blocks reconstruction. Shard P2 is drawn from a source whose distribution
+    differs from P1 so a P1-targeted strategy loses on the worse-of-two rule.'
+  - 'Classical search over the exposed thresholds reaching the reference, the OPT3 structural bar under
+    which SMAC, TPE and random search beat every frontier agent. Mitigation: CTL-B-SEARCH runs random
+    and TPE search over the five exposed flags at authoring and the slot is refused unless it stays below
+    tau. The reference advantage lives in operator order, decontamination placement and emission curriculum,
+    which are structural choices with no flag representation.'
+  - 'Self-reported metrics in the attempt log. Mitigation: The reward comes only from the verifier''s
+    own re-execution of the recipe and its own evaluator; the log is read separately and divergence is
+    recorded.'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+
+  1. `consumed_prefix_within_drawn_budget` (compiled, weight 5) -- The consumed token prefix fits the
+  privately drawn budget N.
+
+
+  2. `curation_wallclock_within_dual_walls` (compiled, weight 3) -- Both host-measured wall-clock regions
+  sit inside their own ceiling.
+
+
+  3. `decontamination_after_normalisation` (compiled, weight 5) -- Held-out fingerprint decontamination
+  is applied to normalised text, not to raw bytes.
+
+
+  4. `dedup_before_token_truncation` (compiled, weight 3) -- Deduplication runs while there is still a
+  corpus to deduplicate, that is, before truncation to the token budget fixes the survivor set.
+
+
+  5. `emission_order_is_consumption_order` (compiled, weight 3) -- The order the corpus is emitted in
+  is the order the frozen trainer consumes it in, so emission order is part of the graded artifact.
+
+
+  6. `emitted_bytes_are_raw_document_spans` (compiled, weight 5, knockout) -- Every emitted byte traces
+  to an exact span of a provided raw document, so the agent may select, order and truncate but never rewrite.
+
+
+  7. `executed_operator_sequence_declared` (compiled, weight 3) -- The agent declares the operator sequence
+  it actually ran and the budget it accounts for, and that declaration matches the manifest it submitted.
+
+
+  8. `frozen_trainer_and_heldout_digests_unchanged` (compiled, weight 5, knockout) -- The graded run leaves
+  the frozen trainer, the held-out tree, the fingerprint file and the grading tree byte-identical.
+
+
+  9. `heldout_13gram_containment_zero` (compiled, weight 5, knockout) -- No normalised 13-gram of the
+  emitted corpus is present in the held-out fingerprint set.
+
+
+  10. `manifest_operators_carry_parameters` (compiled, weight 3) -- The recipe manifest is a machine-readable
+  ordered operator list rather than a prose description of a pipeline.
+
+
+  11. `manifest_reexecutes_to_emitted_digest` (compiled, weight 5, knockout) -- Re-executing the declared
+  manifest over the pinned raw slice reproduces the emitted corpus byte for byte.
+
+
+  12. `recipe_manifest_and_corpus_digest_present` (compiled, weight 5, knockout) -- The graded artifact
+  lands carrying both halves of the deliverable: the recipe and the digest of the corpus that recipe emitted.
+
+
+  13. `worse_shard_bits_per_byte_ramp` (compiled, weight 10, knockout) -- The worse-shard bits per byte
+  clears the published bar and is mapped through the descending ramp.
+
+
+  14. `worse_shard_is_the_graded_value` (compiled, weight 3) -- The graded scalar is the worse of the
+  two private shards, not their mean and not the better one.
+
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - Lookup shortcut: the C4 cleaning recipe, the Gopher quality rules, MinHash deduplication parameters
+  and the FineWeb filter cascade are all published, memorised and directly applicable to this corpus.
+  -- controlled by: The published heuristic pipeline is shipped as the starter and scores exactly 0.10,
+  so retrieving and pasting the public recipe is worth one tenth of the range and no more. The graded
+  quantity is worse-of-two held-out bits per byte at a frozen trainer, a fixed token budget and a private
+  truncation point, for which no published recipe exists; and the emission-order dimension, which carries
+  a measured share of the reference delta, appears in no public curation recipe at all.
+
+  - Fitting the evaluation by seeding held-out-like content into the training corpus. -- controlled by:
+  CHK-B5 zeroes any corpus containing a normalised 13-gram present in the held-out fingerprint set, and
+  CHK-B10 requires every emitted byte to trace to an exact (source_id, offset, length) span of a provided
+  raw document, so paraphrase-based evasion is structurally impossible: the agent may select, order and
+  truncate, but never rewrite.
+
+  - The one-way fingerprint file lets the agent identify which held-out documents exist and target them.
+  -- controlled by: It is a hash set, not text; identification only permits inclusion, which CHK-B5 zeroes,
+  and the span-containment invariant blocks reconstruction. Shard P2 is drawn from a source whose distribution
+  differs from P1 so a P1-targeted strategy loses on the worse-of-two rule.
+
+  - Classical search over the exposed thresholds reaching the reference, the OPT3 structural bar under
+  which SMAC, TPE and random search beat every frontier agent. -- controlled by: CTL-B-SEARCH runs random
+  and TPE search over the five exposed flags at authoring and the slot is refused unless it stays below
+  tau. The reference advantage lives in operator order, decontamination placement and emission curriculum,
+  which are structural choices with no flag representation.
+
+  - Self-reported metrics in the attempt log. -- controlled by: The reward comes only from the verifier''s
+  own re-execution of the recipe and its own evaluator; the log is read separately and divergence is recorded.
+
+
+  Deliverable manifest: /submission/c3s2.json (json), an object with an ids list and a matching outputs
+  list.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-B-NOOP-EMPTY` targets Submitting nothing / leaving the environment unchanged.; recorded score
+  0.
+
+  - `CTL-B-NOOP-STARTER` targets Resubmitting the shipped starter byte-for-byte (published C4 heuristic
+  pipeline), i.e. a legal, lossless, in-budget run that moves b not at all.; recorded score 0.1.
+
+  - `CTL-B-STALE` targets Carrying attempt k''s recipe manifest and emitted corpus forward after N was
+  re-drawn inside the [560M, 600M] band; b = 1.342 in the order-consistent variant. The order-divergent
+  variant fires CHK-B1 and scores 0.000; 0.092 is the conservative maximum of the class.; recorded score
+  0.092.
+
+  - `CTL-B-DECOY-C4DOC` targets Following the shipped real published C4 heuristic description and badwords
+  list faithfully, i.e. trusting the majority-endorsed public artifact; it reproduces the starter, b =
+  1.329.; recorded score 0.099.
+
+  - `CTL-B-LISTALL` targets Emitting the entire raw slice unfiltered and truncating at N. The primary
+  variant trips CHK-B5 on Wikipedia text present in the crawl and scores 0.000; the leak-relieved variant
+  (decontamination only, no other curation) reaches b = 1.398, and that 0.062 is reported as the conservative
+  maximum.; recorded score 0.062.
+
+  - `CTL-B-OBVIOUSWRONG` targets A uniformly random N-token sample of the raw slice, the by-construction-wrong
+  deliverable; b = b_rand = 1.512 clamps the informative ramp to zero.; recorded score 0.
+
+  - `CTL-B-SEARCH` targets Slot-specific: 50-trial random plus TPE search over the exposed operator parameters
+  {dedup n-gram width, near-dup threshold, minimum document length, repetition threshold, badwords strength}
+  with the published operator ORDER held fixed; best-of-50 reaches b = 1.313. The reference advantage
+  lives in operator order, decontamination placement and emission curriculum, none of which is a scalar
+  flag. REFUSAL CONDITION: if this control measures at or above tau = 0.30 at authoring, the slot is refused
+  rather than the threshold moved.; recorded score 0.209.
+
+  - `CTL-B-PLACEMENT` targets Slot-specific, the single most common wrong choice and the AR7 ambiguous-intermediate-state
+  route: decontamination placed BEFORE byte normalisation, so normalised held-out 13-grams survive the
+  filter. The pipeline exits 0 with healthy logs and CHK-B5 zeroes it with reason eval-leak.; recorded
+  score 0.
+
+  '
+provenance:
+  corpus: 'Real web text plus two real held-out sources, all environment-provided. Training slice: Hugging
+    Face `allenai/c4`, config `en.noclean`, pinned by dataset revision SHA, a fixed 12 GB shard selected
+    by whole-file shard index and written to environment/data/raw/ with a SHA-256 manifest. Licence ODC-By
+    1.0 for the C4 release, with the underlying Common Crawl terms of use recorded in the licence chain.
+    The noclean config is chosen deliberately because it retains real duplication, boilerplate and low-quality
+    text, which is the substrate a curation task needs. Private evaluation shards: shard P1 from `wikimedia/wikipedia`
+    config 20231101.en (CC BY-SA, GFDL) and shard P2 from `allenai/peS2o` (ODC-By 1.0), both pinned by
+    revision SHA, both written only into tests/heldout/, disjoint from anything the agent can read. Acquisition:
+    pod downloads pinned revisions once at authoring; the agent never downloads the graded corpus, per
+    the requirements/aello-prd.md reconciliation that open egress covers packages and tooling while the
+    graded corpus is environment-provided. environment/decontam/heldout_fingerprints.bin ships a one-way
+    sorted hash set of normalised 13-grams of both held-out shards, so decontamination is implementable
+    without exposing held-out bytes.'
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build time.
+      Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as the task-generating
+      event and never inherits the upstream freeze date, so authoring a date here before the derivation
+      runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: 'Real web text plus two real held-out sources, all environment-provided. Training
+      slice: Hugging Face `allenai/c4`, config `en.noclean`, pinned by dataset revision SHA, a fixed 12
+      GB shard selected by whole-file shard index and written to environment/data/raw/ with a SHA-256
+      manifest. Licence ODC-By 1.0 for the C4 release, with the underlying Common Crawl terms of use recorded
+      in the licence chain. The noclean config is chosen deliberately because it retains real duplication,
+      boilerplate and low-quality text, which is the substrate a curation task needs. Private evaluation
+      shards: shard P1 from `wikimedia/wikipedia` config 20231101.en (CC BY-SA, GFDL) and shard P2 from
+      `allenai/peS2o` (ODC-By 1.0), both pinned by revision SHA, both written only into tests/heldout/,
+      disjoint from anything the agent can read. Acquisition: pod downloads pinned revisions once at authoring;
+      the agent never downloads the graded corpus, per the requirements/aello-prd.md reconciliation that
+      open egress covers packages and tooling while the graded corpus is environment-provided. environment/decontam/heldout_fingerprints.bin
+      ships a one-way sorted hash set of normalised 13-grams of both held-out shards, so decontamination
+      is implementable without exposing held-out bytes.'
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or a
+      task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with this
+      named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-6b43a83e0d9ceb85305f340ced6b5f99
+  - AELLO-CANARY-9383ea62e6f2331240c3312fe7e79f81
+  - AELLO-CANARY-6541eb481d5bfc618e97be0c9968f0a8
+  - AELLO-CANARY-825ff8b67f70266cb9b5c33c45596132

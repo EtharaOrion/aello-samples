@@ -1,0 +1,277 @@
+# Harbor delivery unit for AELLO-C8-S1.
+#
+# schema_version is TOP LEVEL, which is where harness/src/harbor/models/task/config.py
+# declares it: TaskConfig.schema_version, default "1.4", with a before-validator mapping a
+# legacy `version` key forward. 1.4 is the value tested against the pinned harness source,
+# not against documentation and not a floating latest.
+schema_version = "1.4"
+
+# Every graded deliverable is declared so its bytes are snapshotted out of the environment
+# before teardown, and re-materialized inside the separate verifier container at the same
+# absolute paths. AGENT-SIDE artifacts only: /logs/verifier/* exists in the verifier
+# container, not in main, and Harbor collects the verifier's own output through its
+# verifier path, not through this list.
+artifacts = [
+  "/workspace/agent_src",
+  "/submission/preds_i20k.npy",
+]
+
+[task]
+name = "aello/c8-s1-cifar100-step-budget"
+description = "Improve a CIFAR-100 training pipeline to maximise balanced accuracy at a fixed 8000-step budget."
+authors = [{ name = "AELLO" }]
+keywords = ["optimization", "bounded-continuous", "vision", "image-classification", "training-recipe"]
+version = "1.2.0"
+
+[metadata]
+
+
+
+# Restored to [metadata] at pass 15 after testing every candidate: each of these is READ BY
+# AN INSTRUMENT (audit/g_opt.py reads metadata.tags; the rest are read across seed/, audit/
+# and memory/). A field an instrument checks IS observable -- by an instrument probe, if not
+# by the runtime -- so reclassifying it as non-binding would break the reader AND hide that
+# it is checked. graded_axis is restored with its re-declared value.
+archetype = "AR6"
+budget_envelope = "one NVIDIA H100 80GB, single-tenant exclusive, execution class per the seed/host.json probe, identical for the agent sandbox and the separate verifier environment"
+category = "image-classification"
+# RE-DECLARATION ATTEMPTED AND REVERTED, 2026-08-29. The axis was moved to "balanced_accuracy"
+# because the bundle cannot measure the budget half of accuracy_at_budget: no step counter runs
+# anywhere, and enforcement is unavailable from inside a verifier whose only inputs are the private
+# heldout labels and two AGENT-WRITTEN trees. But seed/admissibility.py GRADED_AXES admits exactly
+# ("time_to_bar", "accuracy_at_budget", "throughput", "quality_under_budget"), so
+# "balanced_accuracy" made the bundle INADMISSIBLE -- require_graded_axis raises
+# GradedAxisMismatch: unknown graded axis. A repair that moves a bundle outside the legal
+# enumeration is not a repair.
+#
+# The enumeration is saying something true: every legal axis presupposes a bound, because an AELLO
+# optimisation slot is bounded by construction. There is no legal term for "accuracy, unbudgeted",
+# so a slot whose budget is not enforced cannot honestly declare ANY legal axis. That is the real
+# finding and it is filed as a gap, not resolved by widening the enumeration to admit this bundle
+# -- moving the reference to fit the material is the shape this pass exists to close.
+#
+# So the legal value is restored and the overclaim is made explicit IN the bundle by
+# graded_step_budget_status below, rather than hidden behind an illegal axis or a silent edit.
+graded_axis = "accuracy_at_budget"
+reward_formula = "r_det = GATE_det * S_outcome * RubricFactor_det; judged rubrics compose downstream and only reduce"
+reward_schema = "one float on the closed interval from zero to one, higher is better. The ramp knee sits deliberately above the measured reference ceiling, so the top of the interval is reachable only by a submission that exceeds that ceiling; the reference itself scores below 1.0. See solution/TRUTH.md."
+slot_id = "AELLO-C8-S1"
+tags = ["optimization", "bounded-continuous"]
+universal_scoring_version = "engram.universal_scoring/v1"
+upstream = "CIFAR-100"
+
+# The reward this bundle's verifier writes is r_det, the DETERMINISTIC score (Bucket D).
+# The judged trajectory rubrics in tests/rubrics.jsonl are graded by the harness's LLM
+# trajectory grader AFTER r_det and may only lower the composed result (seed/reward.py
+# gate form). No judged term participates in the number written to /logs/verifier/reward.txt.
+
+# Client v3 line 75 names both tags; optimization lane item 1 binds them.
+
+# Optimization lane item 1 binds three DISTINCT quantities, never aliases:
+#   budget_hours   - per-attempt completion bound, from client-requirements-v3.md:138.
+#   max_timeout    - refinement-loop terminator across attempts, an authored pacing
+#                    choice; the equal value is a coincidence of independent
+#                    authorities, not an alias.
+#   max_attempts   - attempt cap, at most one hundred, fifty the default.
+# The run ends when max_timeout or max_attempts trips first; an attempt ends at
+# budget_hours.
+# CORRECTED 2026-08-31. This read 6.0, ALIASING budget_hours = 6.0 in the same file.
+# Optimization lane item 1 states that max_timeout and budget_hours "are explicitly distinct,
+# never aliases": max_timeout terminates the refinement run ACROSS attempts, budget_hours bounds
+# ONE attempt. Equal values collapse the two roles: a terminator equal to the per-attempt ceiling
+# cannot admit a second attempt. Note what is NOT claimed -- seed/contract.yaml's refusal ("refusing
+# the delivered shape that sized fifty 432-second attempts to fill six hours") condemns the
+# DERIVATION METHOD, deriving per_attempt_seconds by dividing a loop bound by the attempt cap, not
+# the coincidence of values. 432 s is independently grounded as the measured reference pace and is
+# unchanged here. The violation repaired is the aliasing, nothing else.
+#
+# The two C6 bundles were reported to the pod as "contradicting themselves" for carrying 8.0
+# against budget_hours 6.0. They are not: distinctness is the clause being SATISFIED. This bundle
+# was the one in violation.
+#
+# BASIS, stated because an unbased number is the budget_margin defect: the terminator must exceed
+# BOTH the per-attempt ceiling (6.0 h) and the reference-paced attempt-cap work
+# (max_attempts 50 x per_attempt_seconds 432 s = 6.0 h), or the run cannot complete its own
+# declared cap plus per-attempt grading overhead. 8.0 is the smallest whole-hour value above both
+# and matches the convention already carried by the two C6 bundles. It is an AUTHORED pacing, not
+# a measurement, and a human may revise it the way budget_margin is revised.
+max_timeout = 8.0
+max_timeout_units = "hours"
+budget_hours = 6.0
+
+# Carried by name only, never a FORGE-authored number; requirements/ values or
+# touchstones/ dispositions override the conservative default.
+budget_margin = "conservative_default"
+max_attempts = 50
+# Operational per-attempt pacing envelope, AUTHORED from measured reference pace with
+# margin (roughly 7.5x the reference wall clock), never derived by dividing a loop
+# bound by the attempt cap: the superseded 432 = 21600/50 derivation conflated
+# budget_hours with max_timeout and is refused (contract optimization_lane block).
+# Corroborated by the compiled step_budget_declared check, by the judged honest_step_budget
+# rubric, and by tests/envelope.py, which carries the same effective-value evaluator; it is
+# not yet enforced by a timer in the verifier, and that residual is recorded in
+# solution/TRUTH.md rather than hidden.
+per_attempt_seconds = 432.0
+# Client v3 line 67: either the last submission or the best one may be picked.
+final_selection = "best"
+
+graded_step_budget = 8000
+# The budget is stated to the agent as: at most 8000 optimizer updates AND at most
+# 1,024,000 training-sample presentations (8000 x the starter's batch of 128), so a larger
+# batch buys fewer steps rather than free compute. instruction.md carries the same words.
+graded_sample_budget = 1024000
+# GRADED AXIS, re-declared 2026-08-27. It read "accuracy_at_budget" and the bundle could not
+# measure the budget half. graded_step_budget = 8000 was checked by ONE AST assertion that the
+# string BUDGET_STEPS = 8000 appears at module level in an agent-authored file; no step counter
+# runs anywhere, tests/verifier.py contains no step logic at all, and graded_sample_budget has no
+# reader outside tests/envelope.py, which nothing invokes. An agent that declared 8000 and trained
+# 16000 updates scored higher and passed every check.
+#
+# The choice was enforce or re-declare, and enforcement is NOT available to this bundle. The
+# verifier's only inputs are the private heldout labels and two AGENT-WRITTEN trees, /submission
+# and agent_src. A step log read from either is forgeable, which is exactly the elapsed_s
+# fail-open repaired in the judge bundles this same pass; shipping it would re-create the defect
+# under a new name. A host-authoritative step counter belongs in the harness, is recorded as owed,
+# and the axis can be restored the moment one exists.
+#
+# So the axis now names what is actually measured: balanced accuracy of the exported predictions
+# against the private graded split. The step budget is DEMOTED from an enforced graded constraint
+# to a declared one, corroborated by the compiled step_budget_declared check and the judged
+# honest_step_budget rubric -- which is what it factually was. An observance probe perturbing
+# graded_step_budget correctly finds no downstream movement, and that is now consistent with what
+# the bundle claims rather than contradicting it.
+
+
+compute_envelope = "one H100"
+
+[environment]
+build_timeout_sec = 1800.0
+# No docker_image pin: Harbor builds the agent image from environment/Dockerfile, which is
+# self-contained and digest-pins its base. This is what client C2 requires ("the sandbox
+# is set up using the instructions specified in the DOCKERFILE"): the environment must be
+# reconstructible from bytes inside the bundle, with no private registry. The previous
+# revision pinned 127.0.0.1:5000/..., which no machine but the authoring host could pull.
+cpus = 8
+memory_mb = 65536
+storage_mb = 131072
+gpus = 1
+gpu_types = ["H100"]
+workdir = "/workspace"
+# NETWORK POLICY, and the layer matters. [environment] is the BASELINE policy and covers
+# trial SETUP (image build + coding-agent install); [agent] is the solve-phase override.
+# Client v3 FAQ: internet is needed ONLY FOR SETUP, so the baseline is an ALLOWLIST
+# bounded to build and agent infrastructure rather than open egress.
+#
+# AN HONEST LIMIT, reported rather than worked around: the solving agent runs INSIDE this
+# container and must reach its model API to think at all, so "no egress while solving"
+# cannot be implemented as an agent-phase no-network without disabling the agent. What is
+# enforceable is that the allowlist carries agent infrastructure and NO dataset or
+# model-zoo host, so the agent cannot fetch CIFAR-100, pretrained weights, or any corpus.
+# The residual intent is carried by the trajectory rubrics no_external_data and
+# no_pretrained_weights, which is judged evidence and not a mechanical guarantee.
+network_mode = "allowlist"
+allowed_hosts = ["pypi.org", "files.pythonhosted.org", "archive.ubuntu.com",
+                 "security.ubuntu.com", "developer.download.nvidia.com",
+                 "downloads.claude.ai", "*.claude.ai", "registry.npmjs.org",
+                 "registry.yarnpkg.com", "deb.nodesource.com", "api.anthropic.com",
+                 "nodejs.org"]
+
+[environment.env]
+AELLO_SLOT = "AELLO-C8-S1"
+AELLO_BUDGET_STEPS = "8000"
+
+[agent]
+timeout_sec = 21600.0
+# Phase override, narrower than the baseline: the agent needs its own bootstrap and the
+# model API, not the apt or nvidia mirrors the IMAGE BUILD needed. Hosts for the client's
+# named solver cohort are included so a non-Anthropic agent can reach its API; the muse
+# spark endpoint must be added here once its host is known (recorded as an open item).
+network_mode = "allowlist"
+allowed_hosts = ["downloads.claude.ai", "*.claude.ai", "registry.npmjs.org",
+                 "registry.yarnpkg.com", "api.anthropic.com", "pypi.org",
+                 "files.pythonhosted.org", "api.openai.com", "chatgpt.com"]
+
+[verifier]
+# NETWORK. Absent, [verifier].network_mode fell through to a deep copy of [environment],
+# so the verifier ran with the twelve-host BUILD allowlist -- api.anthropic.com and pypi.org
+# among them -- and inherited gpus=1. That made solution/policy.yaml's network_verifier: denied
+# false, and the "no GPU is declared or needed" sentence below false, in the same bundle that
+# asserted both. Bound explicitly. The token is "no-network"; "none" is not a member of Harbor's
+# NetworkMode enum and fails validation.
+network_mode = "no-network"
+timeout_sec = 1800.0
+# SEPARATE verifier, built from tests/ as its build context (tests/Dockerfile), exactly as
+# the Harbor contract specifies: "the image must provide /tests/test.sh ... Harbor does
+# not upload tests for separate envs". The graded labels under tests/heldout/ are baked
+# into this image and are never present in the agent's container. Grading is CPU-only
+# (integer comparisons over the submitted predictions), so no GPU is declared or needed.
+# The submitted predictions and the agent's code snapshot arrive through the artifacts
+# list above, re-materialized at their original absolute paths.
+environment_mode = "separate"
+
+# Snapshot every file the agent authored, BEFORE environment teardown, into two places:
+#   /logs/agent/agent_code/  bind-mounted to <trial_dir>/agent and read by the host-side
+#       council, so it grades the agent's REAL code rather than a starved excerpt.
+#   /workspace/agent_src/    collected as an artifact and re-uploaded into the separate
+#       verifier, so the deterministic scan sees every file the agent wrote.
+# Broad capture: any filename the agent chose. Best-effort, never fails the trial.
+[[verifier.collect]]
+command = '''mkdir -p /logs/agent/agent_code /workspace/agent_src && cd /workspace && find . -type f \( -name '*.py' -o -name '*.sh' -o -name '*.md' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' -o -name '*.txt' -o -name '*.ipynb' \) -not -path './environment/data/*' -not -path './agent_src/*' -exec cp --parents {} /logs/agent/agent_code/ \; -exec cp --parents {} /workspace/agent_src/ \; ; true'''
+timeout_sec = 60.0
+
+[solution.env]
+AELLO_ORACLE = "1"
+
+# Fields kept in [metadata] BECAUSE they are enforceable and therefore defects, not
+# provenance -- moving them would hide the gap:
+#   budget_hours           enforceable: [agent] timeout_sec is read and enforced; this is the number it should be derived from
+#   budget_margin          enforceable in principle, but it has never been resolved to a number ANYWHERE, so there is no second operand for FORGE 4c's comparison. That is a defect in the value, not in the field
+#   compute_envelope       enforceable: [environment].gpu_types is read by the modal, gke, beam and daytona backends; docker ignores it
+#   final_selection        enforceable: deliver.py already selects, with a hardcoded max() instead of branching on this
+#   graded_sample_budget   same as graded_step_budget
+#   graded_step_budget     enforceable HOST-SIDE. It is unenforceable from inside the verifier, which is why the axis was re-declared, but a harness step counter would observe it
+#   max_attempts           enforceable: the loop already takes an iteration count, from --iters instead of this
+#   max_timeout            enforceable: scaffold/refine.py already has a cumulative deadline, it just reads a hardcoded constant instead of this
+#   per_attempt_seconds    enforceable: it is a wall-clock bound and the trial already enforces wall-clock bounds
+
+# ---------------------------------------------------------------------------------------------
+# [metadata.provenance] -- EXPLICITLY NON-BINDING.
+#
+# Only keys with NO reader anywhere in seed/, audit/, memory/ or the scaffold, and no conceivable
+# runtime probe: pure labels for humans. Calling such a field a "binding" is a category error,
+# and a FORGE.md clause requiring one is INERT.
+#
+# Deliberately NOT here: every field some component already enforces by another route, and every
+# field an instrument checks. A field that COULD be observed but merely is not today is a DEFECT,
+# and moving it here would hide the gap behind a reclassification.
+# ---------------------------------------------------------------------------------------------
+[metadata.provenance]
+# final_selection_basis: prose justifying final_selection; final_selection itself stays out, it is enforceable
+final_selection_basis = "The reward is bounded, monotone and higher-is-better, so the best attempt is well defined and picking it does not reward a late lucky seed over a real improvement."
+# graded_step_budget_status: a status label recording that the budget is declared, not enforced
+graded_step_budget_status = "declared_and_corroborated__not_enforced"
+# scoring_engine: a name label; the engine that runs is the vendored wheel
+scoring_engine = "aello_eval"
+# universal_scoring_engine_location: a path label for humans; the vendored wheel is hashed
+universal_scoring_engine_location = "harness/packages/aello-eval/, vendored as tests/aello_eval-0.1.0-py3-none-any.whl"
+
+# GPU HALF of the A4 repair, 2026-08-31. network_mode = "no-network" above stopped the verifier
+# inheriting the build allowlist, but the GPU inheritance survived it: with no
+# [verifier.environment] table, verifier_mode.py returns
+# `task_cfg.environment.model_copy(deep=True)`, so the verifier took gpus = 1 and gpu_types
+# ["H100"] from [environment] while task.toml's own [verifier] comment says "Grading is CPU-only
+# ... so no GPU is declared or needed". Both could not be true.
+#
+# NOTE THE MERGE SEMANTICS, because they decide the shape of this table: when
+# task_cfg.verifier.environment is not None it is used WHOLESALE -- there is no field-level merge
+# with [environment]. So this block must be COMPLETE, not a one-line gpus override, or cpus,
+# memory and workdir would silently fall to library defaults. Every value below is copied from
+# [environment] except gpus, gpu_types and the network fields.
+[verifier.environment]
+build_timeout_sec = 1800.0
+cpus = 8
+memory_mb = 65536
+storage_mb = 131072
+gpus = 0
+workdir = "/workspace"
+network_mode = "no-network"

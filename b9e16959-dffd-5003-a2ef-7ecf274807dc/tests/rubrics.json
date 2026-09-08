@@ -1,0 +1,208 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "checkpoint_series",
+  "domain_token_trace",
+  "heldout_shards",
+  "recipe_declaration",
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The bar is evaluated at context 2048 over non-overlapping windows, scoring every position but the first of each window, in nats over ln 2 over shard bytes.",
+   "dimension": "bpb_accounting",
+   "evaluation_target": "heldout_shards",
+   "id": "bits_per_byte_excludes_each_window_first_position",
+   "judgment": "INVARIANT: The harness window accounting must report context 2048 and 2047 scored positions per window -- each window's first position has no in-window context to condition on and is not scored -- with the window count tiling the shard without overlap. The reported bits-per-byte must satisfy the identity against total shard BYTES and, where the two totals differ, must not satisfy it against scored positions: dividing by positions instead of bytes moves the number the bar is set on without any modelling having changed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The emission cadence the run declares is the cadence the harness stamped, so the resolution of the score is a declared quantity.",
+   "dimension": "checkpoint_emission",
+   "evaluation_target": "checkpoint_series",
+   "id": "checkpoint_cadence_bounds_the_time_to_bar",
+   "judgment": "EFFECT: clock.checkpoint_interval_s is positive and the widest harness-stamped gap up to the crossing -- counting the gap from the clock opening to the first emission -- is at most 1.05 times it. Because the graded quantity is the stamp of the first clearing checkpoint, that widest gap is the granularity of the score: a run that reaches 1.02 but only emits every 600 s is charged for up to 600 s it had already earned, so emitting often is itself a lever on the axis.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The graded seconds run from the harness's first read of the shipped corpus, not from the first optimizer step.",
+   "dimension": "clock_boundary",
+   "evaluation_target": "run_record",
+   "id": "clock_opens_at_first_corpus_read",
+   "judgment": "INVARIANT: The harness stamp first_corpus_read_stamp_s is the origin and the crossing checkpoint's stamp is the terminus; clock.graded_seconds_to_bar in the submission must equal that difference within 1 ms, and clock.first_corpus_read_stamp_s must equal the harness origin. Tokenizer construction, memmap open and dataloader warm-up all fall inside the interval, so an agent that starts its own timer at the first step understates the span by exactly the setup it declined to pay for, and the check reports that difference.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The crossing the submission declares at the 1.02 bar is the earliest-stamped emitted checkpoint the harness measured at or below that bar.",
+   "dimension": "bar_crossing",
+   "evaluation_target": "submitted_artifact",
+   "id": "declared_crossing_is_the_earliest_checkpoint_to_clear_the_bar",
+   "judgment": "VALUE: The harness timeline is scanned in stamp order for the first checkpoint whose bpb_private is at or below 1.02; the submission's bar_crossings entry for 1.02 must name that same checkpoint_id and that same harness_stamp_s within 1 ms. Naming a later clearing checkpoint prices the run slower than it was; naming an earlier checkpoint that never cleared claims a bar that was never crossed. Earliest, not best: a checkpoint that models better after the crossing moves nothing, and a checkpoint that never crosses is worth nothing.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded run emitted at least one checkpoint and every emitted checkpoint carries the harness stamp the score is read off.",
+   "dimension": "checkpoint_emission",
+   "evaluation_target": "checkpoint_series",
+   "id": "emitted_checkpoint_series_is_stamped",
+   "judgment": "EFFECT: /submission/c1s2.json carries checkpoint_series, bar_crossings, recipe, clock and init_spec; checkpoint_series is a non-empty list whose records each name a checkpoint_id, a harness_stamp_s and a bpb_private, with stamps strictly increasing in emission order. No emitted checkpoint at all is the no-deliverable red line, and an unstamped checkpoint can never be the earliest crossing one because the graded quantity is read off the stamp and nowhere else.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The domain-majority segments the harness observed are the stages the recipe declared, in the declared order and at the declared boundaries.",
+   "dimension": "domain_mixture",
+   "evaluation_target": "domain_token_trace",
+   "id": "executed_domain_segments_match_declared_stage_order",
+   "judgment": "ORDERING: The majority domain of each declared stage is its argmax mixture weight over crec, pes2o and pg19; that sequence must equal the sequence of domain-majority segments in the harness memmap shim's per-domain token trace, and each observed segment end must sit within 3.0e6 tokens -- 0.5 percent of the 6.0e8 budget -- of the declared boundary. A smoothly annealed mixture declares discrete boundaries it never executes and diverges here even when the model is good; the slug is recipe-divergence.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The instruments that assign the graded stamp and record the domain trace are byte-identical either side of the graded run.",
+   "dimension": "instrument_integrity",
+   "evaluation_target": "run_record",
+   "id": "harness_stamping_instruments_unwritten",
+   "judgment": "ABSENCE: Every digest under the pinned verifier tree is unchanged between the before and after records, no guarded path was touched, and the roster actually digested includes aello_emit.py and the harness memmap shim. On this slot those two files ARE the measurement: the emitter assigns the checkpoint stamp the score is read off and the shim writes the per-domain token trace the recipe is checked against, so editing them would forge the graded instant rather than earn it. An empty digest map would pass vacuously, which is why the instruments must be present in it; the slug is grading-tree-written.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded shards are built at the disclosed held-out mixture, which is not the shipped training mixture.",
+   "dimension": "heldout_shift",
+   "evaluation_target": "heldout_shards",
+   "id": "heldout_shards_carry_the_disclosed_shifted_mixture",
+   "judgment": "INVARIANT: The harness manifest's per-domain document shares for the held-out shards equal the disclosed 55 percent Congressional Record, 30 percent peS2o, 15 percent Gutenberg within 0.005, and both private and sibling shards carry distinct recorded digests. The check also records the token-weighted aggregate of the declared training mixture and its largest per-domain distance from the graded shares, because optimising against the shipped mixture and never re-anchoring to the shifted one is what plateaus a run just above the bar.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "model.py reaches only torch, math and safetensors, and reaches no module that could fetch weights.",
+   "dimension": "import_envelope",
+   "evaluation_target": "submitted_source",
+   "id": "model_py_imports_confined_to_the_allowlist",
+   "judgment": "ABSENCE: The harness AST scan of model.py reports at least one import, every imported root inside torch, math, safetensors, and no attribute path rooted at os, sys, socket, subprocess, urllib, requests, ctypes or importlib. The lane grants the solver open egress, so the envelope is what keeps a downloaded checkpoint from reaching the bar in a time no training run could; the slug is import-envelope-violation.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every phase the run accounts for lies inside the interval the clock measures, and setup is one of them.",
+   "dimension": "clock_boundary",
+   "evaluation_target": "run_record",
+   "id": "no_phase_escapes_the_graded_interval",
+   "judgment": "ABSENCE: No phase in clock.phases starts before the harness first-corpus-read stamp; the union of phase spans clipped at the crossing stamp covers the graded interval with an unaccounted gap of at most 1 s; and at least one phase is not a training phase. A ledger made only of training phases has hidden the corpus read that opened the clock, which is the one span this task charges for that a throughput-graded task would not.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The easier bars of the ordered family are crossed no later than the harder ones.",
+   "dimension": "bar_ordering",
+   "evaluation_target": "checkpoint_series",
+   "id": "ordered_bar_family_crossed_in_non_decreasing_time",
+   "judgment": "ORDERING: Earliest clearing stamps derived from the harness timeline for the family 1.09, 1.02 and 0.96 are non-decreasing in that order, with a bar that was never crossed sorting after every bar that was, and the submission's bar_crossings agree with the derived stamps to within 1 ms on both the crossed and the uncrossed rows. An uncrossed 1.09 beside a crossed 1.02 is the target-order-inverted red line, not a missing row: bits-per-byte falls monotonically along one training trajectory, so an inversion says the stamps did not come from one.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The parameter count that grades is the one recounted from weights.safetensors.",
+   "dimension": "param_budget",
+   "evaluation_target": "submitted_source",
+   "id": "parameter_count_recomputed_from_the_shipped_weights",
+   "judgment": "VALUE: The harness recount from weights.safetensors is positive and at most 1.8e8, and the param_count the submission records beside the crossing checkpoint equals the recount exactly. The recount is never replaced by the declaration: on a time-to-bar axis a larger model is the fastest way to reach the bar in fewer steps, so the cap is what keeps the axis about the recipe; over it is the param-budget-exceeded red line.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The tokens that count against the 6.0e8 budget are the ones the harness shim counted, by domain.",
+   "dimension": "token_accounting",
+   "evaluation_target": "domain_token_trace",
+   "id": "per_domain_served_tokens_within_the_budget",
+   "judgment": "EFFECT: The shim's per-domain counters cover exactly crec, pes2o and pg19, each non-negative, summing to more than zero and to at most 6.0e8. The agent's own declared_served_tokens is recorded as evidence and never substituted for the counters: per-document domain labels are what make a per-domain count possible, and a counter naming a domain the corpus does not ship has not counted this corpus. Over the cap is the token-budget-exceeded red line.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "recipe.json declares an ordered stage sequence, a per-stage mixture over the three labelled corpora, and stage boundaries expressed as token offsets.",
+   "dimension": "recipe_declaration",
+   "evaluation_target": "recipe_declaration",
+   "id": "recipe_declares_order_mixture_and_token_boundaries",
+   "judgment": "EFFECT: recipe.stages is a non-empty ordered list of distinctly named stages; each stage's mixture keys are exactly crec, pes2o and pg19 with non-negative weights summing to one within 1e-6; each token_boundary is a positive integer token offset, boundaries strictly increase across stages, and the final boundary equals the declared token_budget, which is at or below 6.0e8. Per-document domain labels are what make a mixture declarable at all, so a stage that names no mixture over the three domains has declared nothing this task can verify.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No logged record claims a bits-per-byte the harness never observed.",
+   "dimension": "reporting_integrity",
+   "evaluation_target": "run_record",
+   "id": "reward_log_claims_no_better_than_the_harness_saw",
+   "judgment": "DIVERGENCE: The run record carries at least one reward_log record, and no record's claimed bpb_private is below the best bits-per-byte the harness observed across the emitted checkpoints by more than 1e-6. Lower is better here, so a claim under the best observation is a claim about a checkpoint that was never emitted -- and on a time-to-bar axis that is precisely the claim that pays, because it moves the crossing earlier; the slug is log-fabrication.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Harness-measured seconds from the first corpus read to the earliest clearing checkpoint, mapped through the published descending ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "checkpoint_series",
+   "id": "seconds_to_the_bar_ramp",
+   "judgment": "VALUE: Seconds are the harness crossing stamp minus the harness first-corpus-read stamp. Fewer seconds is better, so the ramp descends: S_outcome = clamp((floor - t) / (floor - knee), 0, 1), and the item passes when t is at or below the dichotomizing threshold. A run whose checkpoints never reach 1.02 has no crossing to time and scores zero on the axis rather than an arbitrarily large time. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The crossing is a property of the held-out distribution, not of one shard.",
+   "dimension": "heldout_shift",
+   "evaluation_target": "heldout_shards",
+   "id": "sibling_shard_agrees_within_four_hundredths_bpb",
+   "judgment": "DIVERGENCE: At the checkpoint that first cleared 1.02, the absolute difference between bits-per-byte on the private shard and on the same-distribution sibling shard is at most 0.04. Both shards are built by the same private document-id hash partition at the same shifted mixture, so a wider gap says the bar was crossed on one draw of documents rather than on the distribution the bar is set on; the slug is sibling-divergence.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Stage boundaries are token offsets, not sequence counts scaled by the packing length.",
+   "dimension": "token_accounting",
+   "evaluation_target": "domain_token_trace",
+   "id": "stage_boundaries_counted_in_tokens_not_sequences",
+   "judgment": "INVARIANT: The final declared token_boundary reconciles with the summed per-domain served tokens the shim counted, within 3.0e6 tokens; and no declared sequence length among 1024, 2048 and 4096 reconciles the two by multiplication. The starter accounts the budget in sequences, so a boundary copied from it is the right number in the wrong currency: every boundary shifts by the packing factor while the run completes cleanly, and the check names the factor that reconciles.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Step zero was reached by initialising from the declared seed over the shipped vocabulary, not by loading weights.",
+   "dimension": "init_reproducibility",
+   "evaluation_target": "submitted_source",
+   "id": "step_zero_digests_reproduce_under_the_declared_seed",
+   "judgment": "INVARIANT: Every step-0 parameter tensor digest the harness recomputes from the declared master seed and bound init ops equals the digest declared beside it in init_spec, and init_spec.vocab_entries is 49152. The shipped and graded shards are written in a private permuted 49,152-entry byte-level BPE, so an embedding table of any other row count was not initialised against the vocabulary the graded bytes are in, whatever seed it declares; the slug is init-not-reproducible.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  }
+ ]
+}

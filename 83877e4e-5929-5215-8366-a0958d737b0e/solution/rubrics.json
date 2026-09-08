@@ -1,0 +1,264 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-ce91d786a4385a70bb0a317142d02254",
+  "AELLO-CANARY-ba6d0f8c04db42677376dc3be6a94452",
+  "AELLO-CANARY-d7df51fe959ef0a4fa36da6b784c8c65",
+  "AELLO-CANARY-072efa8e79e13f69b7fb43c25232a6d6"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "attempt_ledger",
+  "bank_ledger",
+  "carry_record",
+  "evidence_packet",
+  "exported_program",
+  "heldout_partitions",
+  "run_record"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The shared episode bank only ever falls, and it opens at the pinned 9,000 accounted seconds.",
+   "dimension": "bank_accounting",
+   "evaluation_target": "bank_ledger",
+   "id": "bank_balance_non_increasing_and_never_below_zero",
+   "judgment": "ORDERING: The recorded balance opens at 9000 accounted GPU-seconds, is non-increasing across strictly increasing attempt indices, never falls below zero, and each row's closing balance equals the previous row's closing balance minus that row's debit. One depleting bank shared across all fifty attempts is what prices forgetting: a finding that was lost is re-purchased at full price out of the same balance, and the purchase cannot be refunded.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Each metered run's debit is the integer the launcher computes from its own token and FLOP counters, never a stopwatch reading.",
+   "dimension": "bank_accounting",
+   "evaluation_target": "bank_ledger",
+   "id": "bank_debits_are_analytic_accounted_seconds_not_wall_clock",
+   "judgment": "VALUE: Every debit equals ceil(tokens times flops_per_token divided by the pinned 3.2e14 FLOP per second reference rate), recomputed from the launcher's integer step-times-batch-times-sequence counter and the FLOPs per token derived by static analysis of the registered graph, and equals the ledger's recorded integer debit exactly. The harness's NVML busy-seconds are recorded beside each debit as a fraud cross-check and must not be what the debit reconciles against: a noisy meter against a bank with no slack is not replayable, and it is the integer meter that fixes how many optimizer steps a run performs and so makes bit-identical weights possible at all.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Running the bank down is a loud refusal priced in bits per byte, never a gate.",
+   "dimension": "bank_accounting",
+   "evaluation_target": "bank_ledger",
+   "id": "bank_exhaustion_grades_the_export_on_disk_rather_than_zeroing",
+   "judgment": "EFFECT: Every run requested at a zero balance was refused before execution with reason BANK_EXHAUSTED, no such refusal appears among the episode's zero-reason records, and the episode still produced a graded export at its last attempt. This is the one budget overrun the slot deliberately declines to zero: an agent that spends its bank early is graded on whatever its last attempt could train, so the cost of having forgotten is paid in the metric and never in a red line.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Bits per byte of the LAST attempt's exported program on the two in-force private partitions, mapped through the published descending ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "exported_program",
+   "id": "bits_per_byte_of_the_last_attempt_export_ramp",
+   "judgment": "VALUE: The graded value is the worse of the two in-force private partitions, measured by the verifier's own executor over the last attempt's frozen export at the announced 2048-token window and byte-normalized. LOWER is better, so the ramp DESCENDS: S_outcome = clamp((floor - bpb) / (floor - knee), 0, 1), and the item passes when bpb is at or below the dichotomizing threshold. Data and compute are both fixed, so the ramp prices shape and nothing else; and because the last attempt is the only one that counts, it prices the architecture the campaign ENDED on rather than the best one it ever held. UNMEASURED AT PHASE 0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured before it reads a single submitted byte, and the slot is not gradeable until the Phase 2 measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "Bits per byte divides by the private partition's raw byte count, so the agent's own vocabulary size neither earns nor costs anything.",
+   "dimension": "bpb_accounting",
+   "evaluation_target": "heldout_partitions",
+   "id": "byte_denominator_prices_the_self_designed_vocabulary_out",
+   "judgment": "INVARIANT: The harness bits-per-byte accounting reports the announced 2048-token evaluation window, and the identity value equals total nats over ln 2 over partition BYTES holds against the pinned 2,097,152-byte length of each in-force partition; where that partition's token count differs from its byte count, the identity must not also hold against tokens. The export's declared vocabulary entry count is recorded as evidence and enters no denominator. The tokenizer is the agent's own to design over a private alphabet permutation, so a per-token denominator would pay for a coarser vocabulary instead of for a better architecture, which is the one substitution this axis exists to refuse.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Nothing in the carry-forward record refers to an evidence diagnostic by its position in the packet.",
+   "dimension": "carry_forward_memory",
+   "evaluation_target": "carry_record",
+   "id": "carry_forward_entries_reference_diagnostics_by_name",
+   "judgment": "ABSENCE: Every diagnostic reference stored in the carry-forward record is a name drawn from the 204-key vocabulary; no reference is an integer index, a field ordinal or a slice of the packet's key order, and no stored name falls outside the vocabulary. The packet's field ORDER is permuted per attempt on a private schedule while the vocabulary itself stays fixed and named, so a positionally keyed record decodes to unrelated diagnostics from the first permutation onward with no error raised and no traceback to notice. The permutation distance between the attempt that wrote each entry and the attempt that reads it is recorded, so the corruption is visible in evidence even on a record that happens to be name-keyed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "What reached attempt k+1 is the fixed three-line harness header plus the first 2048 UTF-8 bytes of NOTES.md at attempt k, and nothing else.",
+   "dimension": "carry_forward_memory",
+   "evaluation_target": "carry_record",
+   "id": "exactly_the_header_and_2048_notes_bytes_crossed_each_boundary",
+   "judgment": "INVARIANT: At every attempt boundary the harness-recorded crossing digest equals the digest of the three-line header concatenated with the first 2048 UTF-8 bytes of that attempt's NOTES.md; the carried tail decodes as UTF-8, so the truncation fell on a codepoint boundary; and the dropped byte count reported in that attempt's packet equals the count the harness measured. The header is three lines and carries the attempt index, the reward and the bank balance. One byte more than that is SUMMARY_CHANNEL_BYPASS at exactly 0.0, because the width of this channel is the whole difficulty of the task: forty-nine private measurements do not fit inside it and the eviction policy is the graded decision.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded artifact is an exported PROGRAM with its parameter blob beside it, not a checkpoint of weights and not a training script.",
+   "dimension": "export_artifact",
+   "evaluation_target": "exported_program",
+   "id": "export_program_and_parameter_blob_land",
+   "judgment": "EFFECT: /submission/a501.json carries exactly the five sections attempt_ledger, bank, carry_record, export and final_selection; export names a program manifest and a parameter blob that both exist on disk; and the manifest carries a non-empty operator sequence and a per-tensor byte table. Weights with no program cannot be run by the verifier's own executor and a program with no blob has nothing to run, so either half alone is the no-deliverable red line rather than a weak submission. The artifact is the program because the graded number is measured by re-executing it on partitions the agent never reads.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every operator symbol in the exported program lies inside the bound envelope this slot ships.",
+   "dimension": "export_artifact",
+   "evaluation_target": "exported_program",
+   "id": "exported_operator_list_inside_the_bound_envelope",
+   "judgment": "ABSENCE: The manifest's operator list is non-empty and every symbol lies in causal_window_attn, gate, linear, rmsnorm, rope, silu, softmax. An empty list would pass vacuously and is refused as unexported instead. The envelope is what makes the deliverable a program rather than a framework call: an operator the verifier's executor does not implement cannot be run on the private partition at all, so the export tool refuses it loudly at export time with ENVELOPE_OP_REFUSED rather than letting the submission be silently graded down.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded number is the maximum over the two sibling private partitions in force, not their mean and not the keyed one alone.",
+   "dimension": "bpb_accounting",
+   "evaluation_target": "heldout_partitions",
+   "id": "graded_bpb_is_the_worse_of_the_two_in_force_partitions",
+   "judgment": "VALUE: Exactly two private sibling partitions are in force at the graded attempt; the value the reward map consumes equals the maximum of the two recomputed from the harness partition table; and the submission's declared graded value equals that maximum bit for bit. The mean and the minimum are recorded beside it and are never substituted for it. Taking the WORSE of the two is what stops a design tuned to one draw of post-2026 Gutenberg volumes from being paid for a distribution it did not fit.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The export that grades is the one submitted at the highest attempt index the harness observed, even when an earlier attempt measured better.",
+   "dimension": "attempt_ordering",
+   "evaluation_target": "attempt_ledger",
+   "id": "graded_export_is_the_last_attempt_not_the_best_one",
+   "judgment": "ORDERING: final_selection.attempt_index equals the largest attempt_index in the harness episode ledger, attempt indices are strictly increasing across the episode, and the export's configuration digest equals that last row's digest. The best-measuring row's index and value are recorded beside them as evidence: where the two rows differ, the last one is still the graded one, so a submission that names its best attempt has named a number the harness will never read. A lucky intermediate is worth nothing on this slot and the order the campaign ends in is itself the graded decision.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The instruments that meter the bank and emit the evidence packet are byte-identical either side of the graded episode.",
+   "dimension": "instrument_integrity",
+   "evaluation_target": "run_record",
+   "id": "metering_and_evidence_instruments_unwritten",
+   "judgment": "ABSENCE: No path under tests/ or solution/ changed digest between environment freeze and verifier start, the sha256 of every file under tests/heldout covering all four graded and all four decoy partitions equals its pinned constant, and the roster actually digested includes the metering launcher and the evidence emitter. On this slot those two files ARE the measurement: the launcher writes the accounted-second debit the bank is drawn against, and the emitter writes the 204-key packet the carry-forward record is built from, so editing either would forge the episode rather than run it. An empty digest roster would pass vacuously, which is why the two instruments must appear inside it; the slugs are GRADING_TREE_WRITE and HELDOUT_DIGEST_MISMATCH.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The meter opens when the shipped shard is first read, not when the process starts and not at the first optimizer step.",
+   "dimension": "bank_accounting",
+   "evaluation_target": "bank_ledger",
+   "id": "metering_opens_at_first_corpus_read_not_interpreter_start",
+   "judgment": "INVARIANT: The metering origin the launcher recorded is the harness's own first read of the shipped PG-19 shard, the harness observed no GPU-touching process before that origin, and every GPU-touching process it observed was launched through the metering launcher. Opening at interpreter start would put a statistics pass over the 2.5 GB shard outside the bank; opening at the first optimizer step would put the whole data pipeline outside it. The device is reachable only through the launcher, so any other attribution is UNMETERED_GPU_ACCESS at exactly 0.0.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Every attempt starts from the frozen image with nothing of any earlier attempt on disk.",
+   "dimension": "attempt_isolation",
+   "evaluation_target": "run_record",
+   "id": "no_prior_attempt_bytes_present_when_an_attempt_opens",
+   "judgment": "ABSENCE: At every attempt boundary the harness recorded, the agent-visible tree at attempt start holds no prior evidence packet, no bank ledger detail, no prior workspace and no prior export, and no persistent mount is present. Each of those four residue classes must have been inspected on at least one boundary: an empty residue roster over an empty inspection roster passes vacuously and is refused as uninspected. The teardown is what makes the 2048-byte channel the only carrier there is, so a surviving file is not untidiness, it is a second memory.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Nothing left the sandbox that could have carried an episode's findings around the 2048-byte channel.",
+   "dimension": "channel_isolation",
+   "evaluation_target": "run_record",
+   "id": "no_upload_shaped_request_left_the_solving_sandbox",
+   "judgment": "ABSENCE: The logging proxy's egress log carries at least one inspected request or an explicit empty-log attestation, and no recorded request uses a method other than GET or HEAD and none carries a non-empty request body. The carry channel is only narrow if it is the widest one available: a POST of the whole ledger at attempt k retrieved by a GET at attempt k+1 would restore an unbounded memory and silently void the design, so the method and body restriction is what makes the 2048-byte cap a cap rather than a suggestion.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every evidence packet carries exactly four held-out keys, exactly one of which is the partition instruction.md names as graded.",
+   "dimension": "evidence_schema",
+   "evaluation_target": "evidence_packet",
+   "id": "one_keyed_graded_partition_against_three_decoy_keys",
+   "judgment": "INVARIANT: Each packet is a JSON object whose keys are drawn exactly from the pinned 204-name vocabulary and which carries exactly four held-out keys; exactly one is the graded key and the other three are decoy partitions drawn from the PG-19 test split, which IS the shipped training distribution. The pairwise spread among the three decoys and the distance from their median to the graded value are recorded as evidence, because those two numbers are what make the wrong answer look corroborated: three agreeing values against one dissenting value is a majority, and on this slot the majority is the decoy family.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The per-channel quantization scales and schedule constants the export declares are the ones its own declared width implies, not ones measured at a probe width.",
+   "dimension": "stale_constant",
+   "evaluation_target": "exported_program",
+   "id": "quantization_scales_recomputed_at_the_export_own_width",
+   "judgment": "DIVERGENCE: The width at which the export says its constants were measured equals the width the export says it was trained at, and every declared per-channel scale and schedule constant equals the value the harness recomputes from that declared width within the pinned tolerance. This is the whole silent-failure surface of the slot and it is a memory surface rather than an arithmetic one: a scale measured on a short probe and carried forward unchanged to the convergence width clips a few percent of channels, raises no traceback, and passes the envelope check, the byte ceiling and the determinism replay untouched. It is visible only in bits per byte. The constant is stale, not miscomputed; the slug is stale-constant.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Measurements taken either side of the unannounced partition rotation are never ranked against one another.",
+   "dimension": "rotation_epoch",
+   "evaluation_target": "attempt_ledger",
+   "id": "ranking_rows_carry_the_partition_epoch_in_force",
+   "judgment": "ORDERING: Every ledger row carries the partition epoch in force at that attempt; over strictly increasing attempt indices the epoch sequence is non-decreasing and increments exactly once, matching the single rotation the harness performed; and every row the final selection compared carries the epoch in force at the last attempt. instruction.md discloses that a rotation occurs and never when, so the discipline that survives it is recording the epoch rather than predicting the instant. The four graded partitions are deliberately separated by genre -- domestic, mystery, science fiction and western -- so a table that mixes epochs is not merely drifting, it is ranking two distributions as one, and it selects the architecture that fit the partition that has been retired.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Two grading passes over the same frozen export bytes return the same float64 bits per byte, exactly.",
+   "dimension": "export_determinism",
+   "evaluation_target": "exported_program",
+   "id": "regrading_the_frozen_export_reproduces_bit_identically",
+   "judgment": "INVARIANT: The harness's two independent grading passes over the identical exported program and parameter blob return float64 bits-per-byte values equal bit for bit, with no tolerance admitted on the score-bearing quantity. Grading is forward-only over frozen bytes with the model in eval and no sampling, so an export whose graph carries a stochastic operator is the only way this can fail -- and it fails loudly as EXPORT_NONDETERMINISTIC rather than being averaged away. Tolerance bands survive on the reconciliation checks that cannot move r_det and nowhere else.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "A configuration already measured this episode is served from the private cache, spends no fresh measurement, and is charged anyway.",
+   "dimension": "measurement_economy",
+   "evaluation_target": "attempt_ledger",
+   "id": "repeat_configurations_cost_bank_but_buy_no_measurement",
+   "judgment": "EFFECT: Every attempt whose canonical configuration digest repeats an earlier attempt's is flagged DUPLICATE_CONFIG in its packet, did not advance the episode's fresh-measurement counter, and still carries a non-zero bank debit; fresh measurements are at most one per attempt and at most fifty across the episode. The count of DISTINCT measured configurations is recorded, because that count and not the attempt count is the number the final selection actually rests on: a carry-forward record that holds no configuration digests re-buys numbers it already owns.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Re-executing the same export under a second private alphabet permutation moves the reward by at most tau.",
+   "dimension": "transfer_null",
+   "evaluation_target": "exported_program",
+   "id": "reward_unmoved_under_a_second_alphabet_permutation",
+   "judgment": "DIVERGENCE: The reward recomputed after re-executing the identical submission under the second pinned alphabet permutation differs from the first by at most 0.03. The shipped shard, the dev split and every graded and decoy partition carry one private bijection over the printable-ASCII alphabet, so parameters that were not derived from the bytes this run actually read cannot survive a change of that bijection and diverge here as PRECOMPUTED_PARAMS. Recorded honestly in the evidence rather than claimed away: frequency analysis can invert a permutation, so this raises the cost of transfer rather than closing the route, and the closing constraints are the byte ceiling, the operator envelope and the metered bank.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The parameter byte count that grades is recounted from the shipped blob and never taken from the declaration beside it.",
+   "dimension": "param_budget",
+   "evaluation_target": "exported_program",
+   "id": "serialized_parameter_bytes_recounted_not_declared",
+   "judgment": "VALUE: The harness recount over the exported parameter blob is positive, is at most 50331648 bytes, and equals the declared serialized_param_bytes exactly; the per-tensor byte table sums to the same recount. Data and compute are both fixed here, so shape is the only lever left and serialized bytes are the currency shape is spent in: the ceiling is what keeps design a better architecture from collapsing into serialize a bigger one. Over it is PARAM_BYTES_EXCEEDED, refused loudly at export.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The two in-force sibling partitions agree closely enough that the graded number is a property of the held-out distribution rather than of one draw.",
+   "dimension": "partition_agreement",
+   "evaluation_target": "heldout_partitions",
+   "id": "sibling_partition_disagreement_within_five_hundredths",
+   "judgment": "DIVERGENCE: The absolute difference in bits per byte across the two in-force siblings at the graded attempt is at most 0.05. Both are 2 MiB partitions of Gutenberg volumes first issued on or after 2026-06-01, built under the same private alphabet permutation, so a wider gap says the number was earned on one draw of documents rather than on the distribution the reward is set on; the slug is shard-gap-exceeded. The measured gap, the genre of each in-force partition and which sibling was the worse one are recorded whether or not the bound holds.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Every byte the run trained on came from the shipped shard, matched per record by digest.",
+   "dimension": "data_provenance",
+   "evaluation_target": "run_record",
+   "id": "training_inputs_are_the_pinned_shipped_shard_bytes",
+   "judgment": "INVARIANT: Every training-time input record's sha256 equals the pinned digest for that record in the shipped shard manifest, the count of records checked is positive, and no mismatched or unpinned record appears. Data is FIXED on this slot, so the lever is shape and not corpus. The graded partitions are Gutenberg volumes first released after 2026-06-01 and a public mirror will serve them on request, so fetching them during the open-egress solving phase would quietly replace an architecture problem with a retrieval one; the slug is EXTERNAL_SUPERVISION.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  }
+ ]
+}

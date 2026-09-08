@@ -1,0 +1,191 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-609155f956d380f15b3b4d72406398e3",
+  "AELLO-CANARY-340a728dcc236349192fdbce4d39ad6f",
+  "AELLO-CANARY-62c169bfe63371d0f6ea5cd7ec88f0a9",
+  "AELLO-CANARY-dcde825fef9015fb05e906169c5c3183"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "horizon_report",
+  "run_record",
+  "shim_ledger",
+  "submitted_artifact"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "Every stamp in the checkpoint ledger is the stamp the harness assigned to that checkpoint, and the graded seconds are recomputed from those stamps.",
+   "dimension": "clock_integrity",
+   "evaluation_target": "run_record",
+   "id": "checkpoint_stamps_are_harness_assigned_not_submission_authored",
+   "judgment": "DIVERGENCE: every checkpoint_ledger entry's checkpoint_id appears in run_record.harness_checkpoint_stamps with an identical stamp_s, and checkpoint_ledger.seconds_to_joint_bar equals the harness stamp of the named crossing minus run_record.first_corpus_read_stamp_s to 1e-06. Seconds are the graded quantity, so they are recomputed rather than read: a checkpoint carrying a fabricated earlier stamp is the cheapest win available on this axis and it is the one this check exists for. Reason stamp-divergence.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The last publication day of the shipped corpus is a measured number, and the recency window is anchored at the cutoff rather than at the corpus's own end.",
+   "dimension": "temporal_frame",
+   "evaluation_target": "submitted_artifact",
+   "id": "corpus_end_measured_from_docmeta_not_assumed_equal_to_the_cutoff",
+   "judgment": "VALUE: era_calendar.corpus_last_pub_epoch_day equals run_record.corpus_max_pub_epoch_day, the maximum pub_epoch_day the harness observed over docmeta.bin; era_calendar.recency_window_start_epoch_day equals cutoff_epoch_day minus 180; and era_calendar.blind_band_days equals cutoff_epoch_day minus corpus_last_pub_epoch_day and is not negative. The corpus does not necessarily end where the evaluation begins, and a plan that assumes it does sizes its anneal against an endpoint the data never reaches. Reason boundary-assumed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The checkpoint that stops the clock clears the far-horizon bits-per-byte bar and the forward-slope bar together, at one checkpoint.",
+   "dimension": "conjunctive_bar",
+   "evaluation_target": "horizon_report",
+   "id": "crossing_checkpoint_clears_both_bars_in_the_same_row",
+   "judgment": "INVARIANT: the row of the host-side horizon report whose checkpoint_id equals checkpoint_ledger.joint_crossing carries bpb_h3 at or below 1.12 AND bpb_h3 minus bpb_h1 at or below 0.06. Two checkpoints, one clearing each bar, are not a crossing and score 0.0 with reason bars-cleared-separately. The bar is conjunctive: a checkpoint that clears bits-per-byte while its slope is 0.09 is worth exactly what a checkpoint that clears neither is worth, and the run that emitted it has not started the reward ramp at all.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The crossing the submission names is the earliest jointly clearing checkpoint by harness stamp, not a later one and not an earlier one that clears a single bar.",
+   "dimension": "conjunctive_bar",
+   "evaluation_target": "submitted_artifact",
+   "id": "declared_crossing_is_the_earliest_row_that_clears_both",
+   "judgment": "ORDERING: across every row of the horizon report, the earliest harness stamp whose row clears both bars belongs to the checkpoint named by checkpoint_ledger.joint_crossing. Naming a later checkpoint concedes seconds the run had already earned; naming an earlier one that cleared only bpb shortens the clock against a crossing that never happened. Both score 0.0 with reason crossing-not-earliest. Because the clock stops at the earliest JOINT crossing, emission cadence is a lever rather than housekeeping: a checkpoint that is never emitted cannot be the row that stops it.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Each era's declared weight matches the share of tokens the shim actually served from that era.",
+   "dimension": "era_mixture",
+   "evaluation_target": "shim_ledger",
+   "id": "declared_era_weights_reconcile_with_served_token_shares",
+   "judgment": "DIVERGENCE: for every era named in schedule.phases, the planned-token-weighted declared share, the sum over phases of planned_tokens times that era's weight divided by total planned tokens, differs from shim_ledger.served_tokens_by_era's share of the same era by at most 0.02 absolute, and each phase's weights sum to 1.0 within 1e-06. The era-volume profile of the shipped corpus is non-uniform and never characterised, so a mixture that is balanced in weights is not balanced in tokens: a temperature that reads as a gentle forward tilt can realise as a flat stream, and a flat declaration can realise recency-heavy. Reason mixture-not-realised.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The publication-date channel that attributes every served token is byte-identical before and after the graded run, and nothing under the grading tree is written.",
+   "dimension": "instrument_integrity",
+   "evaluation_target": "run_record",
+   "id": "docmeta_epoch_day_channel_unaltered_by_the_graded_run",
+   "judgment": "ABSENCE: run_record.docmeta_sha256_before equals docmeta_sha256_after and both equal run_record.docmeta_sha256_pinned, and run_record.guarded_paths_touched is empty. docmeta.bin is an instrument rather than data: an edit to its pub_epoch_day channel re-labels every token's era, and the cutoff absence and the recency quota then become assertions about a calendar the run authored for itself. Both facts are read from the record the run produced, never from a scan taken afterwards, which cannot separate a write made inside the graded region from one made before it. Reason grading-tree-written.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No phase, the recency anneal included, empties the oldest era out of the mixture.",
+   "dimension": "era_mixture",
+   "evaluation_target": "submitted_artifact",
+   "id": "every_phase_keeps_a_floor_of_the_oldest_era",
+   "judgment": "INVARIANT: schedule.oldest_era_floor_share is strictly positive and, for every phase in token_ledger.per_phase, oldest_era_served_tokens is strictly greater than zero and its share of that phase's served tokens is at least that floor. A schedule that drops the oldest era from its final phase buys near-horizon fit and pays for it in bpb(H3) minus bpb(H1), which is the bounded term: the run then clears one bar, misses the other, and scores what clearing nothing scores. Reason oldest-era-floor-breached.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Optimizer steps times global batch tokens reconciles with the shim's served-token counter, and that counter stays inside the budget.",
+   "dimension": "token_attribution",
+   "evaluation_target": "run_record",
+   "id": "every_trained_token_passed_through_the_attributing_shim",
+   "judgment": "DIVERGENCE: the absolute difference between run_record.optimizer_steps times run_record.global_batch_tokens and shim_ledger.served_tokens_total is at most 0.005 of the shim counter, and served_tokens_total is greater than zero and at most 4.0e8. A byte the shim never served carries no pub_epoch_day, so it sits outside both the cutoff absence and the quota share: unaccounted tokens do not merely add compute, they void the two temporal guarantees the rest of this rubric asserts. Reason unaccounted-tokens, or token-budget-exceeded when the counter is over the cap.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded slope is the degradation from the near forward horizon to the far one, taken on two era-labelled shards under one checkpoint and one tokenizer.",
+   "dimension": "forward_slope",
+   "evaluation_target": "horizon_report",
+   "id": "forward_slope_is_h3_minus_h1_not_a_within_shard_trend",
+   "judgment": "VALUE: the slope recomputed as bpb_h3 minus bpb_h1 from the same horizon-report row equals checkpoint_ledger.declared_forward_slope to 1e-06 absolute, and both terms are read from shards drawn at different offsets past the cutoff, H1 from [C, C+90d) and H3 from [C+270d, C+630d). A slope taken inside one shard, or between a forward shard and the in-era validation split, measures sampling noise or in-era fit and is not a forward degradation; it scores 0.0 with reason slope-not-across-horizons. Era-labelled evaluation is the whole instrument here: without two dated shards the second bar cannot be computed at all.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The earliest clearing stamp is non-decreasing as the shard sits further past the cutoff.",
+   "dimension": "drift_monotonicity",
+   "evaluation_target": "horizon_report",
+   "id": "further_horizon_never_clears_before_a_nearer_one",
+   "judgment": "ORDERING: the earliest harness stamps at which the checkpoint series first reaches the common target of 1.12 on H1, on H2 and on H3 satisfy t(H1) <= t(H2) <= t(H3), and a horizon never reached contributes no ordering rather than an infinite one. Under forward drift a shard 270 to 630 days past the cutoff is strictly harder than one inside the first 90, so a far horizon clearing first is evidence of a mis-stamped series or of an artifact fitted to one window, not of forward generalisation. Reason horizon-order-inverted.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Nothing the model trained on was published on or after the cutoff at which the forward horizons begin.",
+   "dimension": "cutoff_absence",
+   "evaluation_target": "shim_ledger",
+   "id": "no_served_token_dated_at_or_after_the_cutoff",
+   "judgment": "ABSENCE: shim_ledger.post_cutoff_served_tokens is exactly 0 and shim_ledger.max_served_pub_epoch_day is strictly less than era_calendar.cutoff_epoch_day, asserted over the whole served stream rather than over a sample. The three horizons ARE the future this task asks the run to extrapolate into, so a single token dated past the cutoff answers a different question with the answer in hand; reason future-token-consumed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The phase order the schedule declares is the order the shim served, broad-era first and the recency anneal last.",
+   "dimension": "phase_ordering",
+   "evaluation_target": "run_record",
+   "id": "recency_anneal_executes_last_by_median_publication_day",
+   "judgment": "ORDERING: the phase names in run_record.phase_median_pub_epoch_day, listed in execution order, equal schedule.phases element for element; the medians are non-decreasing; and the phase flagged is_recency_anneal is the last element of both lists and the only one so flagged. The same era weights executed anneal-first lose most of the forward gain, so a declared anneal-last that the shim recorded running first is an order divergence rather than a recipe; reason schedule-order-diverged.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The recency share is the share of tokens the shim actually served out of the final 180 days before the cutoff, and it stays at or below 0.15.",
+   "dimension": "recency_quota",
+   "evaluation_target": "shim_ledger",
+   "id": "recency_quota_share_read_from_served_tokens_not_declared_weights",
+   "judgment": "INVARIANT: shim_ledger.recency_window_served_tokens divided by shim_ledger.served_tokens_total is at or below 0.15, the numerator counting only tokens attributed through docmeta.bin to documents whose pub_epoch_day lies in [C-180d, C). The share is computed from the harness-owned counters and never from schedule.era_weights, because the corpus era-volume profile is not uniform and is characterised nowhere in the environment: a weight vector that reads as 0.12 recency can serve 0.19 of the stream. Exceeding the ceiling scores 0.0 with reason recency-quota-exceeded.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Harness-measured seconds from the first corpus read to the earliest checkpoint that clears both bars at once, mapped through the published descending ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "run_record",
+   "id": "seconds_from_corpus_read_to_the_conjunctive_bar_ramp",
+   "judgment": "VALUE: t is the harness stamp of the earliest checkpoint whose horizon-report row carries bpb_h3 at or below 1.12 and bpb_h3 minus bpb_h1 at or below 0.06, minus run_record.first_corpus_read_stamp_s. Lower t is better, so the ramp descends from floor to knee; a run whose series never clears both bars in one row has no t at all rather than a large one, and lands on the sub-gate band instead. UNMEASURED AT PHASE 0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured before it reads a single submitted byte, and the slot reports gradeable=false rather than a score of zero.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The graded clock opens at the first read of the shipped corpus, so every second spent before the first optimizer step is charged to the run and declared.",
+   "dimension": "clock_boundary",
+   "evaluation_target": "run_record",
+   "id": "setup_seconds_charged_from_first_corpus_read",
+   "judgment": "INVARIANT: run_record.first_corpus_read_stamp_s is present and strictly precedes run_record.first_optimizer_step_stamp_s, and checkpoint_ledger.setup_seconds equals their difference to 1e-06. The docmeta scan, the era index materialisation and any vocabulary rebuild all sit inside that interval, so a run that reports its training seconds and calls them the graded time is short by its entire setup; reason setup-outside-the-clock. Nothing here is read from a duration the agent timed itself.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The run writes down its temporal frame, its phase schedule, its served-token accounting, its checkpoint ledger and its tokenizer currency at the declared submission path.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "submission_carries_calendar_schedule_ledger_and_crossing",
+   "judgment": "EFFECT: /submission/c1s1.json parses as an object and carries all five sections: era_calendar, schedule, token_ledger, checkpoint_ledger and tokenizer. A submission missing era_calendar scores 0.0 with reason submission_malformed; it is not a run that was slow, it is a run that never wrote down where the cutoff sat relative to the corpus it read, and every other check here is a statement about that relation.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The fixed token budget is converted into trained bytes at the bytes-per-token the submitted tokenizer realises on the newest text the run is allowed to read.",
+   "dimension": "tokenizer_currency",
+   "evaluation_target": "submitted_artifact",
+   "id": "token_budget_priced_at_the_newest_readable_era_fertility",
+   "judgment": "VALUE: tokenizer.fertility_slice_start_epoch_day equals era_calendar.corpus_last_pub_epoch_day minus 180, so the fertility is measured on the newest readable era rather than on the earliest one or on the corpus average; tokenizer.realized_bytes_per_token is strictly positive; and token_ledger.served_tokens_total multiplied by it equals tokenizer.trained_bytes_total to 1e-06 relative. The cap is 4.0e8 TOKENS while the bar is per BYTE, so the exchange rate between them decides how much corpus the budget actually buys, and a vocabulary whose merges were fitted on older terminology spends the same budget on fewer forward-window bytes while raising no error anywhere. Reason fertility-not-measured-forward.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  }
+ ]
+}

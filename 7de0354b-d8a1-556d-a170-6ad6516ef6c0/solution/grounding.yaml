@@ -1,0 +1,461 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S5
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item whose mode is judged below is one whose assertion names a numeric bar that Phase 0 does not author,
+  not one that resists compilation.'
+deliverable:
+  path: /submission/masks.npz
+  kind: npz
+  shape: one two-dimensional integer land-cover mask per graded tile id, each on that tile's own co-registered
+    spectral grid
+evaluation_target_vocabulary:
+- run_record
+- submitted_artifact
+- submitted_source
+items:
+- id: mask_archive_lands
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The keyed mask archive lands at the graded path and every member is an integer raster.
+  judgment: '/submission/masks.npz opens with pickling disabled and carries at least one member, and every
+    member is a two-dimensional array of integer dtype. A class-probability volume of shape (classes,
+    rows, cols), a float raster of soft labels, and a pickled object array each fail here with reason
+    submission_malformed rather than being argmaxed, rounded or unpickled on the agent''s behalf: the
+    deliverable is a land-cover labelling, and turning a posterior into one is a modelling decision the
+    submission has to have already made.'
+- id: coregistered_grid_agreement
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Every graded tile carries a mask on the grid its spectral stack and elevation raster share.
+  judgment: 'For each id in the graded tile set the archive holds a member whose (rows, cols) equals the
+    trailing two axes of that tile''s twelve-band spectral stack and equals the shape of that tile''s
+    elevation raster. Co-registration is the premise of the whole fusion: the elevation raster is on the
+    spectral grid, so a mask that is on neither cannot be intersected with the graded labels at all. A
+    mask left at a downsampled inference resolution, a mask returned on the elevation raster''s own native
+    grid, and a graded tile with no member are three distinct failures reported separately here, and none
+    of the three is resampled, cropped or padded to fit.'
+- id: land_cover_labels_within_class_index
+  dimension: deliverable
+  weight: 4
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Every mask value is a land-cover class the shipped class index names.
+  judgment: 'The distinct values across all submitted masks are a subset of the class ids the shipped
+    class index publishes. Per-class IoU is defined only over that class set: a label outside it names
+    no class, can intersect no truth, and would enter the per-class mean as a term with an empty numerator,
+    so it is out of domain rather than merely wrong. A negative label, an ignore sentinel the index does
+    not declare, and an off-by-one class numbering all land here.'
+- id: thirteen_channel_fusion_order_declared
+  dimension: process
+  weight: 4
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The run record declares the fusion order over all thirteen input channels and the stage at
+    which the elevation channel joins.
+  judgment: The declared channel order names each of the twelve BigEarthNet-S2 reflectance bands exactly
+    once -- B01 through B09 with B8A, B11 and B12, the Sentinel-2 set less the cirrus band B10 -- plus
+    exactly one channel identified as elevation, and the record names the fusion stage at which that elevation
+    channel enters. A roster carrying only B02, B03 and B04 is the CTL-RGBONLY control and fails here
+    rather than being graded as a weak fusion; a roster of thirteen indistinguishable bands fails because
+    it does not say which one is the elevation channel, which is the declaration trap one is about.
+- id: per_band_scaling_not_global
+  dimension: process
+  weight: 4
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Normalisation is declared per band, and the SWIR bands do not inherit the visible bands'
+    scale.
+  judgment: The declared normalisation carries one location-and-scale pair for each of the twelve bands,
+    those twelve scales are not all one number, and neither B11 nor B12 carries a scale equal to a visible
+    band's. The twelve bands are radiometrically distinct and do not share a dynamic range; one global
+    statistic drives the SWIR reflectances toward the noise floor, which is trap two stated as an arithmetic
+    fact rather than as advice. Where the vendored band statistics ship, every band the declaration scales
+    must be a band those statistics name, so the scales are traceable to the corpus rather than invented.
+- id: elevation_heldout_tiles_untrained
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: No graded tile's elevation raster or spectral stack entered training.
+  judgment: 'The record''s declared training tile ids and its declared elevation-read tile ids are both
+    disjoint from the graded tile set. The two are checked separately because the rasters are co-registered
+    and separately readable: a run can consume the elevation of a tile whose spectral stack it never opened,
+    and that is still the graded terrain entering training. This is red line 2. An absent declaration
+    fails closed -- unproven disjointness is not proven disjointness -- and the declaration is checked
+    against the graded tile index the verifier holds, never against a post-hoc scan of the agent''s tree.'
+- id: graded_tile_archives_untouched
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The graded run writes nothing into the checker tree or onto the graded tile archives.
+  judgment: 'No path in the write manifest the run itself produced lands under tests/, on the private
+    graded mask archive, or on the graded spectral or elevation archives. This is red line 1, and the
+    graded rasters are named individually because they sit in the agent-visible half of the split: the
+    agent must read graded_spectral.npz and graded_elevation.npz to predict at all, and overwriting either
+    one is the write that would matter. An absent manifest fails closed.'
+- id: vendored_encoder_only
+  dimension: integrity
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: Any pretrained encoder is vendored inside the bundle, not fetched.
+  judgment: The declared encoder provenance either says the network was trained from scratch or resolves
+    to a path inside the delivered tree, and it names no remote host or hub identifier. A pretrained Sentinel-2
+    encoder pulled from a model zoo would supply exactly the band-fusion design this slot grades; solve-time
+    egress is allowlisted to model-API and bootstrap hosts and reaches no model-zoo host, so a declaration
+    naming one describes a fetch the sandbox could not have performed.
+- id: mask_member_order_deterministic
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The mask archive replays to the same content, member order included.
+  judgment: 'Re-running the agent''s entry point under the recorded seed reproduces the archive''s CONTENT
+    digest -- member names, dtype strings, shapes and raw bytes hashed in the archive''s stored order
+    -- and the archive''s member sequence equals the tile order the record declares. The digest is taken
+    over content in stored order and not over the file, because an npz is a zip whose member headers carry
+    a timestamp convention belonging to the writing library rather than to the run, and a file-level digest
+    would report a perfectly deterministic solve as divergent on one numpy release and not on another.
+    Member order sits inside the digest for the opposite reason: it is a property of the run, and a solve
+    that writes its tiles in whatever order a dictionary happens to iterate predicts identical masks and
+    still lands them in a different archive.'
+- id: tile_budget_declared
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The agent declares its own tile and inference-stride budget for the graded run.
+  judgment: The record carries an agent-authored declaration naming the number of training tiles it consumed,
+    the seconds it charged to the graded run, and the stride at which it stitched overlapping tile predictions;
+    the stride is a positive integer no larger than the tile edge, because a stride wider than the tile
+    leaves graded pixels no window ever covered. The declaration is what is graded, not the harness's
+    own measurement, so the check cannot be satisfied by a field the harness writes.
+- id: mean_per_class_iou_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Mean per-class IoU over the private tile set clears the published bar through the ramp.
+  judgment: 'Intersections and unions are pooled per land-cover class across every graded tile and the
+    mean is taken over the classes whose pooled union is non-empty, so a class the graded tiles do not
+    contain contributes no term and is never credited as a perfect one -- an empty intersection over an
+    empty union is undefined, and scoring it 1.0 would pay for classes nobody predicted. A graded tile
+    with no submitted member, or one whose mask is off the co-registered grid, contributes its whole label
+    area to the union and nothing to the intersection, so omitting a tile can only lower the mean. UNMEASURED
+    AT PHASE 0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured
+    before it reads the submission, and the slot is not gradeable until the measurement wave writes them.'
+measurement_tier: gpu
+measurement_tier_basis: trains a from-scratch classifier over multispectral imagery
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a floor,
+    knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0 asserts
+    the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: published BigEarthNet mIoU for a multispectral baseline of the same parameter class
+knee_anchor_source: an external published figure, fixed before any measurement on this slot
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome = clamp((metric
+    - floor) / (knee - floor), 0, 1) through the published ramp.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+truth_narrative:
+  opening: maximise mean per-class IoU on a private held-out tile set by fusing the twelve Sentinel-2
+    reflectance bands with the co-registered elevation channel. The graded artifact is one two-dimensional
+    integer land-cover mask per graded tile id, each on that tile's own co-registered spectral grid, written
+    to /submission/masks.npz. The graded quantity is mean per-class intersection-over-union over the private
+    tile set, pooled per class and averaged over the classes that actually occur.
+  insight: 'Thirteen channels reach the network and only twelve of them are reflectance. The elevation
+    raster shares the spectral grid by construction -- that co-registration is the only reason it can
+    be fused pixel-for-pixel at all -- but it is metres against per-band reflectance, so it is a second
+    modality on a shared grid rather than a thirteenth band, and the two facts pull in opposite directions:
+    the grid invites concatenation and the units forbid it. The metric compounds the pull. Mean PER-CLASS
+    IoU pools each land-cover class across the graded tiles and averages over the classes that occur,
+    so a class absent everywhere is dropped rather than scored perfect, and a rare class covering a few
+    hundred pixels weighs exactly as much as the class covering half the corpus -- which is where the
+    elevation channel earns its place, because the classes that separate on terrain are the small ones.
+    None of that is reachable until every graded tile carries a mask on its own co-registered grid: r_det
+    is zero on any red line and on any knockout failure before a single intersection is counted.'
+  steps:
+  - heading: 'Fusion point: early channel concat vs mid-level feature fusion'
+    paragraph: Where the elevation channel joins decides whether it is a modality or a band. Early concatenation
+      puts all thirteen channels through one stem and one set of first-layer statistics; mid-level fusion
+      carries an elevation branch of its own and joins it after the spectral stem has already formed features.
+      The run record has to say which, and name the elevation channel as elevation, because the two designs
+      are not distinguishable from the submitted masks alone. A lever the contract records as separately
+      ablatable for this slot; its worth is measured on the Phase 2 ladder over the full lever power set,
+      never asserted here.
+  - heading: Per-band normalisation from vendored band statistics
+    paragraph: The twelve bands are acquired at three ground resolutions and span different reflectance
+      ranges; the vendored statistics give a location and scale per band so that B11 and B12 are not normalised
+      by a number computed mostly from the visible bands. This is the lever the compiled per-band check
+      reads a declaration of, and the check refuses a single global statistic rather than scoring it low.
+      A lever the contract records as separately ablatable for this slot; its worth is measured on the
+      Phase 2 ladder over the full lever power set, never asserted here.
+  - heading: Elevation-derived slope/aspect features
+    paragraph: 'Slope and aspect are derivatives of the elevation raster on the same grid, so they cost
+      no new co-registration and carry terrain information the raw height does not: a valley floor and
+      a plateau at the same altitude are the same number until you differentiate. A lever the contract
+      records as separately ablatable for this slot; its worth is measured on the Phase 2 ladder over
+      the full lever power set, never asserted here.'
+  - heading: Class-frequency-aware loss for the rare land-cover classes
+    paragraph: The graded mean is per class, not per pixel, so a class covering a thousandth of the corpus
+      carries a full term in it. A loss weighted by pixel frequency optimises something the metric does
+      not measure. A lever the contract records as separately ablatable for this slot; its worth is measured
+      on the Phase 2 ladder over the full lever power set, never asserted here.
+  - heading: Tile-overlap inference stitching
+    paragraph: Predictions near a tile edge see less context than predictions at its centre, and the stride
+      at which overlapping windows are stitched decides how much of each graded tile is labelled from
+      an edge. The declared stride is bounded by the tile edge because a wider one leaves graded pixels
+      no window ever covered. A lever the contract records as separately ablatable for this slot; its
+      worth is measured on the Phase 2 ladder over the full lever power set, never asserted here.
+  traps:
+  - Concatenates elevation as a thirteenth band and the fusion collapses to a single stream.
+  - Normalises all bands with one global statistic and the SWIR bands vanish.
+  - 'Counts a class the graded tiles do not contain as a perfect one: an empty intersection over an empty
+    union is undefined, and scoring it 1.0 pays for classes nobody predicted.'
+  - Submits masks only for the tiles it is confident about. A graded tile with no member contributes its
+    whole label area to the union and nothing to the intersection, so an omitted tile costs more than
+    a wrong one.
+  - Predicts at a downsampled resolution and upsamples to the elevation raster's native grid instead of
+    the spectral grid the graded labels are on.
+  - 'a pretrained Sentinel-2 encoder from a model zoo would shortcut the fusion design Mitigation: solve-time
+    egress is allowlisted to model-API and bootstrap hosts only and no model-zoo host is reachable; any
+    backbone must be vendored'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `tile_budget_declared` (compiled, weight 3) -- The agent declares its own tile and inference-stride
+  budget for the graded run.
+
+  2. `thirteen_channel_fusion_order_declared` (compiled, weight 4) -- The run record declares the fusion
+  order over all thirteen input channels and the stage at which the elevation channel joins.
+
+  3. `per_band_scaling_not_global` (compiled, weight 4) -- Normalisation is declared per band, and the
+  SWIR bands do not inherit the visible bands'' scale.
+
+  4. `elevation_heldout_tiles_untrained` (compiled, weight 5, knockout) -- No graded tile''s elevation
+  raster or spectral stack entered training.
+
+  5. `vendored_encoder_only` (compiled, weight 3) -- Any pretrained encoder is vendored inside the bundle,
+  not fetched.
+
+  6. `mask_archive_lands` (compiled, weight 5, knockout) -- The keyed mask archive lands at the graded
+  path and every member is an integer raster.
+
+  7. `coregistered_grid_agreement` (compiled, weight 5, knockout) -- Every graded tile carries a mask
+  on the grid its spectral stack and elevation raster share.
+
+  8. `land_cover_labels_within_class_index` (compiled, weight 4, knockout) -- Every mask value is a land-cover
+  class the shipped class index names.
+
+  9. `mask_member_order_deterministic` (compiled, weight 3) -- The mask archive replays to the same content,
+  member order included.
+
+  10. `graded_tile_archives_untouched` (compiled, weight 5, knockout) -- The graded run writes nothing
+  into the checker tree or onto the graded tile archives.
+
+  11. `mean_per_class_iou_ramp` (compiled, weight 10, knockout) -- Mean per-class IoU over the private
+  tile set clears the published bar through the ramp.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - a pretrained Sentinel-2 encoder from a model zoo would shortcut the fusion design -- controlled by:
+  solve-time egress is allowlisted to model-API and bootstrap hosts only and no model-zoo host is reachable;
+  any backbone must be vendored
+
+  - dropping the nine non-RGB bands and the elevation channel -- controlled by: CTL-RGBONLY, and by `thirteen_channel_fusion_order_declared`,
+  which refuses a roster that does not name all twelve reflectance bands
+
+  - predicting the modal land-cover class everywhere -- controlled by: CTL-SINGLECLASS, and by the per-class
+  pooling in `mean_per_class_iou_ramp`, under which every class but the modal one scores zero
+
+
+  Deliverable manifest: /submission/masks.npz (npz), one two-dimensional integer land-cover mask per graded
+  tile id, each on that tile''s own co-registered spectral grid.
+
+
+  Corpus layout, as the compiled checks read it:
+
+
+  - `environment/data/graded_spectral.npz` -- agent-visible, one twelve-band stack per graded tile id.
+
+  - `environment/data/graded_elevation.npz` -- agent-visible, one elevation raster per graded tile id,
+  on the same grid.
+
+  - `environment/data/band_statistics.json` -- the vendored per-band location and scale.
+
+  - `environment/data/class_index.json` -- the land-cover class ids the per-class mean runs over.
+
+  - `tests/heldout/graded_masks.npz` -- the private graded labels, verifier-side only.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-NOOP` targets the shipped starter verbatim; recorded score None.
+
+  - `CTL-RGBONLY` targets drop the nine non-RGB bands and the elevation channel; recorded score None.
+
+  - `CTL-SINGLECLASS` targets predict the modal land-cover class everywhere; recorded score None.
+
+  '
+provenance:
+  corpus: BigEarthNet-S2 v1.0 (Sumbul et al.) Sentinel-2 patches with a co-registered elevation raster
+  anchors:
+    knee_anchor: published BigEarthNet mIoU for a multispectral baseline of the same parameter class
+    knee_anchor_source: an external published figure, fixed before any measurement on this slot
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build time.
+      Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as the task-generating
+      event and never inherits the upstream freeze date, so authoring a date here before the derivation
+      runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: BigEarthNet-S2 v1.0 (Sumbul et al.) Sentinel-2 patches with a co-registered elevation
+      raster
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or a
+      task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with this
+      named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+corpus_layout:
+  graded_spectral: environment/data/graded_spectral.npz
+  graded_elevation: environment/data/graded_elevation.npz
+  band_statistics: environment/data/band_statistics.json
+  class_index: environment/data/class_index.json
+  graded_masks: tests/heldout/graded_masks.npz
+  split_discipline: The graded spectral stack and its co-registered elevation raster ship agent-visible
+    under environment/data/, because the agent has to predict on them. The graded land-cover masks ship
+    only under tests/heldout/, which red line 1 forbids the graded run from touching and which the separate
+    verifier mounts.
+  bands:
+  - B01
+  - B02
+  - B03
+  - B04
+  - B05
+  - B06
+  - B07
+  - B08
+  - B8A
+  - B09
+  - B11
+  - B12
+  bands_basis: 'The twelve BigEarthNet-S2 reflectance bands: Sentinel-2''s thirteen less the cirrus band
+    B10, which the corpus does not ship. Twelve spectral channels plus one elevation channel is the thirteen
+    this slot fuses.'
+  visible_bands:
+  - B02
+  - B03
+  - B04
+  swir_bands:
+  - B11
+  - B12
+  elevation_channel_tokens:
+  - ELEV
+  - DEM
+  - DSM
+  fusion_stages:
+  - early_concat
+  - mid_level_fusion
+  guarded_writes:
+  - /tests/
+  - graded_spectral.npz
+  - graded_elevation.npz
+  - graded_masks.npz
+  remote_encoder_tokens:
+  - http://
+  - https://
+  - hf_hub
+  - huggingface
+  - torch.hub
+  - model_zoo
+  - s3://
+  - gs://
+  run_record: run_record.json
+  run_record_basis: Written by the graded run beside the bundle root and read by the verifier. instruction.md
+    publishes every key the compiled checks read, so no check grades an obligation the agent was never
+    told to carry.
+
+canary:
+  - AELLO-CANARY-64e40139a41090860fd302035370d48d
+  - AELLO-CANARY-5bd0be3a160298993782b68cfcf9f8a5
+  - AELLO-CANARY-53a8ccda1f8385db6db18a47947ded69
+  - AELLO-CANARY-6e98d3431d8759bf062af90956533987

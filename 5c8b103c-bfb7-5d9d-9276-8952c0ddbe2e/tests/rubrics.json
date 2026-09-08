@@ -1,0 +1,216 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "graded_shard",
+  "run_record",
+  "sibling_shard",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The submission reproduces byte for byte from the recorded seed, both coupled outputs together in the one file.",
+   "dimension": "process",
+   "evaluation_target": "submitted_source",
+   "id": "both_coupled_artefacts_replay_byte_identically",
+   "judgment": "EFFECT: The sha256 of /submission/c6s2.json equals replay_artifact_sha256, the digest the run record carries from the agent's own second run under its recorded seed. Byte identity of the whole artifact rather than agreement on a metric: the two outputs are coupled, so a replay that reproduces the label vectors while re-deriving the indices from a second decode has not reproduced the run, and a scalar comparison could not tell the two apart. An absent digest fails with reason replay_unavailable rather than passing, because an unperformed replay is not a successful one.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every graded solution carries BOTH emitted objects -- a per-step label sequence and a first-error index -- in one record, because this task's deliverable is the coupled pair and not either half.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "both_outputs_present_for_every_graded_solution",
+   "judgment": "EFFECT: /submission/c6s2.json exists, parses as a JSON object, and carries an ids list beside an outputs list of equal length. Every element of outputs is an object carrying both the labels key and the first_error_index key. A record holding labels alone fails with reason index_absent and a record holding first_error_index alone fails with reason labels_absent; the two reasons are separate because they are separately reachable and separately diagnostic, a per-step classifier that never learned to localise reaching the first and a localiser that never learned to label reaching the second. An absent artifact fails with reason submission_missing and an unparseable one with submission_malformed, so an empty workspace and a corrupt write are never reported as the same failure.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The compiled rejection of CTRL_S2_LIST_ALL and CTRL_S2_ALL_SENTINEL: an all-\"good\" labelling with -1 everywhere is prefix-consistent by construction and is not a solution.",
+   "dimension": "correctness",
+   "evaluation_target": "submitted_artifact",
+   "id": "constant_label_or_constant_index_submission_rejected",
+   "judgment": "ABSENCE: The submission fails when every emitted label across every solution is the same class, or when every emitted first_error_index is the same value, and the evidence names which. The route is real rather than theoretical: the all-good, all-sentinel submission satisfies the coupling item exactly -- a vector with no \"bad\" MUST emit -1 -- and harvests the class imbalance of step-level process labels, so the ordering invariant cannot be the thing that rejects it. Here it is rejected on the face of the bytes with reason degenerate_constant_output, before the band, the confusion matrix or the localisation rate is formed. The evidence carries the emitted class histogram and the emitted index histogram so a near-degenerate submission, one class at 0.97 say, is visible in the report even where it is not yet failing.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "First-error exact match on the subgroup whose final answer matches gold while a human-labelled bad step is present clears its bound floor of 0.48.",
+   "dimension": "correctness",
+   "evaluation_target": "graded_shard",
+   "id": "correct_answer_bad_step_subgroup_floor",
+   "judgment": "VALUE: The subgroup is the graded solutions the manifest flags correct_answer_bad_step: the final answer agrees with the gold answer and yet a human annotator marked at least one step bad. Its exact-match rate must be at or above 0.48, bound at Phase 0.5. This is the subgroup where every corroborating signal points the wrong way -- the answer is right, so a pipeline that has learned to read the outcome rather than the process emits -1 and is wrong on every member -- and it is the reason the deliverable is a process judgment rather than an answer check. The check requires a non-empty subgroup and reports the sentinel share the submission emitted inside it, because a rate that fails because the run emitted -1 everywhere in this subgroup is a different diagnosis from one that fails on which step it picked.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every graded count is accumulated over the canonical sorted id order, so the private per-run permutation of presentation order changes what the pipeline saw and cannot change what it scores.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_artifact",
+   "id": "counts_invariant_under_the_presentation_permutation",
+   "judgment": "INVARIANT: The verifier forms the 9-cell confusion matrix and the integer localisation match count twice: once walking the submission in the order it shipped, which is the run's own permuted presentation order, and once walking it in canonical sorted id order. The two must be identical in every cell and in the count. They can only differ if a check has become order-dependent -- keying by position rather than by id is the ordinary way that happens, and it is exactly the defect a per-run permutation is designed to expose. The check additionally requires the submission to carry no positional key, so a record naming its own row index has nothing to key against. Reason order_dependent_aggregation on a mismatch, with both count vectors in the evidence.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "No stratum is emitted with a dead neutral class, and the direction of any collapse is reported as a signed index displacement rather than left to be inferred.",
+   "dimension": "calibration",
+   "evaluation_target": "graded_shard",
+   "id": "every_stratum_carries_emitted_neutral_support",
+   "judgment": "ABSENCE: Every stratum must carry at least one emitted neutral step. This is not implied by the band item and the gap is exactly where the dominant failure of this task hides: in a stratum whose human neutral rate is at or below 0.03, emitting zero neutrals passes the band with room to spare while the intermediate class has been collapsed into a decisive one. The check therefore fails with reason neutral_class_collapsed naming the strata with zero emitted neutral support, and its evidence carries the signed mean displacement between the emitted and the human first-error index over the localisable solutions of each such stratum, because the two collapse directions are separately diagnosable: folding neutral into good pushes the emitted index late and folding it into bad pushes it early, and an aggregate step accuracy shows neither.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The two coupled outputs agree with each other: the emitted index is the position of the first emitted \"bad\" label, and no step before it carries \"bad\".",
+   "dimension": "correctness",
+   "evaluation_target": "submitted_artifact",
+   "id": "first_error_index_equals_first_bad_label_in_its_own_vector",
+   "judgment": "ORDERING: For every submitted solution the verifier computes the first \"bad\" position of that solution's own labels list, or -1 when it holds none, and requires the emitted first_error_index to equal it exactly. The count of solutions where it does not is pc, the prefix-divergence count, and the check passes only at pc equal to 0. This is an assertion about the submission's internal consistency alone -- no human label is consulted -- which is what makes it the item that separates one monotone decode from two heads reconciled after the fact: independent per-step argmax with a separately argmaxed index scores a respectable macro-F1 and still lands roughly 2,900 divergences in 10,000, and control CTRL_S2_INDEPENDENT_ARGMAX exists to be measured wrong here. The evidence names the first eight divergent ids with the emitted index, the first bad position and the intervening labels, so a late-index and an early-index failure are distinguishable in the report.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "A whole-shard off-by-one in step indexing is named as an indexing defect rather than absorbed into a low localisation rate.",
+   "dimension": "correctness",
+   "evaluation_target": "graded_shard",
+   "id": "global_index_offset_rejected",
+   "judgment": "DIVERGENCE: Over the solutions where both the emitted and the human index are positions rather than sentinels, the verifier forms the multiset of signed offsets emitted minus human. If a single non-zero offset accounts for more than half of that population, the run carries a global indexing convention error -- one-based steps against a zero-based manifest is the ordinary cause -- and the check fails with reason global_index_offset naming the offset and its share. This is the failure PRC1 records as silently shifting every index by one with no traceback and visible only in the objective; here it has a name and a number. The evidence carries the whole offset histogram from -3 to +3 with a tail bucket, so a genuine localiser with a symmetric near-miss spread is never confused with a systematic shift.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded run wrote into no guarded path and holds no copy of the private human label vectors, the private first-error index vector or the private stratum map.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "human_labels_and_stratum_map_not_held_agent_side",
+   "judgment": "ABSENCE: Two assertions, each with its own reason. First, the harness's guarded_paths_touched list is empty; any entry under tests/, naming the graded or sibling label files, or under the verifier's own output directory fails with reason wrote_into_guarded_tree. Second, no file collected under agent_src matches tests/heldout/graded_labels.json, tests/heldout/sibling_labels.json or tests/heldout/graded_manifest.json by sha256, and no JSON payload the agent wrote reproduces the private first-error index vector in canonical id order, the per-id human step-count map or the per-id stratum map -- three shapes, because a copy of this slot's private state can be taken at three different granularities and only the first is caught by a file digest. Reason private_labels_held_agent_side, with the matching path and the shape it matched.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The submitted id set is exactly the graded manifest's id set, and every label sequence is exactly as long as that solution's step count under the private re-segmentation.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "ids_and_step_counts_match_the_graded_manifest",
+   "judgment": "VALUE: The submitted ids, as strings, form a set with no duplicate that is exactly the union of the graded manifest's ids and its sibling manifest's ids. The union and not the graded manifest alone: the agent is shipped the features of both private shards and cannot know which one is graded, so emitting for both is the contract and emitting for one of them makes the sibling gap uncomputable. An id in neither manifest fails with reason id_not_in_manifest and an id in either that the submission omits fails with reason id_absent_from_submission. For each id the labels list has exactly that manifest entry's step_count entries. The manifest's step counts are taken under the private whitespace and LaTeX-spacing normalisation that instruction.md discloses in prose, so a segmentation fitted to the shipped byte form drifts here rather than silently mislabelling every step after the drift; a length mismatch fails with reason step_count_mismatch and the evidence names the worst eight ids with both counts. Red line 4 requires this to fail loudly rather than to be graded down, so it is a knockout: a 42-step vector against 41 human steps has no honest alignment and every downstream count over it would be an artefact of the misalignment.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The localisation rate is an exact integer match over indices in which -1 is one of the classes, and the four ways a pair can meet are counted separately.",
+   "dimension": "correctness",
+   "evaluation_target": "graded_shard",
+   "id": "index_exact_match_scores_minus_one_as_its_own_class",
+   "judgment": "VALUE: loc is the count of graded solutions whose emitted first_error_index equals the human first-error index exactly, divided by the graded solution count, accumulated as Python integers over the canonical sorted id order. The pair is classified four ways and every count is reported -- both_sentinel (emitted -1 against human -1, a match), both_indexed_equal (a match), both_indexed_unequal (a miss, and the near-miss distribution at distance one, two and beyond is carried) and kind_mismatch (one side -1 and the other a position, always a miss). The fourth bucket is the one that is easy to get wrong and expensive to get wrong: treating a sentinel as compatible with any index converts every no-error solution into a free match, and on a step-level process corpus the no-error population is large. Exact match is unforgiving in a way macro-F1 is not, and this item is where that is made explicit rather than asserted.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Every emitted step label is one of the three human classes. The middle class is a class, not a band between two decisive ones, and nothing outside the three-value vocabulary is a label.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "labels_drawn_from_the_three_human_classes",
+   "judgment": "INVARIANT: Every entry of every labels list is exactly one of \"good\", \"neutral\" or \"bad\". A float score, a probability, an integer code, a null, a \"unknown\"/\"uncertain\"/\"skip\" token or a nested list fails with reason label_outside_vocabulary and the evidence names the first eight offending values with their solution id and step position. The check also records which of the three classes the submission actually used: a run whose emitted alphabet is the two decisive classes is in-domain here and is reported as emitted_classes of size two, which is the reading the per-stratum band and the live-neutral-row items then act on. Domain and support are separated deliberately, so a collapsed neutral class fails the check that is about collapse rather than the check that is about vocabulary.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "First-error exact match on the deep-error subgroup -- at least twelve steps with the human first error at index eight or later -- clears its bound floor of 0.44.",
+   "dimension": "correctness",
+   "evaluation_target": "graded_shard",
+   "id": "long_solution_first_error_subgroup_floor",
+   "judgment": "VALUE: The subgroup is the graded solutions the manifest flags long_solution: step_count at least 12 and human first_error_index at least 8. Its exact-match rate must be at or above 0.44, the floor bound at Phase 0.5 in seed/contract.yaml, which is not a ramp constant and is therefore authored here rather than left null. The check first requires the subgroup to be non-empty and fails with reason subgroup_absent if it is: a floor over an empty subgroup is unfirable, and the previous revision of this obligation carried the unbound phrase \"its subgroup floor\" and could never fire at all. The subgroup is the haystack case -- the error sits behind eight or more correct distractor steps -- and a localiser fitted on short solutions collapses here while its aggregate rate stays respectable, so the evidence reports the subgroup rate beside the whole-shard rate and the gap between them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Macro-F1 is a mean over three per-class F1 terms, so the neutral class must have both support and prediction mass or the metric is being read over a two-class problem.",
+   "dimension": "correctness",
+   "evaluation_target": "graded_shard",
+   "id": "neutral_row_and_column_of_the_confusion_matrix_are_live",
+   "judgment": "INVARIANT: The verifier forms the 9-cell confusion matrix over (\"good\", \"neutral\", \"bad\") from integer counts in canonical id order, requires the nine cells to sum to the graded step total, and requires the neutral row (human neutral steps) and the neutral column (emitted neutral steps) both to be non-empty. An empty neutral column makes that class's precision undefined and its F1 term either zero or dropped depending on the convention, which is the difference between a macro-F1 over three classes and a macro-F1 over two wearing the same name. The evidence carries all nine cells, the three per-class precisions, recalls and F1 terms, the macro-F1 itself, and the plain binary step accuracy obtained by folding neutral into good -- the two side by side, because a run that has collapsed the middle class reads respectably on the second and poorly on the first, and seeing them together is what makes the failure legible.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The no-error case is the exact integer -1 and nothing else, and every other index is a genuine position inside its own label sequence.",
+   "dimension": "correctness",
+   "evaluation_target": "submitted_artifact",
+   "id": "no_error_sentinel_is_typed_minus_one_not_a_wildcard",
+   "judgment": "VALUE: Every first_error_index is a Python int -- a bool is rejected explicitly, since True equals 1 under comparison and would silently name step one as the first error -- and is either exactly -1 or in range(len(labels)) for its own record. The string \"-1\", the float -1.0, null, None-as-\"none\" and an index equal to len(labels) all fail with reason index_not_an_exact_class. The sentinel is graded as a class and never as a wildcard: it matches the human -1 and nothing else, and it is matched by nothing else. That is the whole reason this item is separate from the exact-match item -- an implementation that treats -1 as \"no opinion, count it right\" turns the no-error population, which is the majority class of the localisation axis, into free score, and the emitted-vs-human accounting in the exact-match item cannot see that if the sentinel was never typed in the first place.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Within every disclosed difficulty stratum the emitted neutral rate sits within plus or minus 0.03 of the human neutral rate for that stratum.",
+   "dimension": "calibration",
+   "evaluation_target": "graded_shard",
+   "id": "per_stratum_neutral_rate_inside_the_band",
+   "judgment": "INVARIANT: For each stratum named in the graded manifest the verifier forms two integer counts over that stratum's steps -- emitted neutral steps and human neutral steps -- divides each by that stratum's step total, and takes the absolute difference. nb is the largest such difference over the strata and the check passes at nb at or below 0.03. Per stratum and not globally: a globally fitted threshold over a shard whose difficulty mixture differs from the shipped split passes an aggregate rate and misses inside the levels, which is the silent mutation this slot carries and what CTRL_S2_STALE_PRIOR is projected to fail at a worst deviation of 0.081. The evidence names every stratum with its two rates, its deviation and its step count, and names the worst stratum explicitly, so a band failure driven by one thin stratum is not confused with a pipeline that is mis-calibrated everywhere.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every macro-F1, localisation rate and elapsed-second figure the run logs about itself is a figure the run actually produced.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "reward_log_matches_recomputed_f1_and_localization",
+   "judgment": "ABSENCE: The last entry of reward_log.jsonl must carry macro_f1, localization_rate and elapsed_seconds, and each must agree with the verifier's own recomputation: the two rates within 0.005 absolute and the seconds within 2 percent relative. A larger gap fails with reason log_fabrication, naming each disagreeing field with both numbers. Red line 5 makes a fabricated log a zero, and until this item nothing measured it. The tolerances are not a grading band -- the graded value never reads the log -- they are the width inside which a run rounding its own report for a human reader is not called a fabricator; the recomputed figures are formed from integer counts and are exact.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Joint quality on the private shard and on its sibling differ by at most 0.04, so a run tuned against the graded shard's own feedback over fifty attempts is caught.",
+   "dimension": "correctness",
+   "evaluation_target": "sibling_shard",
+   "id": "sibling_shard_joint_quality_gap",
+   "judgment": "DIVERGENCE: Joint quality is the mean of macro-F1 and the localisation exact-match rate, formed identically on the graded shard and on the sibling shard, both from integer counts. sib is the absolute difference and must be at or below 0.04. The sibling is a second private shard drawn under the same stratification, so a genuine pipeline's two figures move together; a threshold set fitted against the graded shard's observed reward across attempts moves them apart, and CTRL_S2_SHARD_FITTED is projected to open a gap of 0.071. The check fails with reason sibling_gap_exceeded and reports both shards' macro-F1, localisation rate and joint quality; it fails with reason sibling_shard_unavailable rather than passing when the sibling labels are absent, because a missing comparator is not agreement.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Segmentation, encoding, three-class fitting, per-stratum calibration, localisation decode and export all ran inside the one timed invocation, and the graded seconds are the harness's own measurement.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "six_named_stages_inside_one_timed_invocation",
+   "judgment": "EFFECT: The run record names all six stages -- segmentation, encoding, three_class_fitting, per_stratum_calibration, localization_decode and export -- each with a start and an end nanosecond reading, and every one of those readings lies inside the closed interval from first_data_touch_ns to artefacts_written_ns. A stage outside the interval fails with reason stage_closure_missing naming it: calibrating thresholds before the timer starts is the ordinary way a wall-clock axis is defeated, and per-stratum calibration is the stage most worth moving out. The check also recomputes the graded integer seconds as ceil((artefacts_written_ns - first_data_touch_ns) / 1e9) and requires the run record's own elapsed_seconds field to equal it, so the timed quantity in the record is the harness's measurement and never the agent's arithmetic.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded value is r_det as seed/contract.yaml stages it: exact zero on any hard constraint, the conjunctive sub-gate ramp below the joint quality gate, and the wall-clock speed ramp above it.",
+   "dimension": "outcome",
+   "evaluation_target": "graded_shard",
+   "id": "staged_r_det_speed_ramp_behind_the_joint_quality_gate",
+   "judgment": "VALUE: require_measured(\"floor\", \"knee\", \"dichotomizing_threshold\") is the FIRST statement, before any submitted byte is read. Then the staged value. Stage 1 returns exactly 0.0 with one named reason on nb above 0.03, pc above 0, sib above 0.04, ca below 0.48, ls below 0.44 or t above the slow end. Stage 2, when f1 is below 0.55 or loc is below 0.55, returns 0.10 * min(clamp((f1 - 0.33) / 0.22), clamp((loc - 0.20) / 0.35)) -- the min is deliberate, so abandoning one axis to raise the other buys nothing, and its supremum 0.10 sits strictly under the 0.12 gate value. Stage 3, when both clear, returns 0.12 + 0.88 * clamp((ln floor - ln t) / (ln floor - ln knee), 0, 1) where t is the harness's integer seconds, FLOOR IS THE SLOW END of the wall-clock ramp and KNEE THE FAST END. UNMEASURED AT PHASE 0: floor, knee and dichotomizing_threshold are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them on the grading host. That ordering is load-bearing: reading the submission first would let an absent artifact report as an ordinary failure, and the verifier would then say gradeable=true with r_det=0.0, collapsing \"this slot is not yet measurable\" into \"the agent scored zero\".",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  }
+ ]
+}

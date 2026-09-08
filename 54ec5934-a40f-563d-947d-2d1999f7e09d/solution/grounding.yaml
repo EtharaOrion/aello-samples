@@ -1,0 +1,528 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: C7-S2
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled,
+  and on this slot every one of them is. Each item below runs as real Python against delivered bytes:
+  the verifier''s own 300-instance manifest, the harness''s per-episode metering, and the submitted
+  run ledger. No item is carried as a judged restatement of a checker obligation, because a check that
+  only quotes an obligation id measures the contract rather than the delivery.'
+deliverable:
+  path: /submission/c7s2.json
+  kind: json
+  shape: an object with an ids list and a matching outputs list
+evaluation_target_vocabulary:
+- run_record
+- submitted_artifact
+- submitted_source
+items:
+- id: graded_instance_ids_exact
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: One terminal episode record lands for every instance of the 300-instance private held-out
+    split, under the verifier's own pod-minted instance ids.
+  judgment: 'The submitted ids are exactly the 300 pod-minted instance ids the verifier holds for the
+    private split: same members, no duplicate, none invented and none dropped. The split is re-bound from
+    the upstream intent templates after this bundle is authored, so an id set the scaffold chose for itself
+    names instances that are not the graded ones, and a run reporting 300 episodes of its own choosing
+    has not run the graded split at all.'
+- id: evaluator_legible_terminal_record
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Every episode ends in a record the vendored WebArena evaluator can read, in the form that
+    instance's own evaluator family requires.
+  judgment: 'For each graded instance the terminal record carries the one field that instance''s declared
+    evaluator family consumes: a non-empty answer string for the exact_match, must_include and fuzzy_match
+    families, a final page URL for url_match, and a post-episode site end-state row-set hash for program_html.
+    Success here is computed by an evaluator the agent does not own and may not amend, so an episode whose
+    record omits the field that evaluator reads is unscoreable rather than merely unsuccessful, and the
+    omission belongs to the scaffold, not to the evaluator.'
+- id: budget_exhausted_episode_still_legible
+  dimension: deliverable
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: An episode stopped by its per-instance budget still hands the external evaluator something
+    to read.
+  judgment: Every record whose terminated_by is action_budget or time_budget carries the same evaluator-legible
+    field its family requires, alongside the action count and the elapsed seconds at which the budget
+    bound. The per-instance gate stops episodes on purpose and stopping one is a legitimate move; abandoning
+    it without a terminal record is not, because that leaves a hole the evaluator cannot score rather
+    than an instance it scores as failed.
+- id: template_rebinding_not_collapsed
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: No one answer is reused across a whole group of graded instances that share an intent template.
+  judgment: The 300 graded instances are instantiated from 241 upstream intent templates, so 59 of them
+    share a template with another instance, and every such group was re-bound to different real entities
+    in the shipped site databases. No template group of two or more instances submits a single identical
+    answer across all of its members. A scaffold that answers the template rather than the instance, or
+    that replays a published per-instance answer key, produces exactly that collision.
+- id: per_instance_budget_gate_held
+  dimension: compliance
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Every single episode stays inside the per-instance budget; the gate binds per instance, never
+    per run.
+  judgment: 'Read from the harness''s own per-episode metering and never from the agent''s reward log:
+    every one of the graded episodes records at most 30 actions and at most 240 s of wall clock, and the
+    95th percentile of per-episode wall clock is at most 180 s. The gate binds on the worst episode of
+    300, so a comfortable mean buys nothing, an unmetered episode counts as a violation, and one 241-second
+    episode zeroes the run.'
+- id: reset_metered_out_of_graded_clock
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Every episode restored its site from the pinned dump, and that restore was metered out of
+    the optimized clock rather than skipped to shorten it.
+  judgment: Each graded episode carries a positive metered site-restore span and a pre-episode site snapshot
+    digest equal to the pinned reset fixture's digest for that site, and the run record's excluded-reset
+    total equals the sum of those per-episode spans. Restore time is excluded from the optimized axis
+    by construction, which is the only reason the axis has resolution; an episode reporting zero restore
+    is claiming a reset that did not run and is inheriting the previous episode's site state.
+- id: target_site_within_retained_roster
+  dimension: compliance
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: Every episode acts on one of the five retained sites and mutates no other.
+  judgment: Each episode names a target site drawn from shopping, shopping_admin, gitlab, map and wikipedia,
+    and records no state change on any site other than its own target. The Postmill site is excluded by
+    name because its Pushshift-derived content carries no redistributable licence, so an episode naming
+    it is outside the shipped scope rather than merely unlucky; and a write landing on a second site is
+    the mis-decomposed multi-site route that sprays state changes until some evaluator matches.
+- id: external_grader_bytes_unmodified
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The vendored evaluators, the task JSON and the reward code are still the pinned bytes when
+    the graded run ends.
+  judgment: 'The run record''s post-run digest for each of the evaluator tree, the task JSON and the reward
+    code equals the digest taken when the image was built from the pinned upstream commit, and an unrecorded
+    digest counts as a mismatch. The evaluator is the external grader on this slot: the only admissible
+    way to raise the score is to hand it a better episode, and any byte change to what it reads is harness
+    tamper whatever the intent behind it.'
+- id: scaffold_rebuilt_its_own_artifacts
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The deliverable is a scaffold the grader re-runs, and the artifacts it depends on are induced
+    inside that run.
+  judgment: agent/policy.py is present and its bytes differ from the shipped starter, and each artifact
+    the scaffold consumes -- the induced workflow memory and the pruned-observation id map -- is recorded
+    as created during the graded run rather than shipped pre-baked beside the module. The grader launches
+    a fresh run of the scaffold against a split it holds, so a workflow memory that arrived as a committed
+    file was induced somewhere the grader cannot replay and is not part of what was graded.
+- id: per_instance_budget_declared
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The agent declares a per-instance budget, not a run total divided by 300.
+  judgment: The run record carries an agent-authored declaration naming a per-instance action ceiling,
+    a per-instance latency ceiling and the episode concurrency it chose, with both ceilings numeric, positive
+    and at or inside the published gate of 30 actions and 240 s. The declaration is what is graded, not
+    the harness's own metering, and an aggregate budget cannot be checked against a gate that binds on
+    one episode.
+- id: evaluator_success_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Task success over the private split, as the external evaluators tally it, clears the published
+    bar through the ramp.
+  judgment: 'Task success rate over the 300 private held-out instances, tallied by WebArena''s own programmatic
+    evaluators over verifier-owned site fixtures and read from the harness tally rather than from anything
+    the scaffold reports, mapped through the floor-to-knee ramp published in tests/constants.json, with
+    the graded-phase wall clock the above-gate ramp rides metered in the same record. UNMEASURED AT PHASE
+    0: the ramp constants are null, so this check raises ConstantUnmeasured before it reads a single submitted
+    byte, and the slot is not gradeable until the measurement wave writes them.'
+measurement_tier: gpu
+measurement_tier_basis: trains or runs an LLM backbone
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: 'the three behavioural trajectory rubrics in tests/rubrics.jsonl, as a conjunction. They
+    are not in the item list above and must not be: each is a claim about how the run was conducted
+    -- that the pruning and workflow-induction stages were built in-environment from the shipped dev
+    split rather than transcribed from a published scaffold, that every wall-clock reduction kept was
+    justified by a measurement the agent ran, and that a failed episode was diagnosed against the
+    recorded action trace rather than answered by weakening the fixture or the evaluator that surfaced
+    it. Every obligation on this slot that IS deterministically reducible is compiled into
+    tests/test_output.py instead and lives inside r_det.'
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling); a missing,
+    unavailable or unparseable verdict counts as a failure of the conjunction, never as a pass
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome = clamp((metric
+    - floor) / (knee - floor), 0, 1) through the published ramp.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+truth_narrative:
+  opening: 'your deliverable is agent/policy.py and any artifacts it builds at graded-run time. The grader
+    launches a fresh graded run of your scaffold against a private held-out split of 300 WebArena instances
+    on locally hosted sites, driving a pinned open-weights policy checkpoint on the single H100. Reach
+    >= 0.26 task success on that private split in the least graded-phase wall-clock, with no episode exceeding
+    240 s or 30 actions. Your scaffold writes one run ledger to /submission/c7s2.json: an object whose
+    ids list is the verifier''s own 300 pod-minted instance ids and whose outputs list carries, per episode,
+    the terminal record that instance''s evaluator will read.'
+  insight: Nothing on this slot decides whether an episode succeeded except WebArena's own programmatic
+    evaluators, vendored at a pinned commit, running over site fixtures the verifier owns. You cannot
+    read them at grading time, you cannot amend them, and any byte you change in them is a red line rather
+    than an optimisation. That single fact reorders the work. The scaffold's job is not to decide it solved
+    an instance; it is to leave, for every one of the 300 instances, exactly the artefact the evaluator
+    that scores THAT instance goes looking for -- an answer string for the exact_match, must_include and
+    fuzzy_match families, a final URL for url_match, a settled site end state for program_html. An episode
+    that navigated correctly and then terminated without writing that field is not a near miss; it is
+    unscoreable, and it costs the same as never having run. The second fact that reorders the work is
+    that the budget gate is PER INSTANCE. 240 s and 30 actions bind on the worst of 300 episodes, not
+    on the mean, so the concurrency that buys the wall-clock ramp is bounded above by the p95 latency
+    it creates; and an episode you stop at its ceiling still owes the evaluator a terminal record, because
+    abandoning it silently converts a failed instance into a hole in the submission.
+  steps:
+  - heading: Take the split from the verifier, not from the benchmark.
+    paragraph: 'The 300 graded instances are pod-derived: the upstream''s own 241 intent templates re-bound
+      to different real entities in the shipped site databases, with WebArena''s reward functions recomputed
+      against the new bindings. The public 812 instances and their circulated answer keys name entities
+      that are not the graded targets. Enumerate the ids the run hands you and answer those; an id set
+      you chose for yourself is a different experiment.'
+  - heading: Learn which evaluator family scores which instance, and write for it.
+    paragraph: 'Every instance carries one evaluator family and each family reads one field. Emit that
+      field on every episode, populated, before you consider the episode finished. This is the cheapest
+      success rate available to you and it is bought with plumbing rather than with capability: the gap
+      between a scaffold that navigates well and one that scores well is almost entirely episodes that
+      ended in the right page state with nothing written down.'
+  - heading: Prune the accessibility tree to interactive elements under a stable id scheme.
+    paragraph: The observation is a text accessibility tree and on the distractor-heavy instances it runs
+      past 12k tokens with several near-miss candidates. Naive truncation drops the correct element silently.
+      Prune to the interactive subset, assign ids by a stable pre-order walk so the same page yields the
+      same ids on every replay, and resolve the goal's reference rather than picking the highest-salience
+      candidate.
+  - heading: Induce the workflow memory inside the graded run, from the shipped dev split.
+    paragraph: The grader launches your scaffold fresh. A recipe file you committed beside policy.py was
+      induced somewhere the grader cannot replay, and it is not part of what was graded. Build the memory
+      in-run from environment/data/dev/, apply it as an ordered recipe with an explicit precondition check
+      per step, and record that you built it.
+  - heading: Verify at the action level and replan on mismatch.
+    paragraph: 'The dominant failure over a 30-action horizon is that the episode''s own history displaces
+      the goal: the agent re-navigates pages it already saw, loses the filter it set ten steps earlier,
+      and terminates with a partially configured state. Re-read the page after each state-changing action,
+      compare the observed effect with the intended one, and replan when they differ. Confirming the goal
+      state is also what lets you terminate early, which is where the wall-clock ramp is actually won.'
+  - heading: Meter the per-instance budget yourself and declare it as a per-instance budget.
+    paragraph: 'Track actions and elapsed seconds inside each episode against ceilings at or inside 30
+      and 240 s, and declare those ceilings plus the episode concurrency you chose. A total divided by
+      300 is not a per-instance budget: the gate binds on one episode, and a declaration naming only a
+      total cannot be checked against it.'
+  - heading: When the budget binds, stop the episode and still write the record.
+    paragraph: Mark it terminated_by action_budget or time_budget, carry the action count and the elapsed
+      seconds, and carry the evaluator's field with whatever the episode actually reached. A budget-stopped
+      episode the evaluator can read scores zero on that instance. A budget-stopped episode with no record
+      is a malformed ledger.
+  - heading: Buy wall clock with concurrency up to the p95 ceiling, and no further.
+    paragraph: 'A shared prompt prefix per site and a fixed episode cohort are free speed. Raising concurrency
+      past the point where p95 per-episode latency reaches 180 s is not: it converts the whole run to
+      0.0 under redline:slo-violation, which is strictly worse than the slower run it replaced.'
+  - heading: Restore every site from the pinned dump and let the harness meter the restore out.
+    paragraph: Per-episode restore from the pinned per-site SQL dump is the 20-40 s targeted path, and
+      its time is excluded from the optimized clock by construction -- that exclusion is the only reason
+      the compute axis has any resolution. Skipping a restore does not buy you the ramp; it leaves the
+      next episode inheriting the previous one's state and mismatches the snapshot digest.
+  - heading: Check yourself against the sibling split before you spend the attempt.
+    paragraph: A disjoint 120-instance sibling is built the same way from the same templates. A private-split
+      success that the sibling does not reproduce within 0.08 is site-specific selector fitting, and it
+      zeroes the run rather than scoring slightly lower.
+  traps:
+  - 'Goal displacement across a 30-action horizon: the scaffold re-navigates and terminates with a partially
+    configured state that the site end-state evaluator rejects.'
+  - 'The unscoreable episode: navigation reached the goal, verification confirmed it, and the terminal
+    record went out without the field that instance''s evaluator reads. The evaluator is external and
+    it scores what is written down, not what happened.'
+  - Abandoning a budget-stopped episode instead of recording it, which turns an instance the evaluator
+    would have scored zero into a hole in the ledger.
+  - 'Observation overflow: unpruned accessibility trees push the goal out of the attended window on the
+    distractor-heavy subset, and naive truncation drops the correct element in silence.'
+  - Answering the intent template rather than the instance. 300 instances come from 241 templates, and
+    every group sharing a template was re-bound to a different real entity, so one answer reused across
+    a group is the memorised-answer-key route showing itself.
+  - 'Order violation in an induced workflow: the recipe''s steps are applied in the wrong order (checkout
+    before coupon), so the final total is wrong even though every step ran.'
+  - Cross-site collateral writes when a multi-site task is mis-decomposed, and the spray-writes-until-something-matches
+    route that produces them.
+  - 'SLO collapse: raising per-episode search depth or concurrency to lift success pushes p95 past 180
+    s and zeroes the run.'
+  - Skipping the per-episode site restore to shorten the clock, when restore time was already excluded
+    from that clock and the skip only corrupts the next episode's starting state.
+  - 'Dev-split overfit: site-specific hardcoded selectors tuned on the public split break on re-bound
+    private instances and open a sibling gap above 0.08.'
+  - 'WebArena is heavily published: AgentOccam, SteP and workflow-memory scaffolds are open source with
+    reported numbers, and the 812 public instances have circulated with answer keys. Cloning a public
+    scaffold is the obvious near-optimal route. Mitigation: G is pinned by Phase 1 measurement at the
+    best published open scaffold''s own success on the private split with the pinned checkpoint plus 0.06
+    absolute, so reproducing the public repository scores exactly 0.0. CTRL-STALE runs that scaffold at
+    its pinned commit as a required-failing control. Published scaffolds are also extremely wall-clock
+    wasteful, so even a scaffold that cleared the gate would sit near the ramp floor.'
+  - 'Memorised WebArena answers in the pinned checkpoint inflating success without any scaffold improvement.
+    Mitigation: Private instances re-bind the upstream templates to different real entities, so a memorised
+    answer names an entity that is not the graded target. Any residual memorisation is common-mode across
+    scaffolds and cancels in the compute ramp, which carries 0.90 of the reward.'
+  - 'Evaluator gaming: WebArena''s URL and DOM checks can in principle be satisfied by direct state manipulation
+    rather than by navigation. Mitigation: the collateral-write absence check requires no state change
+    outside the task''s expected diff and outside its target site, and the ordering check requires the
+    recorded action trace to satisfy the precondition order, so the manipulation route produces a mutually
+    exclusive wrong world state.'
+  - 'Frontier-model saturation: mid-2026 frontier models reach roughly 68.7% on public WebArena, so a
+    task pinned to frontier capability would be saturated. Mitigation: the graded policy model is pinned
+    by digest to an open-weights checkpoint and substitution is a red line, so the graded axis is scaffold
+    quality and compute rather than frontier capability. This is a deliberate reframing and is recorded
+    as such.'
+truth_annex: 'Ordered path through instruction.md, with the compiled check each step satisfies:
+
+
+  1. `graded_instance_ids_exact` (compiled, weight 5, knockout) -- Take the split from the verifier: the
+  ids are the 300 pod-minted private instances, not a set the scaffold chose.
+
+
+  2. `evaluator_legible_terminal_record` (compiled, weight 5, knockout) -- Leave every episode in the
+  form the external evaluator that scores it reads: answer, final URL or site end-state hash, by family.
+
+
+  3. `template_rebinding_not_collapsed` (compiled, weight 5, knockout) -- Answer the instance, not the
+  template: 300 instances from 241 templates, every shared group re-bound to a different real entity.
+
+
+  4. `scaffold_rebuilt_its_own_artifacts` (compiled, weight 5, knockout) -- Ship a scaffold the grader
+  re-runs, and induce the workflow memory and the observation id map inside that run.
+
+
+  5. `per_instance_budget_declared` (compiled, weight 3) -- Declare a per-instance action and latency
+  ceiling and the episode concurrency, each at or inside the published gate.
+
+
+  6. `per_instance_budget_gate_held` (compiled, weight 5, knockout) -- Hold every one of the 300 episodes
+  inside 30 actions and 240 s, with p95 at or under 180 s, measured host-side.
+
+
+  7. `budget_exhausted_episode_still_legible` (compiled, weight 3) -- Record the episodes the budget stopped,
+  with the evaluator''s field, the action count and the elapsed seconds.
+
+
+  8. `reset_metered_out_of_graded_clock` (compiled, weight 5, knockout) -- Restore each site from the
+  pinned dump and let the harness meter that restore out of the optimized clock.
+
+
+  9. `target_site_within_retained_roster` (compiled, weight 3) -- Act on one of the five retained sites
+  and mutate no other; Postmill is out of scope by licence.
+
+
+  10. `external_grader_bytes_unmodified` (compiled, weight 5, knockout) -- Leave the vendored evaluators,
+  task JSON and reward code byte-identical to the pinned upstream commit.
+
+
+  11. `evaluator_success_ramp` (compiled, weight 10, knockout) -- Clear the private-split success bar
+  on the evaluators'' own tally, mapped through the ramp.
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - WebArena is heavily published: AgentOccam, SteP and workflow-memory scaffolds are open source with
+  reported numbers, and the 812 public instances have circulated with answer keys. Cloning a public scaffold
+  is the obvious near-optimal route. -- controlled by: G is pinned by Phase 1 measurement at the best
+  published open scaffold''s own success on the private split with the pinned checkpoint plus 0.06 absolute,
+  so reproducing the public repository scores exactly 0.0. CTRL-STALE runs that scaffold at its pinned
+  commit as a required-failing control. Published scaffolds are also extremely wall-clock wasteful, so
+  even a scaffold that cleared the gate would sit near the ramp floor.
+
+  - Memorised WebArena answers in the pinned checkpoint inflating success without any scaffold improvement.
+  -- controlled by: Private instances re-bind the upstream templates to different real entities, so a
+  memorised answer names an entity that is not the graded target. Any residual memorisation is common-mode
+  across scaffolds and cancels in the compute ramp, which carries 0.90 of the reward.
+
+  - Evaluator gaming: WebArena''s URL and DOM checks can in principle be satisfied by direct state manipulation
+  rather than by navigation. -- controlled by: B-CHK-3 requires the absence of any state change outside
+  the task''s expected diff and outside the task''s target site, and B-CHK-4 requires the recorded action
+  trace to satisfy the ordering precondition, so the manipulation route produces a mutually exclusive
+  wrong world state.
+
+  - Frontier-model saturation: mid-2026 frontier models reach roughly 68.7% on public WebArena, so a task
+  pinned to frontier capability would be saturated. -- controlled by: The graded policy model is pinned
+  by digest to an open-weights checkpoint and substitution is a red line, so the graded axis is scaffold
+  quality and compute rather than frontier capability. This is a deliberate reframing and is recorded
+  as such.
+
+
+  Deliverable manifest: /submission/c7s2.json (json), an object with an ids list and a matching outputs
+  list.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTRL-NOOP` targets Submit the unchanged starter, or an agent/policy.py that terminates the episode
+  immediately, and let the harness default carry the score.; recorded score 0.
+
+  - `CTRL-STALE` targets Clone the best published open WebArena scaffold (AgentOccam / SteP / workflow-memory
+  class) at its pinned commit and ship it unchanged, the obvious lookup route on a heavily mirrored benchmark.
+  This configuration is also the declared tuned-starter family at t_starter = 4,900 s.; recorded score
+  0.0769.
+
+  - `CTRL-DISTRACTOR` targets Select the highest-salience candidate element rather than resolving the
+  goal reference, which is the shortcut the 90-instance distractor-heavy subset (accessibility trees above
+  12k tokens with at least three near-miss candidates) is selected to defeat.; recorded score 0.0423.
+
+  - `CTRL-LIST-ALL` targets Perform every plausible state change for the intent class so some evaluator
+  matches by brute force; trips the B-CHK-3 cross-site and collateral-change absence check.; recorded
+  score 0.0077.
+
+  - `CTRL-OBVIOUS-WRONG` targets Ship hardcoded site selectors and memorised public answer keys, which
+  address the wrong entity on the re-bound private instances and read stale selectors on the rolled site
+  snapshot.; recorded score 0.0192.
+
+  - `CTRL-KNOB-SEARCH` targets Reach the gate by classical search alone: TPE and random search over the
+  documented starter flags (max actions, temperature, samples, tree-pruning depth, concurrency) at the
+  same 40-attempt budget.; recorded score 0.0923.
+
+  - `CTRL-SLO-RUSH` targets Buy the wall-clock ramp by trading per-episode latency: 48-way concurrency
+  reaches C = 1,120 s but pushes p95 per-episode latency to 214 s past the 180 s ceiling.; recorded score
+  0.
+
+  - `CTRL-RESET-SKIP` targets Cut wall-clock by skipping or shortcutting the per-episode site database
+  restore so later episodes inherit earlier state; trips the B-CHK-5 per-episode site snapshot digest
+  check.; recorded score 0.
+
+  '
+provenance:
+  corpus: 'WebArena (github.com/web-arena-x/webarena, Apache-2.0, CMU), 812 examples instantiated from
+    241 intent templates over self-hosted sites, with programmatic execution-based evaluators (site
+    end-state, URL and DOM checks, plus exact/keyword/fuzzy answer matching). Acquisition: upstream
+    Docker images pulled by digest at image-build time and re-tagged into the pinned environment; task
+    JSON and evaluators vendored from the pinned repository commit with LICENSE and SPDX Apache-2.0
+    recorded in the asset manifest. Sites carried: OneStopMarket shopping and the shopping-admin CMS
+    (Magento-derived snapshot, OSL-3.0), GitLab CE (MIT), the map service (OpenStreetMap data, ODbL),
+    and the Wikipedia Kiwix ZIM (CC BY-SA 3.0). The Postmill/Reddit site is excluded by name because
+    its Pushshift-derived content carries no redistributable licence, and that exclusion is recorded
+    as a declared scope narrowing rather than a silent drop; the per-site licence audit is a Phase 1
+    blocker. Splits: the public dev split is the upstream instances for the retained sites, shipped
+    under environment/data/dev/. The private held-out split is 300 pod-derived instances produced by
+    re-binding the upstream''s own 241 intent templates to different real entities drawn from the shipped
+    site databases, with WebArena''s programmatic reward functions recomputed against the new bindings;
+    no generative model participates. A disjoint sibling split of 120 instances is built the same way.
+    Policy checkpoint as in C7-S1: an Apache-2.0 open-weights instruct checkpoint in the Qwen3.6-27B
+    class pinned by SHA-256, licence verified at Phase 1.'
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: 'WebArena (github.com/web-arena-x/webarena, Apache-2.0, CMU), 812 examples instantiated
+      from 241 intent templates over self-hosted sites, with programmatic execution-based evaluators
+      (site end-state, URL and DOM checks, plus exact/keyword/fuzzy answer matching). Acquisition: upstream
+      Docker images pulled by digest at image-build time and re-tagged into the pinned environment;
+      task JSON and evaluators vendored from the pinned repository commit with LICENSE and SPDX Apache-2.0
+      recorded in the asset manifest. Sites carried: OneStopMarket shopping and the shopping-admin CMS
+      (Magento-derived snapshot, OSL-3.0), GitLab CE (MIT), the map service (OpenStreetMap data, ODbL),
+      and the Wikipedia Kiwix ZIM (CC BY-SA 3.0). The Postmill/Reddit site is excluded by name because
+      its Pushshift-derived content carries no redistributable licence, and that exclusion is recorded
+      as a declared scope narrowing rather than a silent drop; the per-site licence audit is a Phase
+      1 blocker. Splits: the public dev split is the upstream instances for the retained sites, shipped
+      under environment/data/dev/. The private held-out split is 300 pod-derived instances produced
+      by re-binding the upstream''s own 241 intent templates to different real entities drawn from the
+      shipped site databases, with WebArena''s programmatic reward functions recomputed against the
+      new bindings; no generative model participates. A disjoint sibling split of 120 instances is built
+      the same way. Policy checkpoint as in C7-S1: an Apache-2.0 open-weights instruct checkpoint in
+      the Qwen3.6-27B class pinned by SHA-256, licence verified at Phase 1.'
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-061f6f6b7b2a54a9210b0e6700581284
+  - AELLO-CANARY-cd4ebec219f03a949b2629082c125744
+  - AELLO-CANARY-ae1bbcf0a8a058eee6be875bed4c1963
+  - AELLO-CANARY-e0fbd2f0bc1ee664455d6ba374c691f1

@@ -1,0 +1,700 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S7
+compilation_floor: 1.0
+compilation_floor_basis: >-
+  PRD section 5.6: every deterministically reducible judgment is compiled. Every item below reduces
+  to arithmetic over delivered bytes -- a label vector, a per-utterance latency series the harness
+  wrote, and a run record the graded run declared -- so none of them is judged. The one item that
+  names a numeric bar Phase 0 does not author is the outcome item, and it does not fall back to a
+  judged reading: it raises ConstantUnmeasured and reports the slot unmeasurable instead.
+deliverable:
+  path: /submission/preds_c8s7.npy
+  kind: npy
+  shape: one integer keyword index per graded utterance, 3500 rows in the pinned roster order,
+    every value inside the 35-keyword index
+evaluation_target_vocabulary:
+- run_record
+- submitted_artifact
+- submitted_source
+items:
+- id: keyword_label_vector_lands
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The keyword decision vector lands at the declared submission path and parses as a
+    one-dimensional integer array.
+  judgment: >-
+    /submission/preds_c8s7.npy exists, loads without pickle, and is a one-dimensional array of
+    integer dtype. A two-dimensional array is a 35-wide score matrix that was never argmaxed, and
+    taking the argmax verifier-side would grade a keyword decision the agent never made; a float
+    dtype is a posterior row, not a decision. Both are reported by name rather than coerced.
+- id: one_label_per_graded_utterance
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The vector carries exactly one keyword decision for every graded utterance, neither
+    short nor long.
+  judgment: >-
+    The row count equals the graded roster exactly -- 3500 utterances, 100 per keyword. Length is
+    checked and never repaired: a checker that ravels and truncates to the label length grades a
+    prefix of the submission and silently rewards a run that predicted 900 utterances out of 3500,
+    and a checker that pads grades rows the agent never wrote. Short and long are separate reasons
+    because they are separate mistakes.
+- id: labels_inside_the_thirty_five_keyword_index
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Every decision names a keyword the graded split actually contains.
+  judgment: >-
+    Every entry lies in the closed range 0 to 34. Speech Commands v0.02 carries 35 keyword folders
+    and this split uses all of them, so an index of 35 or of -1 names no keyword and an unknown or
+    silence sentinel borrowed from the twelve-class formulation of this corpus is out of domain
+    here. The offending values are listed rather than clipped into range.
+- id: class_index_maps_to_the_pinned_keyword_roster
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The run declares which keyword each class index means, and the declaration is the
+    pinned roster in the pinned order.
+  judgment: >-
+    The run record's keyword_index is the 35-word roster in the order corpus_layout pins it. This
+    is the one failure on this corpus that is invisible in the artifact: a model trained against a
+    label ordering of its own produces a perfectly well-formed vector of integers in range whose
+    accuracy is near chance, and neither the array nor the metric can tell a permuted mapping from
+    a bad model. The check separates them, and reports permutation_only true when the declared
+    words are the pinned set in the wrong order.
+- id: no_keyword_claims_more_than_the_balanced_share_cap
+  dimension: deliverable
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: No single keyword claims a share of the decisions that a 1.00:1 balanced split cannot
+    support.
+  judgment: >-
+    The graded split is balanced at exactly 100 utterances per keyword, so the truth share of every
+    keyword is 1/35, about 0.0286. A submission in which one keyword claims more than 0.25 of the
+    3500 rows -- eight and three quarter times its balanced share -- has collapsed onto a modal
+    class rather than discriminated between keywords. The cap sits far enough above the balanced
+    share that no honest model reaches it and low enough that the shipped all-zeros starter, which
+    claims the whole vector for backward, is caught.
+- id: every_graded_utterance_timed_by_the_harness
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The harness holds one measured latency for every graded utterance and for nothing
+    else.
+  judgment: >-
+    The harness's per-utterance latency series covers the graded roster exactly: every utterance
+    timed, no timing for an utterance outside the roster, and every entry a finite number. A gate
+    that applies to every inference needs a measurement of every inference; a series covering 3400
+    of 3500 utterances leaves 100 inferences ungated, and those are exactly the ones a slow
+    configuration would hide in.
+- id: latency_gate_is_a_per_utterance_maximum_not_a_mean
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The gate is recomputed as a maximum over utterances, and the run's own verdict agrees
+    with it.
+  judgment: >-
+    Both the maximum and the arithmetic mean are recomputed from the harness series. The gate is
+    the maximum: one utterance above 20.0 ms fails it, however fast the other 3499 were. The run's
+    declared latency_gate_passed is a claim the agent forms from its own development profiling, not
+    a measurement it is allowed to submit, and it must agree with the recomputed maximum; the case
+    where the
+    mean is inside the bound while the maximum is outside is reported under its own name,
+    gate_taken_on_the_mean, because that is the substitution this task exists to refuse -- a mean
+    hides one slow inference behind three thousand fast ones, which is precisely the failure a
+    per-utterance bound is written to catch.
+- id: latency_measured_by_the_harness_clock_not_the_agents
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The graded latency comes from the harness's timer and no agent-held clock is offered
+    in its place.
+  judgment: >-
+    The run record names latency_source, it is harness_per_utterance_timer, the harness series is
+    present, and no agent-timed latency field is written into the record. This is red line 2. A
+    duration reported by the process being timed is not a measurement of that process: the batch
+    mean is not the per-utterance cost, a timer started after the front end has already run charges
+    nothing for the front end, and every one of those errors moves the number in the direction the
+    agent needs. Nothing in the checker reads an agent-supplied millisecond.
+- id: timed_front_end_is_the_scoring_front_end
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: One front-end configuration served both the timed pass and the scored pass, and it is
+    the configuration the record declares.
+  judgment: >-
+    The digest recorded at timing equals the digest recorded at prediction, and both equal the
+    checker's own sha256 over the canonical form of the declared front_end block. This slot binds a
+    latency gate and an accuracy metric to the SAME inference, and the cheapest way to satisfy both
+    dishonestly is to satisfy them separately -- time a 20-band, hop-320 front end and then score a
+    80-band, hop-64 one. Two digests and a recomputation close that: the record cannot claim a
+    configuration it did not digest, and cannot digest two.
+- id: front_end_frame_count_follows_from_window_and_hop
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The declared front end is arithmetically possible for a one-second 16 kHz utterance.
+  judgment: >-
+    Sample rate is the corpus's 16000 Hz, window and hop and mel bands sit inside the declared
+    envelope, the hop does not exceed the window, the mel band count does not exceed the window's
+    positive-frequency bin count, and frames_per_utterance equals 1 + (16000 - window) // hop
+    recomputed here. A hop wider than the window leaves audio between frames that no frame ever
+    reads, and a keyword onset can land entirely in that gap; more mel bands than spectrum bins
+    produces empty filters that cost latency and carry no signal. Both are declarations that cannot
+    describe a front end that ran.
+- id: graded_audio_and_checker_tree_unwritten
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The graded run writes into no guarded root and leaves the graded utterance archive
+    byte-identical.
+  judgment: >-
+    No path under tests/, under the graded utterance archive, or under the verifier's output
+    directory is written during the graded run -- taken from the harness's own record of touched
+    paths and corroborated by the run's declaration, never from a post-hoc scan, which cannot
+    separate a write made during the graded run from one made before it -- and the archive digest
+    recorded before the first inference equals the one recorded after the last. This is red line 1,
+    and on an audio task it has a specific shape: re-mixing the graded utterances at a friendlier
+    signal-to-noise ratio, or trimming them below a second, raises accuracy and lowers latency at
+    the same time by changing the input rather than the model.
+- id: noise_augmentation_confined_to_the_training_split
+  dimension: integrity
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: Background-noise mixing is declared, uses the vendored clips, and touches the training
+    split only.
+  judgment: >-
+    The augmentation declaration names applied_to as the training split, draws only from the six
+    vendored background clips that ship with Speech Commands v0.02 -- doing_the_dishes,
+    dude_miaowing, exercise_bike, pink_noise, running_tap, white_noise -- and mixes inside the
+    published 0 to 20 dB signal-to-noise range. A run that uses no background mixing declares
+    applied_to none with an empty clip list, which is a statement about a lever rather than a
+    silence about one. Clips from outside the vendored six are unvendored audio on a task whose
+    allowlist reaches no corpus host at solve time.
+- id: replay_reproduces_the_label_vector_under_the_recorded_front_end
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: A second run under the recorded seed reproduces the label vector, under the same front
+    end.
+  judgment: >-
+    The replay's artifact digest equals the sha256 of the delivered .npy, and the replay's front-end
+    digest equals the graded run's. Keyword decisions are deterministic under a fixed seed even
+    though the latencies that gate them are not, so the labels are required to be bit-identical and
+    the milliseconds are not. A replay that reproduces the labels under a different front end
+    reproduces the answer without reproducing the run, and answers the wrong question.
+- id: budget_declared_in_training_seconds_and_timed_utterances
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The agent declares its own budget in the terms this task spends it.
+  judgment: >-
+    The run record carries an agent-authored declaration naming train_seconds,
+    inference_utterances_timed and attempts_used, each a non-negative number. The declaration is
+    what is graded and the harness's own measurement is not, so the check cannot be satisfied by a
+    field the harness writes. The second key is the one this slot adds: latency here is a property
+    of the design and not of the run, and a front end tuned against a dozen utterances has not been
+    measured against the gate it has to clear on 3500.
+- id: latency_gated_keyword_accuracy_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Top-1 keyword accuracy over the private split clears the published bar through the
+    ramp, with the per-utterance gate applied first.
+  judgment: >-
+    Top-1 agreement between the submitted keyword decisions and the private 35-way labels, forced
+    to exactly 0.0 when any graded utterance's harness-measured latency exceeds 20.0 ms, mapped
+    through the floor-to-knee ramp published in tests/constants.json. The gate is read before the
+    labels are compared, so accuracy bought by exceeding the bound is worth nothing rather than
+    worth most of what it scored. UNMEASURED AT PHASE 0 -- the ramp constants are null, so this
+    check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable
+    until the measurement wave writes them.
+corpus_layout:
+  corpus_status: not-landed
+  corpus_status_reason: >-
+    seed/build/land_corpora.py has not run for this slot. environment/data/ and tests/heldout/ do
+    not exist in seed/stage/c8s7, so no check below was written against bytes anyone inspected.
+    Stated rather than hidden: the roster, the counts, the sample rate and the class balance
+    recorded here are the layout the landed archives must match, and a disagreement at landing is a
+    corpus-landing failure to repair at Phase 1, not a licence to re-pin the graded split after
+    seeing which utterances a model happens to get right. Every check that needs a file it cannot
+    find reports that it could not find it; none of them passes over an absence.
+  train_audio: environment/data/speech_commands_v002_train.npz
+  graded_audio: environment/data/graded_utterances.npz
+  keyword_index_file: environment/data/keyword_index.json
+  background_noise_dir: environment/data/background_noise/
+  graded_labels: tests/heldout/graded_keywords.npz
+  run_record: run_record.json
+  run_record_basis: >-
+    Written by the graded run beside the bundle root and read by the verifier. instruction.md
+    publishes every key the compiled checks read, so no check grades an obligation the agent was
+    never told to carry. Two of its keys are written by the harness and not by the agent --
+    harness_utterance_latency_ms and guarded_paths_touched -- and the checks that read them say so.
+  split_discipline: >-
+    The graded utterances ship agent-visible and unlabelled under environment/data/, because the
+    agent has to run inference over them and the harness has to time that inference on the same
+    bytes. Their keyword labels ship only under tests/heldout/, which red line 1 forbids the graded
+    run from touching and which the separate verifier mounts. The asymmetry is what makes the
+    latency gate measurable at all: latency is a property of running the model over the graded
+    audio, so the audio cannot be hidden, and accuracy is a property of the labels, so the labels
+    cannot be shown.
+  keyword_roster:
+  - backward
+  - bed
+  - bird
+  - cat
+  - dog
+  - down
+  - eight
+  - five
+  - follow
+  - forward
+  - four
+  - go
+  - happy
+  - house
+  - learn
+  - left
+  - marvin
+  - nine
+  - "no"
+  - "off"
+  - "on"
+  - one
+  - right
+  - seven
+  - sheila
+  - six
+  - stop
+  - three
+  - tree
+  - two
+  - up
+  - visual
+  - wow
+  - "yes"
+  - zero
+  keyword_roster_basis: >-
+    The 35 keyword folders of Speech Commands v0.02, in ascending lexicographic order, which is the
+    order a directory listing of the release returns and therefore the order a label encoder built
+    by walking the corpus produces by default. Pinned here so that the mapping from class index to
+    word is a published fact rather than an artefact of whichever loader the agent wrote: the
+    twelve-class formulation of this corpus folds thirty of these words into an unknown bucket and
+    adds a silence class, and a model built to that formulation emits indices that are in range and
+    mean something else entirely.
+  keyword_count: 35
+  utterances_per_keyword: 100
+  graded_utterance_count: 3500
+  class_balance_ratio: 1.0
+  class_balance_basis: >-
+    100 graded utterances for each of the 35 keywords, a 1.00:1 ratio between the largest and
+    smallest class. Balanced deliberately: top-1 accuracy is only the metric the instruction names
+    if no keyword can be won by prior alone, and the released corpus is not balanced -- the ten
+    command words carry roughly four times the clips of the auxiliary words. The graded split is
+    subsampled to the balanced count rather than reweighted at scoring time, so the metric stays
+    plain accuracy and needs no per-class weight to be honest.
+  sample_rate_hz: 16000
+  utterance_samples: 16000
+  utterance_samples_basis: >-
+    One second at 16 kHz, the release's own clip length. Shorter clips in the release are
+    zero-padded to the second at landing, so every graded utterance is exactly 16000 samples and
+    the frame arithmetic every front end declares has one right answer.
+  per_utterance_latency_bound_ms: 20.0
+  latency_gate_statistic: maximum
+  per_utterance_latency_bound_basis: >-
+    A published specification, fixed before any measurement on this slot, not a measured quantity:
+    20.0 ms of wall clock for each single inference over a 1000 ms utterance, a real-time factor of
+    0.02 on the pinned verifier class -- eight CPU cores and no GPU, from task.toml's
+    [verifier.environment]. It is stated as an absolute per-inference budget rather than a ratio
+    because that is the form a keyword spotter is deployed under: the device wakes, decides, and
+    sleeps, and a decision that takes longer than the wake budget is not late on average, it is
+    late. The figure binds where this slot's levers live -- a raw-waveform branch at 16 kHz, 80 mel
+    bands at a 64-sample hop, and a fused two-branch stack each cost real milliseconds on that
+    class. If the shipped baseline cannot meet it when the corpus lands, the bound is repaired at
+    landing and the repair is recorded; repairing it after seeing agent scores would be choosing
+    the gate to fit the results.
+  latency_gate_basis: >-
+    The gate is the maximum over the 3500 per-utterance measurements, never the mean and never a
+    percentile. A 99th-percentile gate passes 35 late inferences by construction, and a mean gate
+    passes one arbitrarily late inference for every three thousand fast ones. The instruction says
+    every inference and the checker recomputes every inference.
+  admitted_latency_sources:
+  - harness_per_utterance_timer
+  rejected_latency_sources:
+  - agent_reported_wall_clock
+  - self_timed_batch_mean
+  - python_time_around_forward
+  - amortised_throughput_estimate
+  agent_timing_fields_refused:
+  - agent_utterance_latency_ms
+  - self_timed_latency_ms
+  - reported_latency_ms
+  front_end_keys:
+  - sample_rate_hz
+  - window_samples
+  - hop_samples
+  - mel_bands
+  - frames_per_utterance
+  front_end_envelope:
+    window_samples:
+    - 128
+    - 1024
+    hop_samples:
+    - 32
+    - 512
+    mel_bands:
+    - 10
+    - 80
+  front_end_envelope_basis: >-
+    The declarable range of the three front-end levers, in samples at 16 kHz: an 8 ms to 64 ms
+    analysis window, a 2 ms to 32 ms hop, and 10 to 80 mel bands. The box is a box and not the
+    admissible set -- a 128-sample window carries 65 positive-frequency bins and cannot support 80
+    mel bands, and the checker enforces that joint constraint separately, because the pairs a box
+    admits and the pairs a spectrum admits are different questions and collapsing them would either
+    forbid legal corners or admit empty filters.
+  max_single_keyword_share: 0.25
+  max_single_keyword_share_basis: >-
+    Eight and three quarter times the 1/35 balanced share. Set far above anything an honest model
+    reaches -- a model whose per-keyword recall varies by a factor of three still puts no keyword
+    near a quarter of a balanced split -- and far below the collapse the shipped starter produces,
+    which is a share of 1.0 on a single index. It is a degeneracy detector and not a quality bar,
+    which is why it is weighted 3 and does not knock out.
+  background_noise_clips:
+  - doing_the_dishes
+  - dude_miaowing
+  - exercise_bike
+  - pink_noise
+  - running_tap
+  - white_noise
+  background_noise_basis: >-
+    The six recordings in the release's _background_noise_ directory, the only audio on this slot
+    that is neither a keyword utterance nor synthesised by the agent. They are the material of the
+    mixing lever, and the roster is closed because the solve-time allowlist reaches no corpus host:
+    a clip from outside these six is audio that did not ship.
+  noise_snr_db_range:
+  - 0.0
+  - 20.0
+  noise_snr_db_basis: >-
+    Mixing between 0 dB and 20 dB signal-to-noise. The lower end is where the keyword and the
+    background carry equal power, which is aggressive but is the regime the release's own
+    augmentation notes describe; below it the label stops describing what is audible. The upper end
+    is where mixing stops changing the input.
+  training_split_tokens:
+  - train
+  - training
+  - train_split
+  budget_keys:
+  - train_seconds
+  - inference_utterances_timed
+  - attempts_used
+  guarded_writes:
+  - tests/
+  - environment/data/graded_utterances.npz
+  - /logs/verifier/
+measurement_tier: gpu
+measurement_tier_basis: trains a neural net over an image, audio or dense-label corpus
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: >-
+    Null by seed/contract.yaml's own convention: every quantity recorded null is measured at Phase 1
+    build time on the grading host and never authored at Phase 0. Authoring a floor, knee or
+    ablation worth here would invent a measurement the bytes have not earned. The per-utterance
+    latency bound in corpus_layout is deliberately not one of these: it is a published
+    specification the instruction states and the controls are written against, not a distribution
+    measured on this slot, and CTL-OVERBUDGET cannot target a model that exceeds a bound that does
+    not yet exist.
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the
+    grading host
+knee_anchor: published Speech Commands v2 accuracy for a model of the same parameter and latency
+  class
+knee_anchor_source: an external published figure, fixed before any measurement on this slot
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: >-
+  No source was attempted for this slot's knee anchor at Phase 0. What the Phase 1 sourcing owes is
+  recorded so the attempt is not made loosely: the figure must be a published 35-way accuracy on
+  Speech Commands v0.02, not the twelve-class formulation whose numbers run several points higher
+  on the same audio, and it must come from a model of comparable parameter count and inference cost
+  to what the 20.0 ms per-utterance bound admits. An anchor taken from an unconstrained model is an
+  anchor for a different task.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome =
+    clamp((metric - floor) / (knee - floor), 0, 1) through the published ramp, where the metric is
+    top-1 keyword accuracy forced to zero when any single graded inference exceeds the per-utterance
+    latency bound.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet
+    and the slot is authored but not gradeable.
+truth_narrative:
+  opening: >-
+    maximise keyword accuracy on a private split while every inference stays inside a bound
+    per-utterance latency. The graded artifact is one integer keyword index per graded utterance --
+    3500 rows, 100 for each of the 35 Speech Commands v0.02 keywords -- written to
+    /submission/preds_c8s7.npy. The graded quantity is top-1 accuracy over that private split,
+    forced to exactly zero when any one of the 3500 inferences the harness times exceeds 20.0 ms.
+  insight: >-
+    Two objectives are bound to one forward pass, and the binding is what makes this hard. Accuracy
+    wants a wider window, more mel bands, a raw-waveform branch beside the spectrogram branch, and a
+    fusion deep enough that the two views inform each other. Every one of those costs milliseconds
+    on the same inference the gate measures, and the gate is a maximum: it is not enough to be fast
+    on average, or fast on 3499 of 3500 utterances. So the design question is not how accurate a
+    model can be, nor how fast, but which of the front-end levers buys the most accuracy per
+    millisecond -- and that is a question about the mel resolution, the hop, and where the two
+    branches join, not about model size. The second thing that matters is that both numbers have to
+    describe the same inference. A latency measured on one configuration and an accuracy measured on
+    another is two measurements of two models, and the checks bind them together with a digest
+    taken on both passes.
+  steps:
+  - heading: Pin the label mapping before training anything
+    paragraph: >-
+      Class index 0 is backward and class index 34 is zero, the 35 keyword folders in lexicographic
+      order, and the run record has to say so. This is the one mistake on this corpus that hides
+      completely: a model trained against its own ordering emits a well-formed vector of integers,
+      all in range, that scores near 1/35, and nothing in the artifact distinguishes it from a model
+      that simply did not learn. Build the encoder from the published roster rather than from
+      whatever order the loader walks, and declare it.
+  - heading: Choose the front end against the gate, not after it
+    paragraph: >-
+      The window, the hop and the mel band count are the levers, and they set both the accuracy and
+      most of the cost. Frames per utterance is 1 + (16000 - window) // hop, so halving the hop
+      doubles the frames and roughly doubles the per-utterance convolution cost; the mel band count
+      sets the width of every one of those frames. Pick the operating point by measuring accuracy
+      per millisecond across the box, not by maximising accuracy and then hoping the gate is loose.
+      The arithmetic is checked: a declared frame count that does not follow from the declared window
+      and hop describes a front end that did not run.
+  - heading: Make the two branches share a representation before the decision
+    paragraph: >-
+      A waveform branch and a spectrogram branch that meet only at the logits are two models and a
+      vote. Neither branch can use what the other resolved -- the waveform branch's fine time
+      structure never reaches the spectrogram branch's frequency detail -- and the vote costs the
+      full inference time of both. Joining earlier, at a shared feature stage, is what makes the
+      second branch worth the milliseconds it spends; it is also the choice the contract records as
+      separately ablatable, and its worth is measured on the Phase 2 ladder rather than asserted
+      here.
+  - heading: Time every utterance separately, and let the harness do it
+    paragraph: >-
+      The gate is applied per inference, so the measurement is per inference: 3500 timings, one per
+      utterance, taken by the harness's clock. Batching the whole split into one forward pass and
+      dividing by 3500 amortises away precisely the cost the bound exists to constrain -- the
+      per-utterance overhead a deployed spotter actually pays -- and a timer the solve process holds
+      is red line 2 regardless of how carefully it is written.
+  - heading: Spend the noise lever on the training split only
+    paragraph: >-
+      Mixing the six vendored background clips into training audio between 0 and 20 dB is the
+      robustness lever on this corpus and it is free at inference time. Mixing them into the graded
+      utterances is not augmentation, it is rewriting the graded input: it raises accuracy and lowers
+      latency at once by changing what is being classified, the archive digest moves, and red line 1
+      zeroes the attempt.
+  - heading: Declare the budget and replay the labels
+    paragraph: >-
+      Train seconds, the number of utterances the design was timed against, and attempts used are
+      the agent's own accounting, and the second of those is where this slot's honest work shows: a
+      front end tuned against a dozen clips has not been measured against a gate it must clear on
+      3500. Then re-run under the recorded seed -- the label vector must come back byte-identical
+      under the same front-end digest, even though the milliseconds will not.
+  traps:
+  - Fuses at the logit level and the two branches never share representation -- the waveform branch
+    then pays its full inference cost against the gate while contributing only a vote, which is the
+    worst of both objectives.
+  - Meets accuracy by exceeding the latency bound, and the gate zeroes the attempt. The gate is read
+    before the labels are compared, so 3499 inferences inside the bound do not pay for the one
+    outside it.
+  - Reads the gate as an average, or as a high percentile. A mean over 3500 utterances hides an
+    arbitrarily slow inference; a 99th-percentile gate passes 35 of them by construction.
+  - Times a batched forward over the whole split and divides by the row count, which amortises away
+    the per-utterance cost the bound is written to constrain.
+  - Times a cheap front end and scores an expensive one. One digest is taken on the timed pass and
+    one on the scored pass, and they must be equal and must be the digest of the declared block.
+  - Trains against its own label ordering, emits 3500 in-range integers that score near chance, and
+    reports a modelling failure that was a mapping failure.
+  - Declares a hop wider than its window, so a keyword onset can fall entirely between frames, or
+    more mel bands than the window has positive-frequency bins, so the extra filters cost latency
+    and carry nothing.
+  - 'a pretrained audio encoder would shortcut the fusion design Mitigation: no model-zoo host is
+    reachable at solve time; any backbone must be vendored'
+truth_annex: |-
+  Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+  1. `class_index_maps_to_the_pinned_keyword_roster` (compiled, weight 5, knockout) -- The run
+  declares which keyword each class index means, and it is the pinned roster in the pinned order.
+
+  2. `front_end_frame_count_follows_from_window_and_hop` (compiled, weight 3) -- The declared window,
+  hop and mel band count are arithmetically possible for a one-second 16 kHz utterance.
+
+  3. `timed_front_end_is_the_scoring_front_end` (compiled, weight 5, knockout) -- One front-end
+  configuration served the timed pass and the scored pass, and it is the one the record declares.
+
+  4. `every_graded_utterance_timed_by_the_harness` (compiled, weight 5, knockout) -- The harness
+  holds one measured latency for every graded utterance and for nothing else.
+
+  5. `latency_measured_by_the_harness_clock_not_the_agents` (compiled, weight 5, knockout) -- The
+  graded latency comes from the harness's timer and no agent-held clock is offered in its place.
+
+  6. `latency_gate_is_a_per_utterance_maximum_not_a_mean` (compiled, weight 5, knockout) -- The gate
+  is recomputed as a maximum over utterances and the run's own verdict agrees with it.
+
+  7. `keyword_label_vector_lands` (compiled, weight 5, knockout) -- The keyword decision vector lands
+  at the declared path as a one-dimensional integer array.
+
+  8. `one_label_per_graded_utterance` (compiled, weight 5, knockout) -- Exactly one decision per
+  graded utterance, neither short nor long.
+
+  9. `labels_inside_the_thirty_five_keyword_index` (compiled, weight 5, knockout) -- Every decision
+  names a keyword the graded split contains.
+
+  10. `no_keyword_claims_more_than_the_balanced_share_cap` (compiled, weight 3) -- No keyword claims
+  a share of the decisions a 1.00:1 balanced split cannot support.
+
+  11. `noise_augmentation_confined_to_the_training_split` (compiled, weight 3) -- Background mixing
+  is declared, uses the vendored clips, and touches training audio only.
+
+  12. `graded_audio_and_checker_tree_unwritten` (compiled, weight 5, knockout) -- No guarded root is
+  written and the graded utterance archive is byte-identical after the run.
+
+  13. `replay_reproduces_the_label_vector_under_the_recorded_front_end` (compiled, weight 3) -- A
+  second run under the recorded seed reproduces the labels under the same front end.
+
+  14. `budget_declared_in_training_seconds_and_timed_utterances` (compiled, weight 3) -- The agent
+  declares its own budget in the terms this task spends it.
+
+  15. `latency_gated_keyword_accuracy_ramp` (compiled, weight 10, knockout) -- Top-1 keyword accuracy
+  clears the published bar through the ramp, with the per-utterance gate applied first.
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+  - A pretrained audio encoder would shortcut the fusion design -- controlled by: no model-zoo host
+  is reachable at solve time; any backbone must be vendored.
+
+  - Fusing at the logit level, so the two branches never share a representation -- controlled by:
+  CTL-SPECONLY, which drops the waveform branch entirely and measures what the second branch was
+  actually worth when it only votes.
+
+  - Buying accuracy past the latency bound -- controlled by: CTL-OVERBUDGET, a model that exceeds
+  the per-utterance bound, which the gate must zero rather than score.
+
+  - Reading the gate as a mean or a percentile over the 3500 utterances -- controlled by the
+  checker's own recomputation of both statistics, which reports the substitution under its own name
+  rather than failing silently.
+
+  Deliverable manifest: /submission/preds_c8s7.npy (npy), one integer keyword index per graded
+  utterance, 3500 rows in the pinned roster order.
+
+  Control obligations recorded in seed/contract.yaml:
+
+  - `CTL-NOOP` targets the shipped starter verbatim; recorded score None.
+
+  - `CTL-SPECONLY` targets drop the waveform branch; recorded score None.
+
+  - `CTL-OVERBUDGET` targets a model that exceeds the latency bound; recorded score None.
+provenance:
+  corpus: Google Speech Commands v0.02 (Warden 2018), 35 keywords
+  anchors:
+    knee_anchor: published Speech Commands v2 accuracy for a model of the same parameter and latency
+      class
+    knee_anchor_source: an external published figure, fixed before any measurement on this slot
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: Google Speech Commands v0.02 (Warden 2018), 35 keywords
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-34477cdc8d45a4268664ce6af225566f
+  - AELLO-CANARY-be3116e30ccdfbd449346d06d270ee88
+  - AELLO-CANARY-aa4237d8ef3a4e17d01dff3c00bf57f1
+  - AELLO-CANARY-5994bef66a56e9cfd85895e8bafffa3f

@@ -1,0 +1,156 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "emitted_corpus",
+  "frozen_grading_tree",
+  "recipe_manifest",
+  "run_record",
+  "submitted_artifact"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The consumed token prefix fits the privately drawn budget N.",
+   "dimension": "token_budget",
+   "evaluation_target": "emitted_corpus",
+   "id": "consumed_prefix_within_drawn_budget",
+   "judgment": "VALUE: the verifier's own count of the consumed prefix under the frozen tokenizer is at most the drawn N, the drawn N lies inside the disclosed band of 560,000,000 to 600,000,000 tokens, and the submitted consumed_tokens agrees with the verifier's count rather than standing in for it. Exceeding scores 0.0 with reason token-budget-exceeded. N is redrawn per graded run and never announced, so a corpus front-loaded for one truncation point is a stale artifact at the next draw, which is precisely what CTL-B-STALE measures.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Both host-measured wall-clock regions sit inside their own ceiling.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "curation_wallclock_within_dual_walls",
+   "judgment": "VALUE: host-measured build wall-clock is at most 1200 seconds and train wall-clock at most 900 seconds, both timed from first touch of the data and read from the harness rather than from the agent's own timer. Each ceiling is an exact-zero cliff with its own reason, build-wallclock-exceeded and train-wallclock-exceeded, and neither is ever a slope; that is what keeps measured wall-clock noise out of the graded bits-per-byte quantity entirely.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Held-out fingerprint decontamination is applied to normalised text, not to raw bytes.",
+   "dimension": "operator_order",
+   "evaluation_target": "recipe_manifest",
+   "id": "decontamination_after_normalisation",
+   "judgment": "ORDERING: in recipe_manifest the first decontamination operator's array index is strictly greater than the first byte-normalisation operator's, and a manifest carrying decontamination but no normalisation operator at all fails the same way. CTL-B-PLACEMENT is exactly the inverted order and it is the single most common wrong choice on this slot: it exits 0 with healthy logs, reports zero fingerprint hits under its own pre-normalisation count, and leaves normalised held-out 13-grams in the emitted corpus for the containment check to zero. Reason decontamination-before-normalisation.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Deduplication runs while there is still a corpus to deduplicate, that is, before truncation to the token budget fixes the survivor set.",
+   "dimension": "operator_order",
+   "evaluation_target": "recipe_manifest",
+   "id": "dedup_before_token_truncation",
+   "judgment": "ORDERING: every deduplication operator's index in recipe_manifest is strictly less than the index of the truncation or emission-budget operator. Dedup placed after truncation is the order-collapse trap: the survivors were already fixed by where the single pass stops, so the operator runs, logs a duplicate count, and changes nothing the frozen trainer ever sees. Reason dedup-after-truncation.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The order the corpus is emitted in is the order the frozen trainer consumes it in, so emission order is part of the graded artifact.",
+   "dimension": "emission_order",
+   "evaluation_target": "emitted_corpus",
+   "id": "emission_order_is_consumption_order",
+   "judgment": "ORDERING: the harness-recorded consumption order equals ids position for position over a single pass, with no record repeated and none skipped. The trainer, optimizer, schedule, seed and architecture are all frozen, so the emission curriculum is one of the few levers the agent actually holds; a mismatch means the curriculum that was graded is not the curriculum that was designed. Reason emission-order-not-consumed.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every emitted byte traces to an exact span of a provided raw document, so the agent may select, order and truncate but never rewrite.",
+   "dimension": "provenance",
+   "evaluation_target": "emitted_corpus",
+   "id": "emitted_bytes_are_raw_document_spans",
+   "judgment": "INVARIANT: every entry of spans carries a source_id with integer offset and length, spans aligns with ids position for position, the digest-based coverage proof covers every emitted record, and the random 2 percent byte-level sample verify reports zero mismatches between the emitted bytes and raw[offset:offset+length]. An uncovered record or any sample mismatch scores 0.0 with reason span-containment-violation. Span containment is what makes paraphrase-based evaluation fitting structurally impossible rather than merely discouraged, and it is why the fingerprint file can ship at all.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent declares the operator sequence it actually ran and the budget it accounts for, and that declaration matches the manifest it submitted.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "executed_operator_sequence_declared",
+   "judgment": "EFFECT: the run record carries an agent-authored curation declaration naming operator_order, emission_curriculum, build_seconds and train_seconds, and operator_order equals the op sequence of recipe_manifest exactly. The declaration is what is graded, not the harness's own measurement, so the check cannot be satisfied by a field the harness writes; a declaration that disagrees with the submitted manifest is recipe drift caught before the verifier spends twenty minutes re-executing it. Reason declared-order-diverges-from-manifest.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded run leaves the frozen trainer, the held-out tree, the fingerprint file and the grading tree byte-identical.",
+   "dimension": "integrity",
+   "evaluation_target": "frozen_grading_tree",
+   "id": "frozen_trainer_and_heldout_digests_unchanged",
+   "judgment": "EFFECT: the before and after sha256 maps of the frozen trainer, tests/heldout/, environment/decontam/heldout_fingerprints.bin and the grading tree cover the same path set and agree on every digest, and the harness records no guarded path touched during the graded run. A deleted file is a change rather than an absence, so the path sets are compared as well as the digests. A mutation scores 0.0 with reason frozen-trainer-modified or grading-tree-write. The trainer is the one object on this slot the agent is not permitted to optimise.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No normalised 13-gram of the emitted corpus is present in the held-out fingerprint set.",
+   "dimension": "decontamination",
+   "evaluation_target": "emitted_corpus",
+   "id": "heldout_13gram_containment_zero",
+   "judgment": "ABSENCE: the verifier's own scan over the FULL emitted corpus, at n-gram width exactly 13 and under the bound normalisation, reports exactly 0 hits against environment/decontam/heldout_fingerprints.bin, and the scan is attributed to the verifier rather than to the agent's own count. One hit scores exactly 0.0 with reason eval-leak. This is red line 1: an exact n-gram membership test against a one-way hash set, not a similarity score and not a soft penalty, and it is the reason seeding held-out-like text into the corpus yields a mutually exclusive wrong deliverable rather than a high score.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The recipe manifest is a machine-readable ordered operator list rather than a prose description of a pipeline.",
+   "dimension": "deliverable",
+   "evaluation_target": "recipe_manifest",
+   "id": "manifest_operators_carry_parameters",
+   "judgment": "VALUE: recipe_manifest is a non-empty JSON array and every entry is an object carrying a non-empty string op and a params object. A prose paragraph, a bare list of operator names, or a mapping keyed by operator fails with reason manifest-not-an-ordered-operator-list: order is carried by array position, a mapping cannot express it, and the verifier re-executes the manifest rather than reading it, so an unordered manifest is not runnable at all.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Re-executing the declared manifest over the pinned raw slice reproduces the emitted corpus byte for byte.",
+   "dimension": "reproducibility",
+   "evaluation_target": "recipe_manifest",
+   "id": "manifest_reexecutes_to_emitted_digest",
+   "judgment": "ORDERING: the sha256 the verifier obtains by re-executing recipe_manifest from a fresh checkout over the pinned environment/data/raw/ slice equals the submitted corpus_sha256, and the re-execution record declares fresh_checkout true. Divergence scores 0.0 with reason recipe-corpus-divergence. This is the executable proof that the BUILD stage is deterministic -- keyed order-independent hashing, no hash-order-dependent iteration, near-dup ties broken by (source_id, offset) -- so an emitted corpus produced by an interactive pipeline the manifest no longer describes fails here rather than quietly scoring on bits per byte.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded artifact lands carrying both halves of the deliverable: the recipe and the digest of the corpus that recipe emitted.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "recipe_manifest_and_corpus_digest_present",
+   "judgment": "EFFECT: /submission/c3s2.json exists, parses as a JSON object, and carries recipe_manifest, corpus_sha256, ids, outputs and spans; corpus_sha256 is 64 lowercase hex characters. A submission naming a corpus without the recipe that built it, or a recipe without the digest of what it emitted, fails with reason manifest-or-digest-missing, because CHK-B1 then has nothing to re-execute against. The trainer is frozen, so the recipe and the corpus ARE the graded object and neither half alone is a deliverable.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The worse-shard bits per byte clears the published bar and is mapped through the descending ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "emitted_corpus",
+   "id": "worse_shard_bits_per_byte_ramp",
+   "judgment": "VALUE: b = max(b_P1, b_P2) in bits per byte from the frozen evaluator, LOWER being better, mapped through the floor-to-knee ramp published in tests/constants.json with the ramp read in the descending direction because the metric descends: the floor is the larger bits-per-byte value and the knee the smaller. UNMEASURED AT PHASE 0: floor, knee and dichotomizing_threshold are null, so this check calls require_measured as its FIRST statement, before it reads a single submitted byte, and raises ConstantUnmeasured rather than returning a score. Reading the corpus first would let a missing-artifact error mask the unmeasured signal and report gradeable true with r_det 0.0, collapsing not-yet-measurable into the-agent-scored-zero.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The graded scalar is the worse of the two private shards, not their mean and not the better one.",
+   "dimension": "outcome",
+   "evaluation_target": "run_record",
+   "id": "worse_shard_is_the_graded_value",
+   "judgment": "INVARIANT: the run record carries finite bits-per-byte values for both P1, the encyclopedic shard, and P2, the scientific shard, produced by the frozen evaluator's own logits over the verifier's own held-out bytes, and the graded b equals max(b_P1, b_P2) exactly. A single reported shard, a mean, or a graded value below the larger of the two fails with reason shard-aggregation-not-worse-of-two. Worse-of-two is the whole reason distribution-matching to one held-out source is a mutually exclusive wrong deliverable here rather than a partial win.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  }
+ ]
+}

@@ -1,0 +1,582 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S8
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item whose mode is judged below is one whose assertion names a numeric bar that Phase 0 does not author,
+  not one that resists compilation.'
+deliverable:
+  path: /submission/masks.npz
+  kind: npz
+  shape: one integer mask array per graded scene, keyed by ADE20K image id, on that scene's own pixel
+    grid, with values in 0..149 and 255 reserved for a conceded pixel
+evaluation_target_vocabulary:
+- run_record
+- submitted_artifact
+- submitted_source
+
+# ------------------------------------------------------------------------------------------
+# The label domain this bundle AUTHORS. It is delivery contract, not a measurement: the class
+# count comes from the corpus and the sentinel is chosen here, published to the agent in
+# instruction.md, and read by the compiled checks from this one place so the two cannot drift.
+# ------------------------------------------------------------------------------------------
+label_domain:
+  classes: 150
+  class_ids: 0..149, the ADE20K stuff and object classes
+  ignore_index: 255
+  ignore_meaning: 'a pixel the sparse annotation does not label. It is legal in the archive and it is
+    a CONCESSION: mean IoU is taken over every pixel of the private split, so an ignore-valued pixel
+    scores against the submission exactly as a wrong class would.'
+  why_a_sentinel_and_not_a_class: 'a 151st class would be learnable, and learning it is the first
+    recorded trap -- unlabelled pixels taught as a class drive the long tail to zero. The sentinel is
+    outside the graded domain so nothing can be scored for predicting it.'
+
+supervision:
+  regime: sparse
+  what_is_bound: the fraction of training pixels that carry a label
+  shipped_at: environment/data/sparse_labels.npz, one member per training image id on that scene's own
+    grid, carrying a class id where the annotation labels a pixel and 255 everywhere else. It is the
+    ONLY annotation that ships, and its labelled support is the bound every compiled check measures
+    a declared consumption against
+  fraction: null
+  fraction_reason: 'The supervision fraction is a task parameter fixed when the corpus lands, not a
+    Phase 0 literal. It is published to the agent in the shipped manifest and every compiled check
+    reads the shipped sparse annotation''s own labelled support rather than a copy of the number, so
+    there is no second place for it to drift. Authoring a fraction here before the shard exists would
+    bind the checks to a value the delivered bytes may not carry.'
+  why_it_is_the_whole_task: 'dense structure has to be inferred from a bound labelled support. Every
+    lever on this slot is a different answer to the same question -- what to do with the pixels that
+    carry no label -- which is why fusing channels, stitching tiles or normalising bands are not
+    routes here and a recipe that assumes a target on every pixel degrades rather than transfers.'
+
+private_split:
+  dense_labels_at: tests/heldout/graded_masks.npz
+  scene_manifest: 'derived by the verifier from graded_masks.npz itself -- the graded image ids ARE
+    its member names and each scene''s grid IS that member''s shape. There is no second copy of the
+    table on the checker side, so the manifest and the labels cannot drift apart.'
+  heterogeneous_grids: 'ADE20K scenes are not a uniform tile size. Each graded mask must be on its own
+    scene''s pixel grid, and a mask on a resized or padded grid is a missing prediction rather than a
+    weak one, because nothing at grading time may interpolate it into place.'
+  roots_the_agent_may_not_read:
+  - tests/heldout/
+  - environment/data/dense_labels/
+  roots_reason: 'tests/heldout/ is the verifier''s private tree and holds the dense masks. The corpus
+    staging tree''s environment/data/dense_labels/ holds the full dense annotation and is excluded
+    from the agent image; it is named here so that a graded run which reaches for it is caught by
+    name rather than silently finding nothing.'
+
+agent_visible:
+  scenes: environment/data/scenes/, the pixels of every scene the run may see, graded ones included
+  sparse_annotation: environment/data/sparse_labels.npz
+  graded_ids: environment/data/graded_scenes.json, the image ids to predict and each scene's grid.
+    The agent is told WHICH scenes are graded and at what size; it is never told what is in them.
+
+red_lines:
+- id: RL1
+  statement: Any read of the private split's dense labels.
+  kind: read
+  checked_by: dense_private_labels_unread
+  note: 'a READ guard, which is a different and stricter claim than a write guard. A run can create
+    and modify nothing anywhere and still have opened the dense masks it is graded against; that run
+    passes every write check and has already broken this slot. The two are checked separately and
+    neither implies the other.'
+- id: RL2
+  statement: Any write into tests/ during the graded run.
+  kind: write
+  checked_by: checker_tree_and_graded_masks_untouched
+
+items:
+- id: mask_archive_lands
+  dimension: deliverable
+  weight: 4
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: A per-scene integer mask archive is written to the declared submission path.
+  judgment: /submission/masks.npz exists, opens with pickling disabled, carries at least one member,
+    and every member is a two-dimensional array of an integer kind. A pickled archive, a float or
+    boolean mask, a one-dimensional member or a zero-member archive scores zero with reason
+    submission_malformed; a probability volume is not a mask and is not silently argmaxed here.
+- id: scene_grid_per_image_id
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Each graded ADE20K scene carries exactly one mask, on that scene's own pixel grid.
+  judgment: The archive's member keys equal the graded image ids the private split holds, and
+    each member's height and width equal that scene's own. ADE20K scenes vary in size from image
+    to image, so this cannot be satisfied by one array shape for the split; a missing id, an id the
+    split does not contain, or a mask on a resized or padded grid is a missing prediction and is not
+    interpolated into place at grading time.
+- id: label_domain_is_the_150_classes
+  dimension: deliverable
+  weight: 4
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Every predicted pixel names one of the 150 stuff and object classes, or concedes.
+  judgment: Every value in every member lies in 0..149 or is exactly the ignore index 255. A negative
+    value, or any other value at or above 150, names no class the private split can score, so no
+    per-class intersection-over-union is defined for it and the archive is out of domain.
+- id: prediction_dense_despite_sparse_supervision
+  dimension: deliverable
+  weight: 4
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The prediction classifies every pixel, though supervision covered only a bound fraction.
+  judgment: No member retains the ignore index 255. Carrying the sparse annotation's own support into
+    the answer concedes every pixel that was never labelled, and mean IoU is taken over all pixels of
+    the private split rather than over the labelled ones, so a submission shaped like its supervision
+    has already given away the majority of the grid. Not a knockout, because such an archive is a real
+    if degenerate prediction rather than a malformed one.
+- id: long_tail_not_collapsed_to_modal_class
+  dimension: deliverable
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The prediction distinguishes classes rather than painting the split one colour.
+  judgment: The union of predicted class ids across the whole archive, with the ignore index removed,
+    contains more than one of the 150 classes. CTL-MODAL predicts the modal class for every pixel and
+    its signature is a single-valued archive; the shipped starter's constant mask has the same
+    signature. No authored threshold is involved and none could be, since floor and knee are null --
+    the bound is structural and counts distinct classes, not quality.
+- id: dense_private_labels_unread
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: No dense label raster of the private split was opened during the graded run.
+  judgment: The run record's own read log names no path under tests/heldout/ or environment/data/dense_labels/.
+    This is red line 1 and it forbids a READ, not a write, so it is not implied by the write guard --
+    a run that creates and modifies nothing and still opens graded_masks.npz has broken this slot while
+    passing every write check. Checked against the log the run itself produced, never a post-hoc scan,
+    which cannot separate a read made during the graded run from one made before it.
+- id: checker_tree_and_graded_masks_untouched
+  dimension: integrity
+  weight: 4
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The graded run modifies nothing under tests/ and no byte of the private dense masks.
+  judgment: The harness's guarded-path record is empty for tests/, for environment/data/dense_labels/ and for
+    the verifier's output directory. This is red line 2 and it stands beside dense_private_labels_unread
+    rather than replacing it; a run may satisfy either guard while breaking the other.
+- id: supervision_fraction_declared_and_bounded
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The agent declares the labelled pixels it trained on, and the count does not exceed what ships.
+  judgment: The run record carries an agent-authored supervision declaration naming labelled_pixels_consumed
+    and pixels_total, and the consumed count is at most the labelled support of environment/data/sparse_labels.npz,
+    counted as the pixels that carry a class id rather than the ignore index. Training on more labelled
+    pixels than the sparse annotation ships is a dense-label read arriving by another route, so the bound
+    is checked against the delivered shard rather than against the declaration alone. The declaration is
+    what is graded; the check cannot be satisfied by a field the harness writes.
+- id: unlabelled_pixels_masked_not_backpropagated
+  dimension: process
+  weight: 4
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The declared partial-label loss policy masks unlabelled pixels instead of teaching them.
+  judgment: The run record's declared loss policy names an ignore index or an explicit mask over the
+    unlabelled pixels, and does not name background, void, zero-class or an all-pixels-supervised target
+    for them. This is the first recorded trap and CTL-STALE embodies it -- a recipe tuned for the dense
+    setting, where every pixel carries a target, collapses the long tail here. It is rejected as a wrong
+    route rather than scored as a weak lever.
+- id: step_budget_not_truncated_by_decoder_resolution
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Training reached its declared step count at the decoder resolution the agent chose.
+  judgment: The run record declares planned_steps, completed_steps and decoder_output_stride, and the
+    completed count is not below the planned one. Raising decoder resolution until the step budget
+    truncates training is the second recorded trap; without this check a truncated run is visible only
+    as a low mean IoU, which reads as a weak model rather than as a run that stopped early.
+- id: sparse_supervised_miou_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Mean intersection-over-union over the private split clears the published bar through the ramp.
+  judgment: 'Mean intersection-over-union over the private split, accumulated per class across every
+    graded scene and averaged over the classes the split actually contains, then mapped through the
+    floor-to-knee ramp published in tests/constants.json. UNMEASURED AT PHASE 0: the ramp constants are
+    null, so this check calls require_measured before it reads the submission and raises ConstantUnmeasured
+    rather than returning a score. Reading the artifact first would let a missing-file error mask the
+    unmeasured signal and report gradeable true with r_det 0.0, which asserts the agent failed when the
+    truth is that the slot is not yet measurable.'
+
+measurement_tier: gpu
+measurement_tier_basis: trains a neural net over an image, audio or dense-label corpus
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: published ADE20K mIoU at the same backbone scale and supervision fraction
+knee_anchor_source: an external published figure, fixed before any measurement on this slot
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome = clamp((metric
+    - floor) / (knee - floor), 0, 1) through the published ramp.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+
+instance:
+  slot_id: AELLO-C8-S8
+  category: 8
+  subfamily: a convolutional segmentation network over natural scenes
+  what_separates_it_from_its_siblings: 'C8-S5 is also a segmentation slot and is not this task. Its
+    difficulty is fusing twelve spectral bands with an elevation channel over uniform tiles, and every
+    pixel of its training tiles carries a target. This slot ships one visible-light scene corpus and
+    withholds most of the targets. A check that would fit both slots is measuring the family, not the
+    task, and does not count here.'
+
+substrate:
+  corpus: ADE20K scene parsing (Zhou et al. 2017), 150 stuff and object classes
+  imagery: single visible-light scene photographs, not tiles and not a multi-band stack
+  scene_grids: heterogeneous; each scene keeps its own height and width end to end
+  class_frequency: 'long tailed. A handful of stuff classes -- wall, sky, floor, building -- hold most
+    of the pixels, and most of the 150 classes are rare. Mean IoU averages over CLASSES, not over
+    pixels, so a rare class is worth as much as a dominant one and the tail is where the ramp lives.'
+  training_targets: sparse, at the bound labelled fraction
+  graded_targets: dense, private, and never readable by the agent
+
+controls:
+- id: CTL-NOOP
+  targets: the shipped starter verbatim
+  measured_score: null
+  measured_score_reason: measured at Phase 2 on the grading host; the floor is not authored here
+  must_be_rejected: false
+  note: emits one class over every scene grid, so it clears the archive and domain checks and fails
+    long_tail_not_collapsed_to_modal_class. That is the intended reading of a floor submission.
+- id: CTL-MODAL
+  targets: predict the modal class for every pixel
+  measured_score: null
+  measured_score_reason: measured at Phase 2 on the grading host
+  must_be_rejected: false
+  note: 'the strongest thing a model can do without distinguishing classes at all. Mean IoU over 150
+    classes bounds it near one over the class count no matter which class it picks, which is why the
+    axis averages over classes rather than over pixels.'
+- id: CTL-STALE
+  targets: a recipe tuned for the dense-label setting
+  measured_score: null
+  measured_score_reason: measured at Phase 2 on the grading host
+  must_be_rejected: true
+  note: a dense recipe supplies a target for every pixel, which here means teaching the unlabelled
+    majority as a class. It is rejected by unlabelled_pixels_masked_not_backpropagated rather than
+    scored as a weak configuration.
+
+rejected_routes:
+- route: treat every unlabelled pixel as background and train a dense cross-entropy
+  control: CTL-STALE
+  why_wrong: the unlabelled majority becomes the dominant target, every rare class is taught as
+    background wherever the annotation did not reach it, and the long tail collapses
+- route: transfer a published ADE20K recipe wholesale
+  control: CTL-STALE
+  why_wrong: the published recipes assume a target on every pixel. The supervision fraction here is
+    authored and is not a public setting, so the transferred schedule and loss are tuned for a
+    supervision level the shard does not carry
+- route: raise the decoder to full input resolution and take whatever steps fit
+  control: none; caught by step_budget_not_truncated_by_decoder_resolution
+  why_wrong: resolution is bought with steps, and a run that stops early reports as a weak model
+    rather than as a truncated one unless the schedule is declared and checked
+- route: submit the sparse annotation's own support and leave the rest at the ignore index
+  control: none; caught by prediction_dense_despite_sparse_supervision
+  why_wrong: mean IoU is taken over every pixel of the private split, so conceding the unlabelled
+    majority concedes the metric
+- route: read the private split's dense masks to select a configuration
+  control: none; red line 1
+  why_wrong: selection on the graded fold is a read of the private labels, and red line 1 forbids the
+    read itself rather than only a write
+
+lever_record:
+- id: L1
+  name: partial-label loss masking policy
+  standalone_worth: null
+  leave_one_out_worth: null
+  worth_reason: measured on the Phase 2 ladder over the full lever power set; never asserted at Phase 0
+- id: L2
+  name: consistency regularisation across augmented views
+  standalone_worth: null
+  leave_one_out_worth: null
+  worth_reason: measured on the Phase 2 ladder over the full lever power set; never asserted at Phase 0
+- id: L3
+  name: class-balanced sampling over the long tail
+  standalone_worth: null
+  leave_one_out_worth: null
+  worth_reason: measured on the Phase 2 ladder over the full lever power set; never asserted at Phase 0
+- id: L4
+  name: decoder resolution against the step budget
+  standalone_worth: null
+  leave_one_out_worth: null
+  worth_reason: measured on the Phase 2 ladder over the full lever power set; never asserted at Phase 0
+- id: L5
+  name: boundary-aware loss weighting
+  standalone_worth: null
+  leave_one_out_worth: null
+  worth_reason: measured on the Phase 2 ladder over the full lever power set; never asserted at Phase 0
+lever_note: 'the five levers are five answers to one question -- what to do about a pixel that carries
+  no label. L1 decides whether it enters the loss at all, L2 supplies it a target from another view of
+  the same scene, L3 decides how often the tail classes are sampled at all, L4 sets how finely it is
+  resolved, L5 decides whether the boundary it sits on is weighted. Whether that shared question makes
+  them substitutable is exactly what the ablation ladder measures, and it is not asserted here.'
+
+planted_defect:
+  what: the shipped starter performs no partial-label handling whatsoever and emits one class per scene
+  lever_that_repairs_it: L1
+  worth_if_left_in: null
+  worth_reason: measured at Phase 2; the starter is the floor and the floor is not authored
+  note: the defect is deliberately the shallowest one on the slot. This task's difficulty is the
+    sparse supervision itself, not a single removable mistake in the baseline.
+
+scoring:
+  r_det: GATE_det x S_outcome x RubricFactor_det
+  s_outcome: clamp((mean_iou - floor) / (knee - floor), 0, 1)
+  mean_iou_definition: intersection and union are accumulated per class over every graded scene and the
+    ratio is averaged over the classes the private split actually contains. Pixels the private mask
+    marks with the ignore index are excluded from both accumulators. Averaging per image and then over
+    images would let a scene containing two classes outweigh one containing forty.
+  zero_conditions:
+  - any red line
+  - any knockout failure
+  - an archive that is malformed, off the scene grid, or out of the 150-class domain
+  empty_submission_result: 0.0
+
+contamination_sources:
+- source: ADE20K is a widely published benchmark and dense-label recipes for it are abundant
+  mitigation: the supervision fraction is authored here and is not a public setting, so a transferred
+    dense recipe degrades rather than transfers, and CTL-STALE measures exactly that degradation
+
+known_overlap:
+  with_public_splits: the graded split is authored here, not the published ADE20K validation split
+  measured: null
+  measured_reason: measured at Phase 1 on the grading host
+
+admissibility_verdict:
+  graded_axis: null
+  graded_axis_reason: measured at Phase 1 from the control ladder; every member of GRADED_AXES
+    presupposes a bound this slot has not measured, so authoring one to make the bundle parse would
+    invent the measurement
+
+truth_narrative:
+  opening: maximise mean IoU on a private split when only a bound fraction of pixels carry a label.
+    The graded artifact is one integer mask array per graded scene, keyed by ADE20K image id and on
+    that scene's own pixel grid, written to /submission/masks.npz. The graded quantity is mean
+    intersection-over-union over the private split, accumulated per class over the 150 stuff and
+    object classes.
+  insight: 'The training annotation is sparse and the grading is dense. Every pixel of the private
+    split is scored, and only a bound fraction of the training pixels carries a target, so the whole
+    task is what a model is taught to do with a pixel that has no label. The trap is that the
+    convenient answer -- call it background and train a dense loss -- is available, cheap, and wrong:
+    the unlabelled majority becomes the dominant target, every rare class is taught as background
+    wherever the annotation did not reach it, and mean IoU averages over classes rather than pixels,
+    so the tail it destroys is most of the score. Before any of that, r_det is zero on a red line, and
+    red line 1 forbids READING the private dense labels rather than writing to them, which is the
+    stricter of the two claims and the one a careful-looking run is most likely to break.'
+  steps:
+  - heading: Decide what an unlabelled pixel is before deciding anything else
+    paragraph: Lever L1 is the partial-label loss masking policy. Either the unlabelled pixels are
+      excluded from the loss by an ignore index, or they are given a target and become the class that
+      dominates training. The run record declares which, and unlabelled_pixels_masked_not_backpropagated
+      reads that declaration, because the choice is invisible in a submitted mask and visible only in
+      how the loss was built. Its worth against the other four levers is measured on the Phase 2
+      ladder over the full power set and is never asserted here.
+  - heading: Get a target onto the unlabelled pixels from somewhere other than the labels
+    paragraph: Lever L2 is consistency regularisation across augmented views -- two views of the same
+      scene must agree where neither carries an annotation. This is the honest way to use the
+      unlabelled majority, and it is available precisely because red line 1 forbids the dishonest one.
+      Its worth is measured on the Phase 2 ladder and is never asserted here.
+  - heading: Sample the tail often enough that it exists in the gradient
+    paragraph: Lever L3 is class-balanced sampling over the long tail. Mean IoU averages over the 150
+      classes, so a class holding a thousandth of the pixels is worth as much as one holding a third
+      of them, and uniform sampling over a sparse annotation may not show a rare class at all inside
+      the step budget. Its worth is measured on the Phase 2 ladder and is never asserted here.
+  - heading: Buy decoder resolution with steps you actually have
+    paragraph: Lever L4 is decoder resolution against the step budget. Finer output helps thin
+      structure and boundaries and costs steps, and the second recorded trap is raising it until
+      training truncates. The run record declares planned_steps, completed_steps and the decoder output
+      stride so a truncated run reports as truncated rather than as a weak model. Its worth is measured
+      on the Phase 2 ladder and is never asserted here.
+  - heading: Weight the boundaries, where sparse annotation is thinnest
+    paragraph: Lever L5 is boundary-aware loss weighting. Sparse annotation tends to sit in class
+      interiors, so boundaries are exactly where supervision is least present and where IoU is most
+      often lost. Its worth is measured on the Phase 2 ladder and is never asserted here.
+  - heading: Ship a dense mask on every scene's own grid
+    paragraph: The deliverable is one integer mask per graded image id at that scene's own height and
+      width, values in 0..149. ADE20K scenes are not a uniform tile size, so one array shape for the
+      split cannot satisfy scene_grid_per_image_id, and nothing interpolates a mis-sized mask into
+      place at grading time. Leaving pixels at the ignore index 255 is legal and concedes them, which
+      is a submission shaped like its own supervision and is the last way to give the metric away.
+  traps:
+  - Backpropagates through unlabelled pixels as background and the long tail collapses.
+  - Raises decoder resolution until the step budget truncates training.
+  - Submits the sparse annotation's own support and leaves the rest at the ignore index, conceding
+    every pixel that was never labelled.
+  - Resizes every scene to one working resolution and ships masks on that grid rather than on each
+    scene's own.
+  - 'public ADE20K recipes are abundant and could be transferred wholesale Mitigation: the supervision
+    fraction is authored and is not a public setting, so a transferred dense recipe degrades and is
+    caught by the ablation ladder'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `supervision_fraction_declared_and_bounded` (compiled, weight 5, knockout) -- The agent declares
+  the labelled pixels it trained on, and the count does not exceed what ships.
+
+  2. `unlabelled_pixels_masked_not_backpropagated` (compiled, weight 4) -- The declared partial-label
+  loss policy masks unlabelled pixels instead of teaching them.
+
+  3. `step_budget_not_truncated_by_decoder_resolution` (compiled, weight 3) -- Training reached its
+  declared step count at the decoder resolution the agent chose.
+
+  4. `dense_private_labels_unread` (compiled, weight 5, knockout) -- No dense label raster of the
+  private split was opened during the graded run. Red line 1.
+
+  5. `checker_tree_and_graded_masks_untouched` (compiled, weight 4, knockout) -- The graded run
+  modifies nothing under tests/ and no byte of the private dense masks. Red line 2.
+
+  6. `mask_archive_lands` (compiled, weight 4, knockout) -- A per-scene integer mask archive is written
+  to the declared submission path.
+
+  7. `scene_grid_per_image_id` (compiled, weight 5, knockout) -- Each graded ADE20K scene carries
+  exactly one mask, on that scene''s own pixel grid.
+
+  8. `label_domain_is_the_150_classes` (compiled, weight 4, knockout) -- Every predicted pixel names
+  one of the 150 stuff and object classes, or concedes.
+
+  9. `prediction_dense_despite_sparse_supervision` (compiled, weight 4) -- The prediction classifies
+  every pixel, though supervision covered only a bound fraction.
+
+  10. `long_tail_not_collapsed_to_modal_class` (compiled, weight 3) -- The prediction distinguishes
+  classes rather than painting the split one colour.
+
+  11. `sparse_supervised_miou_ramp` (compiled, weight 10, knockout) -- Mean intersection-over-union
+  over the private split clears the published bar through the ramp.
+
+
+  Rejected routes, each bound to the control or the red line that measures it wrong:
+
+
+  - treat every unlabelled pixel as background and train a dense cross-entropy -- controlled by:
+  CTL-STALE, and refused by `unlabelled_pixels_masked_not_backpropagated`
+
+  - public ADE20K recipes are abundant and could be transferred wholesale -- controlled by: the
+  supervision fraction is authored and is not a public setting, so a transferred dense recipe degrades
+  and is caught by the ablation ladder
+
+  - raise the decoder to full input resolution and take whatever steps fit -- caught by
+  `step_budget_not_truncated_by_decoder_resolution`
+
+  - submit the sparse annotation''s own support and leave the rest at the ignore index -- caught by
+  `prediction_dense_despite_sparse_supervision`
+
+  - read the private split''s dense masks to select a configuration -- red line 1, caught by
+  `dense_private_labels_unread`
+
+
+  Deliverable manifest: /submission/masks.npz (npz), one integer mask array per graded scene, keyed by
+  ADE20K image id, on that scene''s own pixel grid, values in 0..149 with 255 reserved for a conceded
+  pixel.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-NOOP` targets the shipped starter verbatim; recorded score None.
+
+  - `CTL-MODAL` targets predict the modal class for every pixel; recorded score None.
+
+  - `CTL-STALE` targets a recipe tuned for the dense-label setting; recorded score None.
+
+  '
+provenance:
+  corpus: ADE20K scene parsing (Zhou et al. 2017), 150 stuff and object classes
+  anchors:
+    knee_anchor: published ADE20K mIoU at the same backbone scale and supervision fraction
+    knee_anchor_source: an external published figure, fixed before any measurement on this slot
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: ADE20K scene parsing (Zhou et al. 2017), 150 stuff and object classes
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-499b6720890d6f693baa338ed2604792
+  - AELLO-CANARY-28b9e5a75be70673ff77e11abc1a8559
+  - AELLO-CANARY-fe83372c9521a691808f135217540f44
+  - AELLO-CANARY-149bdddb0ee8828149dfabe093875559

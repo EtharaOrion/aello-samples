@@ -1,0 +1,829 @@
+"""Derivation for C7-S1: every canonical artifact descends from solution/grounding.yaml.
+
+WHAT THIS FILE OWNS
+    solution/TRUTH.md          the narrative, rendered from the frozen literals of the grounding
+    solution/rubrics.json      the private copy of the compiled item surface
+    solution/provenance.yaml   the step-8i carrier (hash-excluded; identity is READ BACK)
+    tests/rubrics.json         the shipped copy of the same surface
+    tests/test_output.py       the compiled checks, as executable relations over the ledger
+    tests/constants.json       the published constants, four of them deliberately null
+
+WHAT IT DOES NOT OWN. tests/verifier.py and tests/test.sh are hand-authored and are never
+rewritten here; instruction.md and task.toml are the client-facing surface and are not generated.
+
+DETERMINISM IS THE CONTRACT. No clock, no network, no locale, no random source, no unsorted set
+iteration. Running this file twice produces byte-identical bytes, and seed/build/freeze_batch.py
+re-runs it after planting the canary and REFUSES the freeze if the tree hash moves.
+
+CANARY PRESERVATION. seed/identity.py plants a tripwire into solution/TRUTH.md (an HTML comment
+block) and solution/rubrics.json (a wrapper-level "canary" key). Both are read off the existing
+file BEFORE the replacement is written and re-attached to it, because a generator that rewrote
+them plainly would delete the tripwire and move the bundle hash.
+
+EVERY COMPILED ITEM CARRIES A BODY. There is no fallback. The fallback this file used to carry
+looked up run_record()["obligations"][<uppercased id>] for any item whose body was missing, which
+meant an item could be authored, emitted, imported and executed while consulting nothing at all --
+a check whose evidence was the absence of a record it had itself invented the key for. main()
+now refuses to emit rather than fall through, so an unbodied item stops the build.
+"""
+import json
+import os
+import sys
+
+import yaml
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+BUNDLE = os.path.dirname(HERE)
+# Nothing is imported from outside the bundle. A staged tree could resolve
+# seed/stage/<slug>/../../build; a DELIVERED tree at dataset/<uuid>/ cannot, so reaching outside
+# would make the delivered bundle import in the stage and fail everywhere it actually ships.
+
+SLOT_ID = "C7-S1"
+TITLE = "# C7-S1 -- what this task actually tests"
+ITEM_KEYS = ("id", "dimension", "weight", "evaluation_target", "criterion", "judgment",
+             "knockout", "mode")
+
+# The one item whose verdict depends on a constant Phase 0 refuses to author. Named here because
+# emit_checks enforces a property about its body that nothing else enforces.
+OUTCOME_ITEM = "pass_squared_ramp"
+RAMP_CONSTANTS = ("floor", "knee", "dichotomizing_threshold")
+
+
+def read_identity(here):
+    """Identity is an INPUT: the freeze computes it over the hashed tree and binds it into the
+    carrier, which is hash-excluded, so reading it back keeps generation acyclic."""
+    path = os.path.join(here, "provenance.yaml")
+    if os.path.exists(path):
+        doc = yaml.safe_load(open(path)) or {}
+        if isinstance(doc.get("identity"), dict):
+            return doc["identity"]
+    return {"canonical_content_hash": None, "uuid": None,
+            "normalization_domain": "aello.canary.norm/v1",
+            "derivation": "uuid5(FORGE_TASK_NAMESPACE, canonical_content_hash)"}
+
+
+def read_screening(here):
+    """The screening instant and result are MEASURED OVER the frozen tree, so they are read back
+    the way identity is; the carrier is hash-excluded, so binding them moves nothing."""
+    path = os.path.join(here, "provenance.yaml")
+    if os.path.exists(path):
+        doc = yaml.safe_load(open(path)) or {}
+        got = {k: doc[k] for k in ("screening_measured_at", "screening_expires_at",
+                                   "screening_result") if k in doc}
+        if got:
+            return got
+    return {"screening_measured_at": None, "screening_expires_at": None,
+            "screening_result": None}
+
+
+def load_grounding():
+    with open(os.path.join(HERE, "grounding.yaml")) as fh:
+        return yaml.safe_load(fh)
+
+
+# ----------------------------------------------------------------------------------------------
+# The compiled surface. PRELUDE, one body per item, then TAIL.
+#
+# The bodies below are the point of this file. Every one of them names something only a paired
+# telecom rollout has: a rollout_index, a simulator seed derived from a task id and that index, a
+# pre/post canonical-JSON digest over the mutated tables, a per-episode host-side latency. None of
+# them would mean anything on a forecaster, a classifier or a segmenter, and that is the test each
+# one had to pass to be written here at all.
+# ----------------------------------------------------------------------------------------------
+
+PRELUDE = '''"""Compiled checks for @@SLOT@@. GENERATED by solution/recompute.py. DO NOT HAND-EDIT.
+
+The graded unit is a PAIR: two independent rollouts of one telecom instance, credited only when
+BOTH satisfied tau2's own reward. Every check below runs against the rollout ledger the graded run
+wrote and against the harness run record, and none of them reads an unmeasured quantity except
+@@OUTCOME@@, which calls require_measured before it opens anything at all.
+"""
+import hashlib
+import json
+import math
+import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+SUBMISSION = @@PATH@@
+CHECKS = []
+
+# Authored bounds. Every one is published in instruction.md or bound in seed/contract.yaml, and
+# not one of them is a measurement: the four measured constants live in constants.json and are
+# null until the Phase 2 wave writes them on the grading host.
+GRADED_TASKS = 114                 # the private held-out telecom split
+ROLLOUTS_PER_TASK = 2              # pass^2 is a conjunction over exactly two rollouts
+GRADED_ROLLOUTS = 228              # 114 x 2, the episodes the ledger must account for
+SIBLING_TASKS = 60                 # the disjoint split the overfit-divergence check reads
+P95_LATENCY_CEILING_S = 90.0
+MAX_EPISODE_LATENCY_S = 180.0
+WALLCLOCK_FLOOR_S = 420.0
+WALLCLOCK_CEILING_S = 1800.0
+SIBLING_GAP_MAX = 0.10
+SELF_REPORT_TOLERANCE = 0.05
+EXACT = 1e-9                       # pass^2 is a rational over 114; this is float noise, not slack
+
+
+class ConstantUnmeasured(Exception):
+    """Raised when a check needs a ramp constant that Phase 0 deliberately left null."""
+
+
+def check(id, weight, knockout, kind):
+    def deco(fn):
+        CHECKS.append({"id": id, "weight": weight, "knockout": knockout, "kind": kind, "fn": fn})
+        return fn
+    return deco
+
+
+def constants():
+    with open(os.path.join(HERE, "constants.json")) as handle:
+        return json.load(handle)
+
+
+def require_measured(*names):
+    c = constants()
+    missing = [n for n in names if c.get(n) is None]
+    if missing:
+        raise ConstantUnmeasured(
+            "@@SLOT@@: " + ", ".join(missing) + " are null. Phase 0 authors no measurement; the "
+            "Phase 2 wave writes these on the grading host and this check becomes gradeable then.")
+    return c
+
+
+def evidence(**kw):
+    return {"evaluation_target": kw.pop("target", "rollout_ledger"), "values": kw}
+'''
+
+
+TAIL = '''
+def run_record():
+    """What the harness metered about the graded run, read from the record the run produced."""
+    path = os.path.join(HERE, "..", "run_record.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path) as handle:
+        return json.load(handle)
+
+
+def load_ledger():
+    """The rollout ledger the graded run wrote at the declared submission path."""
+    with open(SUBMISSION) as handle:
+        doc = json.load(handle)
+    if not isinstance(doc, dict):
+        raise ValueError("the ledger must be a JSON object")
+    ids, outputs = doc.get("ids"), doc.get("outputs")
+    if not isinstance(ids, list) or not isinstance(outputs, list):
+        raise ValueError("the ledger must carry an ids list and a matching outputs list")
+    if len(ids) != len(outputs):
+        raise ValueError("ids and outputs disagree in length")
+    return doc
+
+
+def entries(doc):
+    """(task id, task record, rollout records) for every graded task, in ledger order."""
+    rows = []
+    for task_id, entry in zip(doc["ids"], doc["outputs"]):
+        entry = entry if isinstance(entry, dict) else {}
+        rolls = entry.get("rollouts")
+        rolls = [r for r in rolls if isinstance(r, dict)] if isinstance(rolls, list) else []
+        rows.append((str(task_id), entry, rolls))
+    return rows
+
+
+def satisfied(rollout):
+    """tau2's own reward for ONE rollout, and it is a conjunction.
+
+    Both halves, never either. A rollout that resolved the conversation fluently without
+    performing the telecom writes is the CTRL-DECOY route, and it did not satisfy the task.
+    """
+    return bool(rollout.get("db_state_matches")) and bool(rollout.get("communication_complete"))
+
+
+def pair_satisfied(rolls):
+    """The graded predicate: both rollouts of the pair, or the task does not count."""
+    return len(rolls) == ROLLOUTS_PER_TASK and all(satisfied(r) for r in rolls)
+
+
+def pass_squared(rows):
+    """The graded quantity, as an exact rational over the tasks the ledger reports."""
+    if not rows:
+        return 0.0
+    return sum(1 for _, _, rolls in rows if pair_satisfied(rolls)) / float(len(rows))
+
+
+def single_rollout_rate(rows):
+    """The quantity pass^2 is NOT, kept so the two can be reported side by side.
+
+    It counts satisfying rollouts over all 228 rollouts and is strictly larger than pass^2
+    whenever any pair disagrees, which is exactly how a ledger that aggregated its pairs the
+    wrong way round gives itself away.
+    """
+    rolls = [r for _, _, rs in rows for r in rs]
+    if not rolls:
+        return 0.0
+    return sum(1 for r in rolls if satisfied(r)) / float(len(rolls))
+
+
+def disagreeing_pairs(rows):
+    """Task ids where exactly one rollout satisfied: the run-to-run variance, made countable."""
+    return [t for t, _, rolls in rows if sum(1 for r in rolls if satisfied(r)) == 1]
+
+
+def simulator_seed(bundle_hash, task_id, rollout_index):
+    """The verifier-owned user simulator's seed, recomputed here rather than read back.
+
+    seed/contract.yaml binds it as the low 64 bits of SHA-256 over the bundle hash, the task id
+    and the rollout index, so simulator behaviour is a pure function of the task and the index
+    rather than of scheduling. Recomputing is the only way to tell a genuine second rollout from
+    a replay of the first, because a scaffold that replays a transcript writes whatever seed it
+    likes into the ledger beside it.
+    """
+    material = "%s||%s||%d" % (bundle_hash, task_id, rollout_index)
+    return int.from_bytes(hashlib.sha256(material.encode("utf-8")).digest()[-8:], "big")
+
+
+def nearest_rank(values, q):
+    """Nearest-rank quantile over a sorted copy. No numpy: this is four lines and numpy is a
+    thing that can be absent from a verifier image nobody promised would carry it."""
+    ordered = sorted(values)
+    if not ordered:
+        return None
+    rank = int(math.ceil(q * len(ordered))) - 1
+    return ordered[min(max(rank, 0), len(ordered) - 1)]
+
+
+def scaffold_path():
+    """agent/policy.py -- the module the grader launches, which IS the deliverable here."""
+    return os.path.join(HERE, "..", "agent", "policy.py")
+
+
+def shipped_starter_path():
+    return os.path.join(HERE, "..", "environment", "starter", "starter.py")
+
+
+def measure():
+    """pass^2 over the private split, recomputed conjunctively from the delivered pair records.
+
+    Recomputed and never read: pass_squared is a field the graded run writes, and the graded
+    quantity is that BOTH rollouts of a pair satisfied tau2's reward. A field cannot establish
+    how a pair was aggregated, and aggregating it the other way -- crediting the better of the
+    two -- is precisely the failure this slot exists to grade.
+    """
+    try:
+        return pass_squared(entries(load_ledger()))
+    except Exception:
+        return 0.0
+'''
+
+
+BODIES = {
+
+ "policy_scaffold_is_agent_authored": '''\
+    src = scaffold_path()
+    if not os.path.exists(src):
+        return False, evidence(target="agent_scaffold", reason="no_policy_module",
+                               expected="agent/policy.py")
+    mine = open(src, "rb").read()
+    starter = shipped_starter_path()
+    unchanged = os.path.exists(starter) and open(starter, "rb").read() == mine
+    return (not unchanged), evidence(target="agent_scaffold", scaffold_bytes=len(mine),
+                                     reason="starter_shipped_unchanged" if unchanged else None)''',
+
+ "graded_ids_are_the_private_114": '''\
+    try:
+        doc = load_ledger()
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    ids = [str(i) for i in doc["ids"]]
+    if len(ids) == SIBLING_TASKS:
+        return False, evidence(tasks=len(ids), want=GRADED_TASKS,
+                               reason="sibling_split_submitted")
+    ok = len(ids) == GRADED_TASKS and len(set(ids)) == len(ids)
+    return ok, evidence(tasks=len(ids), distinct=len(set(ids)), want=GRADED_TASKS,
+                        reason=None if ok else "wrong_private_split_cardinality")''',
+
+ "every_task_carries_a_rollout_pair": '''\
+    try:
+        rows = entries(load_ledger())
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    want = list(range(ROLLOUTS_PER_TASK))
+    malformed = []
+    for task_id, _entry, rolls in rows:
+        seen = sorted(r.get("rollout_index") for r in rolls
+                      if isinstance(r.get("rollout_index"), int))
+        if seen != want:
+            malformed.append({"task": task_id, "rollout_index": seen, "records": len(rolls)})
+    counted = sum(len(rolls) for _, _, rolls in rows)
+    ok = not malformed and counted == GRADED_ROLLOUTS
+    return ok, evidence(rollouts=counted, want=GRADED_ROLLOUTS,
+                        malformed_pairs=len(malformed), first=malformed[:5],
+                        reason=None if ok else "rollout_pair_malformed")''',
+
+ "pair_credit_is_conjunctive": '''\
+    try:
+        rows = entries(load_ledger())
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    mismatched = []
+    for task_id, entry, rolls in rows:
+        claimed = entry.get("task_credited")
+        conjunction = pair_satisfied(rolls)
+        if claimed is None or bool(claimed) != conjunction:
+            mismatched.append({"task": task_id, "credited": claimed,
+                               "both_rollouts_satisfied": conjunction,
+                               "satisfying": sum(1 for r in rolls if satisfied(r))})
+    ok = not mismatched
+    return ok, evidence(tasks=len(rows), mismatched=len(mismatched), first=mismatched[:5],
+                        reason=None if ok else "pair_credit_not_conjunctive")''',
+
+ "pair_simulator_seeds_differ": '''\
+    bundle_hash = run_record().get("bundle_hash")
+    if not bundle_hash:
+        return False, evidence(target="run_record", reason="no_bundle_hash_recorded")
+    try:
+        rows = entries(load_ledger())
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    replayed, misderived = [], []
+    for task_id, _entry, rolls in rows:
+        seeds = []
+        for roll in rolls:
+            index, got = roll.get("rollout_index"), roll.get("simulator_seed")
+            seeds.append(got)
+            if not isinstance(index, int) or got is None:
+                misderived.append({"task": task_id, "reason": "seed_or_index_absent"})
+            elif int(got) != simulator_seed(bundle_hash, task_id, index):
+                misderived.append({"task": task_id, "rollout": index,
+                                   "reason": "seed_not_derived_from_task_and_index"})
+        if len(seeds) == ROLLOUTS_PER_TASK and seeds[0] == seeds[1]:
+            replayed.append(task_id)
+    ok = not replayed and not misderived
+    reason = None
+    if replayed:
+        reason = "pair_is_a_replay_not_a_second_rollout"
+    elif misderived:
+        reason = "simulator_seed_not_derived"
+    return ok, evidence(replayed_pairs=len(replayed), misderived_seeds=len(misderived),
+                        first_replayed=replayed[:5], first_misderived=misderived[:5],
+                        reason=reason)''',
+
+ "reported_pass_squared_recomputes": '''\
+    try:
+        doc = load_ledger()
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    rows = entries(doc)
+    recomputed = pass_squared(rows)
+    single = single_rollout_rate(rows)
+    split = disagreeing_pairs(rows)
+    reported = doc.get("pass_squared")
+    if reported is None:
+        return False, evidence(recomputed=recomputed, disagreeing_pairs=len(split),
+                               reason="ledger_reports_no_pass_squared")
+    try:
+        reported = float(reported)
+    except (TypeError, ValueError):
+        return False, evidence(recomputed=recomputed, reported=repr(doc.get("pass_squared")),
+                               reason="reported_pass_squared_not_a_number")
+    ok = abs(reported - recomputed) <= EXACT
+    return ok, evidence(reported=reported, recomputed=recomputed, single_rollout_rate=single,
+                        disagreeing_pairs=len(split),
+                        reads_as_single_rollout_rate=abs(reported - single) <= EXACT,
+                        reason=None if ok else "reported_pass_squared_does_not_recompute")''',
+
+ "write_set_hash_matches_on_credited_rollouts": '''\
+    try:
+        rows = entries(load_ledger())
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    credited, wrong_row = 0, []
+    for task_id, entry, rolls in rows:
+        want = entry.get("expected_write_set_sha256")
+        for roll in rolls:
+            if not satisfied(roll):
+                continue
+            credited += 1
+            got = roll.get("post_episode_sha256")
+            if want is None or got is None or got != want:
+                wrong_row.append({"task": task_id, "rollout": roll.get("rollout_index"),
+                                  "expected": want, "post_episode": got})
+    ok = not wrong_row
+    return ok, evidence(credited_rollouts=credited, digest_mismatches=len(wrong_row),
+                        first=wrong_row[:5],
+                        reason=None if ok else "credited_without_expected_write_set")''',
+
+ "no_collateral_row_mutated": '''\
+    try:
+        rows = entries(load_ledger())
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    collateral, undiffed = [], 0
+    for task_id, _entry, rolls in rows:
+        for roll in rolls:
+            diff = roll.get("rows_changed_outside_write_set")
+            if diff is None:
+                undiffed += 1
+            elif diff:
+                collateral.append({"task": task_id, "rollout": roll.get("rollout_index"),
+                                   "rows": diff[:4] if isinstance(diff, list) else diff})
+    ok = not collateral and not undiffed
+    reason = None
+    if collateral:
+        reason = "collateral_write"
+    elif undiffed:
+        reason = "no_full_table_diff_recorded"
+    return ok, evidence(collateral_rollouts=len(collateral), undiffed_rollouts=undiffed,
+                        first=collateral[:5], reason=reason)''',
+
+ "dispatch_preconditions_ordered": '''\
+    try:
+        rows = entries(load_ledger())
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    constrained, violations = 0, []
+    for task_id, entry, rolls in rows:
+        mandated = entry.get("mandated_order")
+        if not mandated:
+            continue
+        constrained += 1
+        for roll in rolls:
+            trace = roll.get("tool_calls")
+            if not isinstance(trace, list):
+                violations.append({"task": task_id, "rollout": roll.get("rollout_index"),
+                                   "reason": "no_tool_call_trace"})
+                continue
+            names = [str(c.get("name")) if isinstance(c, dict) else str(c) for c in trace]
+            for rule in mandated:
+                before, after = str(rule[0]), str(rule[1])
+                if after not in names:
+                    continue
+                if before not in names or names.index(before) > names.index(after):
+                    violations.append({"task": task_id, "rollout": roll.get("rollout_index"),
+                                       "required_before": before, "observed_after": after})
+    ok = not violations
+    return ok, evidence(order_constrained_tasks=constrained, violations=len(violations),
+                        first=violations[:5],
+                        reason=None if ok else "precondition_order_violated")''',
+
+ "episode_latency_slo_holds": '''\
+    try:
+        rows = entries(load_ledger())
+    except Exception as exc:
+        return False, evidence(reason="ledger_unreadable", error=str(exc))
+    latencies = []
+    for _task_id, _entry, rolls in rows:
+        for roll in rolls:
+            seconds = roll.get("host_side_latency_s")
+            if seconds is not None:
+                latencies.append(float(seconds))
+    if len(latencies) != GRADED_ROLLOUTS:
+        return False, evidence(timed_episodes=len(latencies), want=GRADED_ROLLOUTS,
+                               reason="latency_not_recorded_per_episode")
+    p95, worst = nearest_rank(latencies, 0.95), max(latencies)
+    ok = p95 <= P95_LATENCY_CEILING_S and worst <= MAX_EPISODE_LATENCY_S
+    return ok, evidence(p95_s=p95, max_s=worst, p95_ceiling_s=P95_LATENCY_CEILING_S,
+                        max_ceiling_s=MAX_EPISODE_LATENCY_S,
+                        reason=None if ok else "slo_violation")''',
+
+ "graded_phase_wallclock_in_band": '''\
+    seconds = run_record().get("graded_phase_wallclock_s")
+    if seconds is None:
+        return False, evidence(target="run_record", reason="no_graded_phase_wallclock")
+    try:
+        seconds = float(seconds)
+    except (TypeError, ValueError):
+        return False, evidence(target="run_record", recorded=repr(seconds),
+                               reason="wallclock_not_a_number")
+    ok = WALLCLOCK_FLOOR_S <= seconds <= WALLCLOCK_CEILING_S
+    reason = None
+    if seconds > WALLCLOCK_CEILING_S:
+        reason = "compute_budget_exceeded"
+    elif seconds < WALLCLOCK_FLOOR_S:
+        reason = "graded_phase_too_short_to_have_driven_228_rollouts"
+    return ok, evidence(target="run_record", wallclock_s=seconds,
+                        band=[WALLCLOCK_FLOOR_S, WALLCLOCK_CEILING_S], reason=reason)''',
+
+ "sibling_split_gap_within_tolerance": '''\
+    rec = run_record()
+    private, sibling = rec.get("pass_squared_private"), rec.get("pass_squared_sibling")
+    if private is None or sibling is None:
+        return False, evidence(target="run_record", reason="no_sibling_measurement")
+    private, sibling = float(private), float(sibling)
+    try:
+        from_ledger = pass_squared(entries(load_ledger()))
+    except Exception:
+        from_ledger = None
+    if from_ledger is not None and abs(private - from_ledger) > EXACT:
+        return False, evidence(target="run_record", private=private,
+                               recomputed_from_ledger=from_ledger,
+                               reason="private_figure_disagrees_with_its_own_ledger")
+    gap = abs(private - sibling)
+    ok = gap <= SIBLING_GAP_MAX
+    return ok, evidence(target="run_record", private=private, sibling=sibling, gap=gap,
+                        tolerance=SIBLING_GAP_MAX, private_tasks=GRADED_TASKS,
+                        sibling_tasks=SIBLING_TASKS,
+                        reason=None if ok else "shard_overfit")''',
+
+ "self_report_matches_server_accounting": '''\
+    rec = run_record()
+    reported, server = rec.get("agent_reward_log"), rec.get("server_side_accounting")
+    if not isinstance(reported, dict) or not isinstance(server, dict):
+        return False, evidence(target="run_record", reason="no_server_side_accounting")
+    diverged = []
+    for field in ("total_latency_s", "prefill_tokens", "decode_tokens"):
+        mine, theirs = reported.get(field), server.get(field)
+        if mine is None or theirs is None:
+            diverged.append({"field": field, "reason": "unaccounted"})
+            continue
+        mine, theirs = float(mine), float(theirs)
+        if theirs and abs(mine - theirs) / abs(theirs) > SELF_REPORT_TOLERANCE:
+            diverged.append({"field": field, "reported": mine, "server": theirs})
+    ok = not diverged
+    return ok, evidence(target="run_record", tolerance=SELF_REPORT_TOLERANCE, diverged=diverged,
+                        reason=None if ok else "self_report_divergence")''',
+
+ "served_checkpoint_matches_pin": '''\
+    rec = run_record()
+    pin, served = rec.get("checkpoint_sha256_pin"), rec.get("checkpoint_sha256_served")
+    if not pin or not served:
+        return False, evidence(target="run_record", reason="checkpoint_digest_unrecorded")
+    mutated = sorted(str(p) for p in (rec.get("harness_bytes_changed") or []))
+    sockets = int(rec.get("outbound_sockets_opened") or 0)
+    reason = None
+    if served != pin:
+        reason = "model_substitution"
+    elif mutated:
+        reason = "harness_tamper"
+    elif sockets:
+        reason = "graded_run_network"
+    return (reason is None), evidence(target="run_record", digest_matches=(served == pin),
+                                      harness_bytes_changed=mutated[:8],
+                                      outbound_sockets=sockets, reason=reason)''',
+
+ "graded_run_touched_no_guarded_path": '''\
+    touched = sorted(str(p) for p in (run_record().get("guarded_paths_touched") or []))
+    holdout = [p for p in touched
+               if p.startswith("tests/") or "heldout" in p or "sibling" in p
+               or p.startswith("/logs/verifier/")]
+    ok = not touched
+    return ok, evidence(target="run_record", touched=touched[:8], count=len(touched),
+                        under_the_holdout_tree=holdout[:8],
+                        reason=None if ok else "holdout_access")''',
+
+ "rollout_budget_declared": '''\
+    decl = run_record().get("agent_budget_declaration")
+    if decl is None:
+        return False, evidence(target="run_record", reason="no_agent_declaration")
+    try:
+        d = json.loads(decl) if isinstance(decl, str) else dict(decl)
+    except Exception as exc:
+        return False, evidence(target="run_record", reason="declaration_unparseable",
+                               error=str(exc))
+    wanted = ("graded_tasks", "rollouts_per_task", "graded_episodes", "concurrency")
+    missing = [k for k in wanted if k not in d]
+    if missing:
+        return False, evidence(target="run_record", declared=sorted(d), missing=missing,
+                               reason="declaration_incomplete")
+    try:
+        tasks, per_task = int(d["graded_tasks"]), int(d["rollouts_per_task"])
+        episodes = int(d["graded_episodes"])
+    except (TypeError, ValueError) as exc:
+        return False, evidence(target="run_record", reason="declaration_not_integral",
+                               error=str(exc))
+    ok = tasks * per_task == episodes == GRADED_ROLLOUTS
+    return ok, evidence(target="run_record", graded_tasks=tasks, rollouts_per_task=per_task,
+                        graded_episodes=episodes, concurrency=d["concurrency"],
+                        want_episodes=GRADED_ROLLOUTS,
+                        reason=None if ok else "declaration_inconsistent")''',
+
+ "pass_squared_ramp": '''\
+    # require_measured FIRST, before the ledger is opened. Opening it first lets a missing or
+    # malformed artifact raise a file error, the verifier records a failed check rather than an
+    # unmeasured one, and the report reads gradeable=true with r_det=0.0 -- which asserts the
+    # agent scored zero rather than that this slot is not yet measurable. Those are two different
+    # claims and the null-constant convention exists to keep them apart.
+    c = require_measured("floor", "knee", "dichotomizing_threshold")
+    m = measure()
+    span = c["knee"] - c["floor"]
+    s = 0.0 if span <= 0 else max(0.0, min(1.0, (m - c["floor"]) / span))
+    return m >= c["dichotomizing_threshold"], evidence(pass_squared=m, s_outcome=s,
+                                                       graded_tasks=GRADED_TASKS,
+                                                       graded_rollouts=GRADED_ROLLOUTS)''',
+}
+
+
+def emit_checks(g, subst):
+    """Assemble tests/test_output.py: prelude, one decorated function per compiled item, tail.
+
+    kind carries the item's own dimension rather than the constant "process" the family template
+    used, so a report can say which surface a failed check belongs to -- rollout_pairing,
+    run_variance, latency_slo -- instead of saying "process" seventeen times.
+    """
+    missing = sorted(i["id"] for i in g["items"]
+                     if i["mode"] == "compiled" and i["id"] not in BODIES)
+    if missing:
+        raise SystemExit("%s: no body written for compiled item(s) %s. There is no generic "
+                         "fallback: an item with no body would consult nothing."
+                         % (SLOT_ID, ", ".join(missing)))
+    prelude = PRELUDE
+    for token, value in subst:
+        prelude = prelude.replace(token, value)
+    chunks = [prelude]
+    for item in sorted(g["items"], key=lambda i: i["id"]):
+        if item["mode"] != "compiled":
+            continue
+        chunks.append('\n@check(id="%s", weight=%d, knockout=%s, kind="%s")\ndef test_%s():\n%s\n'
+                      % (item["id"], item["weight"], item["knockout"], item["dimension"],
+                         item["id"], BODIES[item["id"]]))
+    return "".join(chunks) + TAIL
+
+
+def build_truth(g, title):
+    """Render solution/TRUTH.md from the frozen literals of solution/grounding.yaml."""
+    n = g["truth_narrative"]
+    lines = [title, "", "GENERATED SECTION. DO NOT HAND-EDIT.", "", n["opening"], "",
+             "## The single most important insight", "", n["insight"], "",
+             "## The ideal solve, step by step", ""]
+    for i, step in enumerate(n["steps"], 1):
+        lines += ["%d. **%s** %s" % (i, step["heading"], step["paragraph"]), ""]
+    lines += ["## Traps that catch agents that are not thinking carefully", ""]
+    lines += ["- " + t for t in n["traps"]]
+    lines += ["", "---", "", "## Contract record (annex; not part of the narrative body)", "",
+              "Retained under FORGE.md item 10e and Phase 2 item 7, which require this file to "
+              "carry the ordered path through instruction.md with each satisfied checker "
+              "identifier, and each rejected route bound to a measured known-wrong control. "
+              "standards/truth-md-authoring-v1.md section 3 admits no fifth section, so this "
+              "annex is a recorded deviation rather than an omission.", "", g["truth_annex"], ""]
+    return "\n".join(lines) + "\n"
+
+
+def build_rubrics(g, item_keys):
+    """The 9g rubric carrier over the COMPILED surface.
+
+    The item schema is CLOSED at eight keys, so item 10f's outcome classification rides as a
+    greppable prefix of the judgment rather than as a ninth key. The three behavioural rubrics
+    under grounding's council_rubrics are deliberately absent: seed/delivery.py measures compiled
+    weight share against compilation_floor over the items in this file, and a judged item here
+    would drop the share below the floor while adding nothing tests/verifier.py can run.
+    """
+    items = []
+    for raw in g["items"]:
+        item = {k: raw[k] for k in item_keys}
+        item["judgment"] = "%s: %s" % (raw["outcome_class"], raw["judgment"])
+        items.append(item)
+    compiled = sum(i["weight"] for i in items if i["mode"] == "compiled")
+    total = sum(i["weight"] for i in items)
+    return {"$schema": "forge.rubric/v1",
+            "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+            "generator": "solution/recompute.py",
+            "compilation_floor": g["compilation_floor"],
+            "compiled_weight_share": round(compiled / total, 6) if total else 0.0,
+            "evaluation_target_vocabulary": sorted(g["evaluation_target_vocabulary"]),
+            "items": sorted(items, key=lambda i: i["id"])}
+
+
+def build_provenance(g, identity):
+    p = g["provenance"]
+    out = {
+        "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+        "generator": "solution/recompute.py from solution/grounding.yaml",
+        "schema_version": "1.0",
+        "slot_id": g["slot_id"],
+        "identity": identity,
+        "corpus": p["corpus"],
+        "anchors": p["anchors"],
+        "shards": p["shards"],
+        "narrative": p["narrative"],
+        "supersedes": p["supersedes"],
+        "upstream_provenance": p["upstream_record"],
+        "reward_composition": p["reward_composition"],
+        "screening_interval_days": p["screening_interval_days"],
+        "screening_detector_version": p["screening_detector_version"],
+        "derivation_instant": p["derivation_instant"],
+        "screening_roots": p["screening_roots"],
+        "empty_submission_result": p["empty_submission_result"],
+        "resolved_closure": p["resolved_closure"],
+        "applicability": p["applicability"],
+        "measurement_tier": g["measurement_tier"],
+        "gradeable": g["gradeable"],
+        "knee_anchor_status": g["knee_anchor_status"],
+        "timed_axis": True,
+    }
+    out.update(read_screening(HERE))
+    return out
+
+
+def validate(grounding):
+    """Refuse to emit a grounding this family cannot honestly compile.
+
+    Four properties, each one a defect this bundle actually carried:
+
+      1. A timed axis is graded on harness measurement, so at least one item must read the run
+         record rather than a duration the scaffold reports.
+      2. Every compiled item must carry a body. There is no generic fallback any more.
+      3. The outcome item's body must call require_measured as its FIRST statement, before it
+         opens the ledger. Reading the artifact first lets a missing-file error mask the
+         unmeasured signal, and the verifier then reports gradeable=true with r_det=0.0.
+      4. The four measured constants stay null at Phase 0. A generator that emitted an authored
+         floor would be inventing the measurement the whole convention exists to withhold.
+    """
+    problems = []
+    items = grounding["items"]
+    targets = {i["evaluation_target"] for i in items}
+    if "run_record" not in targets:
+        problems.append("a timed slot must grade against the harness run record")
+
+    compiled = [i for i in items if i["mode"] == "compiled"]
+    for item in compiled:
+        if item["id"] not in BODIES:
+            problems.append("compiled item %s carries no body" % item["id"])
+    for body_id in sorted(BODIES):
+        if body_id not in {i["id"] for i in compiled}:
+            problems.append("body %s belongs to no compiled item" % body_id)
+
+    if OUTCOME_ITEM not in {i["id"] for i in compiled}:
+        problems.append("the outcome item %s is not a compiled item" % OUTCOME_ITEM)
+    else:
+        statements = [ln.strip() for ln in BODIES[OUTCOME_ITEM].split("\n")
+                      if ln.strip() and not ln.strip().startswith("#")]
+        head = statements[0] if statements else ""
+        if "require_measured(" not in head:
+            problems.append("%s must call require_measured before it reads anything; its first "
+                            "statement is %r" % (OUTCOME_ITEM, head[:60]))
+        for name in RAMP_CONSTANTS:
+            if '"%s"' % name not in head:
+                problems.append("%s does not require the %s constant" % (OUTCOME_ITEM, name))
+
+    for name in ("floor", "knee", "dichotomizing_threshold", "reward_gate_pass_threshold"):
+        if grounding["constants"].get(name) is not None:
+            problems.append("measured constant %s was authored at Phase 0" % name)
+    return problems
+
+
+def main():
+    g = load_grounding()
+    # The validator runs FIRST and refuses rather than emitting: a generator that writes a carrier
+    # it knows is malformed hands the drift check a moving target.
+    problems = validate(g)
+    if problems:
+        raise SystemExit("%s grounding is not well-formed: %s" % (SLOT_ID, "; ".join(problems)))
+
+    dl = g["deliverable"]
+    subst = (("@@SLOT@@", SLOT_ID), ("@@PATH@@", repr(dl["path"])), ("@@OUTCOME@@", OUTCOME_ITEM))
+
+    # EVERYTHING IS COMPUTED BEFORE ANY OUTPUT FILE IS OPENED. `with open(p, "w")` truncates
+    # before its body's arguments are evaluated, so a read inside the with-statement reads the
+    # file the line just emptied. That shipped once here, over the frozen identity.
+    truth_path = os.path.join(HERE, "TRUTH.md")
+    rubric_path = os.path.join(HERE, "rubrics.json")
+    tests_dir = os.path.join(BUNDLE, "tests")
+
+    truth = build_truth(g, TITLE).rstrip("\n") + "\n"
+    rubric = build_rubrics(g, ITEM_KEYS)
+    shipped_rubric = build_rubrics(g, ITEM_KEYS)
+    compiled_surface = emit_checks(g, subst)
+    provenance = build_provenance(g, read_identity(HERE))
+
+    # solution/TRUTH.md and solution/rubrics.json are PRIVATE_CARRIERS: seed/identity.py plants a
+    # canary block into them at freeze, and canary normalisation is what keeps planting from
+    # moving identity. Regenerating them plainly would DROP the planted tripwire and the next
+    # content_hash would differ from the frozen one, so the block is carried across.
+    keep = None
+    if os.path.exists(truth_path):
+        import re as _re
+        found = _re.search(r"<!-- AELLO-CANARY-BLOCK.*?-->\n?", open(truth_path).read(), _re.S)
+        keep = found.group(0) if found else None
+    if os.path.exists(rubric_path):
+        try:
+            previous = json.load(open(rubric_path))
+            if "canary" in previous:
+                rubric["canary"] = previous["canary"]
+        except Exception:
+            pass
+
+    os.makedirs(tests_dir, exist_ok=True)
+    with open(truth_path, "w") as fh:
+        fh.write(truth + ("\n" + keep if keep else ""))
+    with open(rubric_path, "w") as fh:
+        json.dump(rubric, fh, indent=1, sort_keys=True)
+        fh.write("\n")
+    with open(os.path.join(tests_dir, "rubrics.json"), "w") as fh:
+        json.dump(shipped_rubric, fh, indent=1, sort_keys=True)
+        fh.write("\n")
+    with open(os.path.join(tests_dir, "test_output.py"), "w") as fh:
+        fh.write(compiled_surface)
+    with open(os.path.join(tests_dir, "constants.json"), "w") as fh:
+        json.dump(g["constants"], fh, indent=1, sort_keys=True)
+        fh.write("\n")
+    with open(os.path.join(HERE, "provenance.yaml"), "w") as fh:
+        # MATCH seed/build/screen_bind.py and the frozen generators exactly: sort_keys=True,
+        # default_flow_style=False, width=100. The screen writes this carrier after the freeze,
+        # so a generator using a different dump convention reorders the keys on the next
+        # regeneration and reports as drift even though no value changed.
+        yaml.safe_dump(provenance, fh, sort_keys=True, default_flow_style=False, width=100,
+                       allow_unicode=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

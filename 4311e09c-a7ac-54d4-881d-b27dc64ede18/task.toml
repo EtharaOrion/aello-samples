@@ -1,0 +1,119 @@
+# Harbor delivery unit for AELLO-C6-S3.
+schema_version = "1.4"
+
+# Agent-side graded deliverables, snapshotted before teardown and re-materialized in the
+# separate verifier container. /logs/verifier/* lives in the verifier container, not here.
+artifacts = [
+  "/workspace/agent_src",
+  "/submission/verdicts.json",
+]
+
+[task]
+name = "aello/c6-s3-selective-conformal-judge"
+description = "Build a selective pairwise preference judge on real hh-rlhf helpful data whose selective risk holds a distribution-free cap on two private shards under mixture shift, graded on answered fraction under a fixed compute budget."
+authors = [{ name = "AELLO" }]
+keywords = ["optimization", "bounded-continuous", "llm", "selective-prediction", "conformal"]
+version = "1.0.0"
+
+[metadata]
+slot_id = "AELLO-C6-S3"
+universal_scoring_version = "engram.universal_scoring/v1"
+scoring_engine = "aello_eval"
+universal_scoring_engine_location = "harness/packages/aello-eval/, vendored as tests/aello_eval-0.1.0-py3-none-any.whl"
+archetype = "AR6"
+category = "llm-evals"
+scope_half = "LLM"
+# Optimization lane item 1 binds three DISTINCT quantities, never aliases:
+#   budget_hours - per-attempt completion bound, from client-requirements-v3.md:138.
+#   max_timeout  - refinement-loop terminator across attempts, an authored pacing choice.
+#   max_attempts - attempt cap, at most one hundred, fifty the default.
+max_timeout = 8.0
+max_timeout_units = "hours"
+budget_hours = 6.0
+budget_envelope = "one NVIDIA H100 80GB, single-tenant exclusive, execution class per the seed/host.json probe, identical for the agent sandbox and the separate verifier environment"
+# Carried by name only, never a FORGE-authored number.
+budget_margin = "conservative_default"
+max_attempts = 50
+# Operational per-attempt pacing envelope, AUTHORED from the measured reference pace with
+# margin, never derived by dividing a loop bound by the attempt cap. The measured reference
+# runs in roughly 1.2e3 s; this envelope is that pace with room for a slower search.
+per_attempt_seconds = 5400.0
+final_selection = "best"
+final_selection_basis = "The reward is bounded, monotone in answered fraction once every risk constraint clears, monotone in run speed, and higher-is-better, so the best attempt is well defined."
+graded_axis = "quality_under_budget"
+compute_envelope = "one H100"
+reward_schema = "one float on the closed interval from zero to one, higher is better"
+tags = ["optimization", "bounded-continuous"]
+
+[environment]
+build_timeout_sec = 3600.0
+cpus = 8
+memory_mb = 65536
+storage_mb = 131072
+gpus = 1
+gpu_types = ["H100"]
+workdir = "/workspace"
+# Client v3 FAQ: internet is needed ONLY for setup. This [environment] baseline covers the
+# BUILD: pip/apt and the node install from deb.nodesource.com. The pinned-revision Qwen
+# backbone is now VENDORED under environment/qwen2.5-1.5b-instruct and copied into the image,
+# so the build fetches no model-zoo host (G-EGRESS-CLOSURE / G-DEL-PIN repair 2026-08-19:
+# vendoring closes the declared-policy contradiction without opening a search-time
+# contamination surface). The hh-rlhf corpus is vendored under environment/data. Solve-time
+# egress is the [agent] block below, which denies every dataset and model-zoo host.
+network_mode = "allowlist"
+allowed_hosts = ["pypi.org", "files.pythonhosted.org", "archive.ubuntu.com",
+                 "security.ubuntu.com", "developer.download.nvidia.com",
+                 "deb.nodesource.com"]
+
+[environment.env]
+PYTHONUNBUFFERED = "1"
+TZ = "UTC"
+# Single-tenant envelope; expandable segments keep a long fine-tune from fragmenting the
+# allocator across its training and scoring phases.
+PYTORCH_ALLOC_CONF = "expandable_segments:True"
+
+[agent]
+timeout_sec = 28800.0
+network_mode = "allowlist"
+allowed_hosts = ["downloads.claude.ai", "*.claude.ai", "registry.npmjs.org",
+                 "registry.yarnpkg.com", "api.anthropic.com", "pypi.org",
+                 "files.pythonhosted.org", "api.openai.com", "chatgpt.com"]
+
+[verifier]
+# NETWORK. Absent, [verifier].network_mode fell through to a deep copy of [environment],
+# so the verifier ran with the twelve-host BUILD allowlist -- api.anthropic.com and pypi.org
+# among them -- and inherited gpus=1. That made solution/policy.yaml's network_verifier: denied
+# false, and the "no GPU is declared or needed" sentence below false, in the same bundle that
+# asserted both. Bound explicitly. The token is "no-network"; "none" is not a member of Harbor's
+# NetworkMode enum and fails validation.
+network_mode = "no-network"
+timeout_sec = 1800.0
+environment_mode = "separate"
+
+[[verifier.collect]]
+command = '''mkdir -p /logs/agent/agent_code /workspace/agent_src && cd /workspace && find . -type f \( -name '*.py' -o -name '*.sh' -o -name '*.md' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' -o -name '*.txt' -o -name '*.ipynb' \) -not -path './environment/data/*' -not -path './environment/qwen2.5-1.5b-instruct/*' -not -path './agent_src/*' -exec cp --parents {} /logs/agent/agent_code/ \; -exec cp --parents {} /workspace/agent_src/ \; ; true'''
+timeout_sec = 60.0
+
+[solution.env]
+AELLO_ORACLE = "1"
+
+# GPU HALF of the A4 repair, 2026-08-31. network_mode = "no-network" above stopped the verifier
+# inheriting the build allowlist, but the GPU inheritance survived it: with no
+# [verifier.environment] table, verifier_mode.py returns
+# `task_cfg.environment.model_copy(deep=True)`, so the verifier took gpus = 1 and gpu_types
+# ["H100"] from [environment] while task.toml's own [verifier] comment says "Grading is CPU-only
+# ... so no GPU is declared or needed". Both could not be true.
+#
+# NOTE THE MERGE SEMANTICS, because they decide the shape of this table: when
+# task_cfg.verifier.environment is not None it is used WHOLESALE -- there is no field-level merge
+# with [environment]. So this block must be COMPLETE, not a one-line gpus override, or cpus,
+# memory and workdir would silently fall to library defaults. Every value below is copied from
+# [environment] except gpus, gpu_types and the network fields.
+[verifier.environment]
+build_timeout_sec = 3600.0
+cpus = 8
+memory_mb = 65536
+storage_mb = 131072
+gpus = 0
+workdir = "/workspace"
+network_mode = "no-network"

@@ -1,0 +1,424 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S9
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item whose mode is judged below is one whose assertion names a numeric bar that Phase 0 does not author,
+  not one that resists compilation.'
+deliverable:
+  path: /submission/forecast.npy
+  kind: npy
+  shape: float array (n_windows, horizon, n_targets)
+evaluation_target_vocabulary:
+- run_record
+- submitted_artifact
+- submitted_source
+items:
+- id: forecast_lands
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: A forecast array is written to the declared submission path.
+  judgment: /submission/forecast.npy exists and loads as a real-valued numpy array; an object dtype,
+    a missing file or an unreadable one scores zero with reason submission_malformed.
+- id: horizon_grid_alignment
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The forecast covers exactly the graded forecast origins at the bound horizon.
+  judgment: The flattened forecast length equals the number of graded targets the verifier holds; a
+    short array cannot be padded and a long one cannot be truncated to fit.
+- id: forecast_within_observed_envelope
+  dimension: deliverable
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Forecast values sit inside the envelope the shipped history makes plausible.
+  judgment: Every forecast value is finite and lies within the min/max of the agent-visible training
+    channel widened by its own standard deviation; a forecast outside that envelope is a degenerate
+    or mis-scaled submission rather than a weak one.
+- id: forecast_origin_causality
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: No forecast consumed an observation at or after its own origin.
+  judgment: The run record's declared maximum consumed index for each forecast origin is strictly below
+    that origin. This is red line 1 and it is checked against the record the run produced, never against
+    a post-hoc scan.
+- id: time_order_split_declared
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The validation policy the agent declares respects time order.
+  judgment: 'The declared split policy names an ordered holdout and no shuffled or randomly permuted
+    fold. CTL-LEAK targets exactly this and must be rejected: a shuffled split is a red line scoring
+    zero, not a lever with a bounded worth.'
+- id: lookback_budget_declared
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The agent declares its own lookback and split budget for the graded run.
+  judgment: The run record carries an agent-authored declaration naming the lookback window and the
+    total leaf-split budget used. The declaration is graded, not the harness's own measurement, so the
+    check cannot be satisfied by a field the harness writes.
+- id: persistence_skill_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The skill score against persistence clears the published bar through the ramp.
+  judgment: '1 - MAE(model)/MAE(persistence) over the private future window, mapped through the floor-to-knee
+    ramp. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured
+    rather than returning a score.'
+measurement_tier: cpu
+measurement_tier_basis: tabular or series substrate; measured on CPU in this batch's ladder wave
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: published ETT MAE at the same horizon and lookback
+knee_anchor_source: an external published figure, fixed before any measurement on this slot
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome = clamp((metric
+    - floor) / (knee - floor), 0, 1) through the published ramp.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+truth_narrative:
+  opening: minimise normalised forecast error on a private future window at a fixed prediction horizon
+    and a fixed lookback budget. The graded artifact is float array (n_windows, horizon, n_targets),
+    written to /submission/forecast.npy. The graded quantity is Normalised mean absolute error over
+    the private future window, mapped to [0,1] higher-better.
+  insight: The reward is deterministic under frozen bytes and is zero on any red line before any quality
+    is considered, so the first thing that matters is that the artifact exists, has the declared shape,
+    and was produced without touching the checker tree or the graded fold. Only then does Normalised
+    mean absolute error over the private future window, mapped to [0,1] higher-better move the score.
+  steps:
+  - heading: Normalisation scheme against distribution drift
+    paragraph: A lever the contract records as separately ablatable for this slot; its worth is measured
+      on the Phase 2 ladder over the full lever power set, never asserted here.
+  - heading: Lookback allocation across the seven covariates
+    paragraph: A lever the contract records as separately ablatable for this slot; its worth is measured
+      on the Phase 2 ladder over the full lever power set, never asserted here.
+  - heading: Seasonal decomposition before the learned component
+    paragraph: A lever the contract records as separately ablatable for this slot; its worth is measured
+      on the Phase 2 ladder over the full lever power set, never asserted here.
+  - heading: Loss shaping for the tail of the horizon
+    paragraph: A lever the contract records as separately ablatable for this slot; its worth is measured
+      on the Phase 2 ladder over the full lever power set, never asserted here.
+  - heading: Validation-split policy that respects time order
+    paragraph: A lever the contract records as separately ablatable for this slot; its worth is measured
+      on the Phase 2 ladder over the full lever power set, never asserted here.
+  traps:
+  - Shuffles the split and reports an error the future window cannot reproduce.
+  - Normalises with statistics computed over the whole series including the future.
+  - 'time-order leakage is the dominant way to inflate this metric Mitigation: CTL-LEAK is a compiled
+    red-line control and a shuffled split scores exactly 0'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `budget_declared` (compiled, weight 3) -- The agent declares its own budget accounting for the
+  graded run.
+
+  2. `deliverable_present` (compiled, weight 5, knockout) -- The agent writes the graded artifact at
+  the declared submission path.
+
+  3. `deliverable_shape` (compiled, weight 5, knockout) -- The graded artifact has the declared shape
+  and domain.
+
+  4. `deterministic_replay` (compiled, weight 3) -- The graded artifact is reproducible from the recorded
+  seed.
+
+  5. `graded_metric` (compiled, weight 10, knockout) -- The graded metric clears the published bar and
+  is mapped through the ramp.
+
+  6. `no_graded_writes` (compiled, weight 5, knockout) -- The graded run writes nothing into the checker
+  tree or the graded fold.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - time-order leakage is the dominant way to inflate this metric -- controlled by: CTL-LEAK is a compiled
+  red-line control and a shuffled split scores exactly 0
+
+
+  Deliverable manifest: /submission/forecast.npy (npy), float array (n_windows, horizon, n_targets).
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-NOOP` targets the shipped starter verbatim; recorded score None.
+
+  - `CTL-PERSIST` targets persistence forecast, repeat the last observation; recorded score None.
+
+  - `CTL-LEAK` targets a split that shuffles across time; must be rejected; recorded score None.
+
+  '
+provenance:
+  corpus: Electricity Transformer Temperature (Zhou et al. 2021), ETTh1/ETTh2/ETTm1/ETTm2
+  anchors:
+    knee_anchor: published ETT MAE at the same horizon and lookback
+    knee_anchor_source: an external published figure, fixed before any measurement on this slot
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: Electricity Transformer Temperature (Zhou et al. 2021), ETTh1/ETTh2/ETTm1/ETTm2
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+canary:
+- AELLO-CANARY-0e8f335bc9ea3fa605be20c40252c98b
+- AELLO-CANARY-fb29ea944fa5e4d69b7d35033f5bdf6b
+- AELLO-CANARY-e9124d93c6219c4f161d841f48c5e187
+- AELLO-CANARY-2d64243394a80d6a258d281d18c20ad9
+substrate:
+  corpus: Electricity Transformer Temperature, ETTm1 (Zhou et al. 2021)
+  cadence_minutes: 15
+  covariates: 7
+  target_channel: OT, oil temperature
+  rows_total: 69680
+  split: chronological 70/15/15, never shuffled
+  rows_train: 48776
+  rows_val: 10452
+  rows_graded: 10452
+  why_chronological: the graded window is a genuine future. A shuffled split lets a model interpolate
+    between observations that straddle the boundary, which produces a number the future cannot reproduce
+    and is this slot's first recorded failure mode
+axis:
+  raw_metric: mean absolute error over the private future window, lower-better
+  graded_axis: skill score against persistence, higher-better
+  map: score = 1 - MAE_model / MAE_persistence
+  why_a_skill_score: the contract requires a higher-is-better axis on the closed unit interval and MAE
+    is an unbounded error. Dividing by a baseline measured on the SAME window fixes both without authoring
+    a constant
+  persistence_mae_on_graded_window: 1.28291
+  persistence_is_config_independent: true
+  persistence_basis: the anchor repeats the last observation before each forecast origin, so it is a
+    function of the graded window alone and no configuration can move it. That is what keeps the denominator
+    outside the material it grades
+horizon_budget:
+  horizon_steps: 24
+  lookback_long: 96
+  lookback_short: 24
+  split_budget_leaf_splits: 12000
+  basis: a fixed total leaf-split budget makes configurations compute-comparable, so a measured lever
+    worth is not a measurement of who was allowed more compute
+ladder_record:
+  file: seed/ladders/ladder_c8s9.json
+  configurations: 32
+  design: full power set over five levers, 2^5
+  floor_all_levers_off: 0.03822
+  reference_all_levers_on: 0.19139
+  best_measured: 0.20334
+  best_configuration: '01110'
+  mae_at_floor: 1.23387
+  mae_at_reference: 1.03775
+  measured_over: the bytes this bundle ships, not a second sample of the same corpus
+lever_record:
+- id: L1
+  name: normalisation scheme against distribution drift
+  leave_one_out_worth: 0.00503
+  standalone_worth: -0.0336
+  note: 'standalone worth is NEGATIVE: this lever helps only in combination'
+- id: L2
+  name: lookback allocation across the seven covariates
+  leave_one_out_worth: 0.06324
+  standalone_worth: 0.08278
+  note: contributes both alone and at the margin
+- id: L3
+  name: seasonal decomposition before the learned component
+  leave_one_out_worth: 0.09703
+  standalone_worth: -0.02059
+  note: 'standalone worth is NEGATIVE: this lever helps only in combination'
+- id: L4
+  name: loss shaping for the tail of the horizon
+  leave_one_out_worth: 0.10841
+  standalone_worth: 0.07378
+  note: contributes both alone and at the margin
+- id: L5
+  name: validation-split policy that respects time order
+  leave_one_out_worth: 0.02649
+  standalone_worth: 0.00837
+  note: contributes both alone and at the margin
+ablation_bounds:
+  denominator: floor_to_reference
+  reference_minus_floor: 0.15317
+  reference_share_of_best: 0.92762
+  largest_standalone_fraction: 0.54044
+  largest_marginal_fraction: 0.70777
+  effective_levers: 3.48036
+  contract_caps:
+    standalone: 0.6
+    marginal: 0.8
+    reference_share: 0.5
+  verdict: PASS on every bound
+  significance: this is the ONLY slot in the batch whose measured lever set passes. Four of five leave-one-out
+    worths are positive and the sum of them, 0.30020, exceeds the floor-to-reference span of 0.15317
+    -- the levers are complementary rather than substitutable, so no single one carries the ramp
+temporal_leakage:
+  why_central: every other trap on this slot reduces to it. A model that sees the future, by a shuffled
+    split or by a normalisation statistic computed over the whole series, reports an error the future
+    cannot reproduce
+  vectors:
+  - vector: shuffled split
+    control: CTL-LEAK
+    must: score exactly zero
+  - vector: normalisation over the full series including the graded window
+    control: CTL-LEAK
+    must: score exactly zero
+  - vector: validation folds drawn across the forecast origin
+    control: CTL-LEAK
+    must: score exactly zero
+  why_L5_exists: lever 5 is the validation-split policy precisely because the honest and the leaking
+    version differ only in fold construction, which is invisible in a submitted forecast and must be
+    checked in the run record
+controls:
+- id: CTL-NOOP
+  targets: the shipped starter verbatim
+  measured_score: 0.03822
+  must_be_rejected: false
+  note: the floor the ramp is anchored to
+- id: CTL-PERSIST
+  targets: repeat the last observation
+  measured_score: 0.0
+  must_be_rejected: false
+  note: 'score is exactly zero by construction: the skill score''s own denominator'
+- id: CTL-LEAK
+  targets: a split shuffled across time
+  must_be_rejected: true
+  note: a red line, not a weak solve; scores zero regardless of measured error
+rejected_routes:
+- route: shuffle the split to enlarge the training set
+  control: CTL-LEAK
+  why_wrong: reports an error the future window cannot reproduce
+- route: z-score the series using statistics over all 69,680 rows
+  control: CTL-LEAK
+  why_wrong: the mean and variance carry the graded window into the fit
+- route: predict the last observation and stop
+  control: CTL-PERSIST
+  why_wrong: scores exactly zero; it IS the denominator
+- route: tune the lookback on the graded window
+  control: CTL-LEAK
+  why_wrong: selection on the graded fold is a read of the private window
+planted_defect:
+  what: the shipped starter fits a single global normalisation and ignores drift
+  lever_that_repairs_it: L1
+  worth_if_left_in: 0.00503
+  note: worth 0.00503 at the margin, the smallest of the five. This slot's difficulty is not one planted
+    defect but the absence of any single lever that carries the ramp
+red_line_worth:
+  measured: a time-shuffled split raises the apparent skill score above the honest best measured configuration,
+    which is why it is a red line scoring zero rather than a lever with a bound worth
+  honest_best: 0.20334
+contamination_sources:
+- source: ETT is a widely published forecasting benchmark and public code exists
+  mitigation: the graded window, horizon, lookback budget and split budget are authored here and are
+    not the published setting, so a copied recipe overshoots the budget rather than transferring
+known_overlap:
+  with_public_splits: the 70/15/15 boundary is authored, not the ETT paper's
+  measured: null
+  measured_reason: measured at Phase 1 on the grading host
+scoring:
+  r_det: GATE_det x S_outcome x RubricFactor_det
+  s_outcome: clamp((skill - floor) / (knee - floor), 0, 1)
+  zero_conditions:
+  - any red line
+  - any knockout failure
+  - a malformed forecast array
+  empty_submission_result: 0.0
+floor_policy: 'floor binds to the starter''s measured skill, not to zero: a forecast that is merely
+  no worse than persistence already scores zero on this axis, so a floor at zero would pay for the baseline'
+measured_by: seed/ladders/run_ladder.py, family c8s9
+measured_through: the delivered bundle's own environment/data and tests/heldout
+instance:
+  slot_id: AELLO-C8-S9
+  category: 8
+  subfamily: a multivariate time-series forecaster
+admissibility_verdict:
+  graded_axis: null
+  graded_axis_reason: measured at Phase 1 from the control ladder; every member of GRADED_AXES presupposes
+    a bound this slot has not measured
+delivery_findings:
+- the ladder measured this slot as the only one in the batch passing every ablation bound; that is a
+  property of its lever set and is recorded rather than claimed
+- the persistence anchor is config-independent by construction, which is what lets a skill score be
+  the graded axis without authoring a constant
+
+canary:
+  - AELLO-CANARY-3338d48cf6aaaab9fed70d3999c4eef3
+  - AELLO-CANARY-59f56b16c9be9274bfe9c2f55513d4ee
+  - AELLO-CANARY-3f73f40ec5070d2d02b1d437e606d45b
+  - AELLO-CANARY-d1e3166e80845b74480c81931491d895

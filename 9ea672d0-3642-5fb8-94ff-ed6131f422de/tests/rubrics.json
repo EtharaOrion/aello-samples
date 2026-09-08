@@ -1,0 +1,255 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "pipeline_manifest",
+  "replay_log",
+  "run_record",
+  "stage_wrapper_record"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The admission controller derived each request's remaining budget from the disclosed formula and chose its rerank depth as a monotone function of that budget.",
+   "dimension": "admission_policy",
+   "evaluation_target": "replay_log",
+   "id": "admission_computes_a_remaining_budget_and_degrades_depth_monotonically",
+   "judgment": "EFFECT: Three things, all recomputed from the per-query records. Every admitted depth is a member of the declared degradation ladder 48, 32, 16, 8, 0, whose head is the declared rerank depth. Every remaining_budget_ms equals deadline_ms minus queue_wait_ms minus admission_elapsed_ms within 1e-6, which is the formula instruction.md publishes. And with the 18,000 queries sorted by remaining budget the admitted depth never decreases, so degradation is a policy over the budget rather than a coincidence of load. And a fourth: if any query in the run missed the 150 ms deadline, at least one query was admitted below the head of the ladder. A controller that watched responses arrive late and never once stepped down is not degrading depth instead of missing the deadline -- it is the deadline-blind chain that answers correctly and answers late -- while a chain fast enough that nothing was ever late is free to stay at full depth forever, which is why the clause is conditioned on a late query existing rather than on degradation happening.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The corpus pass and the query path encode under the same E5 tokenizer contract, each side carrying the asymmetric prefix it is supposed to carry.",
+   "dimension": "tokenizer_contract",
+   "evaluation_target": "run_record",
+   "id": "both_encode_paths_share_the_e5_tokenizer_contract",
+   "judgment": "INVARIANT: The corpus side records the prefix \"passage: \" and the query side records the prefix \"query: \" -- the asymmetric contract multilingual-e5 was trained under -- and the two sides agree exactly on max_tokens, on pooling and on whether the output is L2-normalised. An empty or absent query prefix is query_prefix_missing: the two encode paths stop being comparable, every query vector sits in a slightly rotated space from every corpus vector, no tool anywhere reports an error, and the only visible symptom is that nDCG falls. A truncation length or a pooling mode that differs across the two sides is the same defect arriving by another route.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The declared chain manifest is on disk at the declared path, parses, and every stage command it names resolves to a real program inside the submission chain root.",
+   "dimension": "deliverable_presence",
+   "evaluation_target": "pipeline_manifest",
+   "id": "chain_manifest_and_stage_programs_present",
+   "judgment": "EFFECT: /submission/chain/pipeline.yaml parses as a mapping carrying a stages list, and for every stage the first element of its command resolves to an existing file under /submission/chain/. A manifest that names a stage program the disk does not have is deliverable_absent, not a shorter chain: the harness re-executes the DECLARED topology cold from raw MIRACL bytes, so a stage whose program is missing makes the whole rebuild unrunnable rather than making the chain one stage smaller. The manifest is the graded path because it is the one file that names every other one.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The OPQ and IVF coarse quantizer was trained on the same normalised chunk vectors the index stores, not on raw passages and not on pre-normalisation vectors.",
+   "dimension": "quantizer_training",
+   "evaluation_target": "run_record",
+   "id": "coarse_quantizer_trained_on_post_normalisation_chunk_vectors",
+   "judgment": "ORDERING: Stage D's training-sample record must name a source artifact whose digest equals stage C's declared output digest, declare its sample size as the published 200,000, and carry a fixed index list rather than a live draw. A quantizer trained on raw passage text, on pre-normalisation vectors, or on a sample drawn before dedup partitions a space the index does not live in: the centroids land off the data, every probe list is the wrong list, and recall collapses at every nprobe. This is an ordering constraint expressed as a digest, because \"after normalisation and after chunking\" is only checkable against the bytes those two steps produced.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The six stages rebuilt cold from raw bytes inside the build budget, and the service they produce answered health and a smoke query inside the launch budget.",
+   "dimension": "build_budget",
+   "evaluation_target": "run_record",
+   "id": "cold_rebuild_and_smoke_query_inside_the_published_budgets",
+   "judgment": "EFFECT: On the harness's own clock, named as the clock source, the cold rebuild of all six stages is at or under 3,600 s and the per-stage seconds recorded sum to that total within 1 s, so no work hides between stages. The service answered its health endpoint and one smoke query within 300 s of launch, with at most one retry permitted because a cold relaunch can lose a port or a driver race once without the chain being wrong. A rebuild that overruns is build_budget_exceeded; a service that never answers is pipeline_build_failed with the failing stage id named. An underspecified objective carried across six heterogeneous stages has to arrive at a running system rather than at a description of one.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The gap between the deadline-free nDCG and the credited nDCG is exactly the ranking quality the late responses threw away.",
+   "dimension": "deadline_accounting",
+   "evaluation_target": "replay_log",
+   "id": "deadline_free_and_credited_ndcg_reconcile_over_the_late_set",
+   "judgment": "INVARIANT: Per replay, Q_free (the mean of ndcg_at_10 over all its queries with the deadline term removed) minus Q (the mean of the credited values) must equal the sum of ndcg_at_10 over that replay's late queries divided by its full query count, within 1e-9, accumulated in a fixed query order. Q_free is always at least Q, and the two are equal only when no query was late. The identity is what makes the late set auditable, and it breaks the moment the log reports a Q_free it did not compute from this same per-query table. The neighbouring arithmetic -- dropping late queries from the DENOMINATOR instead of crediting them zero, which is what would turn a chain answering a third of its queries on time into a chain with an excellent mean -- is closed next door, by the replay-protocol check's fixed 6,000 records per replay. The two checks close it between them and neither closes it alone.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The deadline-respecting nDCG@10, taken as the median of the three cold replays, clears the published bar and is mapped through the ramp.",
+   "dimension": "serving_outcome",
+   "evaluation_target": "replay_log",
+   "id": "deadline_respecting_ndcg_through_the_ramp",
+   "judgment": "VALUE: Q is the median across the three cold replays of the mean per-query credit, where credit is nDCG@10 against the private MIRACL qrels for a response inside its 150 ms deadline and exactly 0 otherwise. Q is mapped through the ramp as clamp((Q - floor) / (knee - floor), 0, 1), and the bar is cleared on the RAMPED value rather than on Q itself, because the dichotomizing threshold and the judged gate's ceiling live on the reward scale: the contract's own arithmetic puts the 0.50 ceiling exactly 0.10 below the 0.60 threshold, and that subtraction is only meaningful if both are reward. UNMEASURED AT PHASE 0: floor, knee and dichotomizing_threshold are null in tests/constants.json, so this check raises ConstantUnmeasured before it opens the replay log and the verifier reports gradeable=false with r_det=null. That is a declared absence, not a measured zero. require_measured is called first for exactly that reason: opening the replay log first would let a missing file raise an ordinary error, the verifier would record a failed check rather than an unmeasured one, and the report would read gradeable=true with r_det=0.0 -- which asserts that the agent scored zero, a different claim from the slot not yet being measurable.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The declared topological order satisfies the six order relations this chain's operations are not commutative under.",
+   "dimension": "stage_ordering",
+   "evaluation_target": "pipeline_manifest",
+   "id": "declared_order_quantizes_and_chunks_before_the_corpus_pass",
+   "judgment": "ORDERING: Kahn's algorithm over the declared edges must yield a topological order -- a cycle is chain_cycle_declared -- and every relation whose BOTH endpoints the chain declares must hold in it: chunk_dedup_address precedes corpus_embed and index_build, encoder_export_quantize precedes corpus_embed, corpus_embed precedes index_build, and both rerank_compile and index_build precede serve. Every one of these is an order that a wrong chain satisfies syntactically and fails semantically. Embedding before chunking embeds whole passages the index never stores. Calibrating the INT8 encoder after the corpus pass leaves 600k corpus vectors in a geometry the served encoder no longer produces. Training the coarse quantizer before the vectors exist trains it on something other than what it will index. A relation whose endpoints are not both declared is skipped and reported as skipped, so a chain that ships fewer stages is priced on quality here too rather than failed on an ordering it never declared.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Every declared stage is a member of the published six-stage roster, appears at most once, and the chain declares the serving stage that produces the endpoint.",
+   "dimension": "stage_roster",
+   "evaluation_target": "pipeline_manifest",
+   "id": "declared_stages_drawn_from_the_roster_without_repetition",
+   "judgment": "INVARIANT: The declared stage ids are drawn from chunk_dedup_address, encoder_export_quantize, corpus_embed, index_build, rerank_compile and serve; none appears twice; and serve is among them. What is REFUSED here is a seventh stage the harness has no re-execution contract for, the same id declared twice -- the stage-edge digests bind by id, so a repeated id makes an artifact's producer ambiguous -- and a chain with no serving stage, which cannot answer a query at all. What is NOT refused is a chain that declares fewer than six. Dropping the cross-encoder is a real design choice with a measured price: the near-duplicate clusters and the hard-negative haystack put a no-rerank chain at Q = 0.118, close to the starter band, so it is priced by the metric rather than policed by a rule, and the declared count is reported as evidence rather than as a verdict.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every artifact a stage consumes is either another stage's declared output or one of the five pinned raw sources, and every declared output but the served endpoint is consumed.",
+   "dimension": "chain_closure",
+   "evaluation_target": "pipeline_manifest",
+   "id": "every_consumed_artifact_has_a_declared_producer",
+   "judgment": "ORDERING: For each stage's inputs the named artifact appears in exactly one other stage's outputs, or is a member of the pinned raw-source roster: the MIRACL corpus shard, the MIRACL dev topics, the Azure arrival trace and the two pinned checkpoints. An input with no producer and no raw source is chain_binding_violation, and that is precisely what a pre-baked index, a hand-carried embedding matrix or a hardcoded id table looks like once it is declared honestly. Symmetrically every declared output other than service://retrieval-endpoint is consumed by some stage, so a declared output nothing reads is a stage the manifest describes and the service does not use. Two stages declaring the same output is ambiguous_producer.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every replayed query received exactly ten distinct ids from the private shard's id space inside the hard timeout, on at least 99 percent of queries.",
+   "dimension": "response_contract",
+   "evaluation_target": "replay_log",
+   "id": "every_response_returns_ten_distinct_in_shard_ids",
+   "judgment": "EFFECT: A query record satisfies the response contract when its ids list holds exactly 10 entries, all distinct, all resolving inside the private shard's id space as the harness resolved them, and its latency is at most the 2,000 ms hard timeout. The violation share over all 18,000 queries must be at most 1 percent, recomputed here rather than read from a recorded rate. The contract is deliberately separate from the deadline: missing the 150 ms deadline costs that one query its credit, while failing to answer at all costs the entire run, so degrading rank quality under load is priced and dropping requests is forbidden.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded quantity is the median of three replay means over three pairwise disjoint private query subsets of 6,000 queries each.",
+   "dimension": "replay_protocol",
+   "evaluation_target": "replay_log",
+   "id": "graded_q_is_the_median_of_three_disjoint_replays",
+   "judgment": "VALUE: Exactly three replays; each carrying exactly 6,000 query records with distinct query ids; the three id sets pairwise disjoint with a union of exactly 18,000 members; and the recorded graded_q equal to the median of the three recomputed means within 1e-12. Median rather than mean, so one replay that lost its accelerator cannot drag the graded value. Disjoint subsets with no query repeated anywhere in a grading run, so a response cache has nothing to be warm for: caching stays a legitimate optimisation that simply has no graded query to hit, which is a metric-design answer to that shortcut rather than a rule against it.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The index's id map is stage A's emitted row order, not an enumeration stage D derived for itself.",
+   "dimension": "id_map_binding",
+   "evaluation_target": "run_record",
+   "id": "index_id_map_is_stage_a_row_order",
+   "judgment": "INVARIANT: Stage D's id map must have the same length as stage A's post-dedup chunk count and the same sha256 over its ordered ids as stage A's emitted id sequence, and stage A's own arithmetic must close first: chunks_emitted equals chunks_before_dedup minus duplicates_removed. The dedup delta is the trap. A stage D that re-enumerates positions 0..N-1 for itself agrees with stage A on length whenever nothing was deduplicated and disagrees by exactly the dedup delta whenever something was, so every id the service returns dereferences to a neighbouring document. The responses stay ten ids long, distinct, and inside the shard; only Q ever finds out. Pinning the id function to a content address is what keeps the private shard's row permutation from breaking the map in silence.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The corpus vectors the index was built over are L2-normalised in fact, and the index metric is the one that makes normalised vectors mean cosine.",
+   "dimension": "metric_agreement",
+   "evaluation_target": "run_record",
+   "id": "index_metric_agrees_with_the_normalisation_stage_c_declares",
+   "judgment": "INVARIANT: Three things must hold together: stage C declares normalisation, every L2 norm in the harness's sample of the emitted corpus vectors is within 1e-3 of 1.0, and stage D's index metric is INNER_PRODUCT. Unnormalised vectors searched under inner product return plausible and wrongly ordered neighbours, because long passages then win on magnitude rather than on direction; normalised vectors searched under L2 are merely a slower route to the same order. The failure is not symmetric, so the check names which half is wrong. Neither half reports an error anywhere in the build, and the entire signal is in Q.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The per-query credit in the replay log is recomputed here from latency and nDCG, and a response past the deadline is credited exactly zero rather than partially.",
+   "dimension": "deadline_credit",
+   "evaluation_target": "replay_log",
+   "id": "late_responses_earn_exactly_zero_ndcg_credit",
+   "judgment": "VALUE: For every one of the 18,000 replayed queries credit is recomputed as ndcg_at_10 when latency_ms is at most 150.0 and exactly 0.0 otherwise, and must equal the credited value the log carries to within 1e-12. No decay, no grace, no rounding of the boundary: a query answered in 150.4 ms with a perfect ranking is worth exactly what a query answered in 150.4 ms with a useless one is worth, which is nothing. Each replay's recorded mean must equal the mean of the recomputed credits over its own 6,000 queries. The credit is recomputed rather than read because a service reporting its own credit would be reporting the thing the reward is made of.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Nothing arrived from outside and nothing private was read: no denied host, no read of the private shard, query subsets or qrels, and no write into the checker tree.",
+   "dimension": "provenance_absence",
+   "evaluation_target": "run_record",
+   "id": "no_private_input_read_and_no_denied_host_contacted",
+   "judgment": "ABSENCE: Three absences, each a red line. Every host in the logging proxy's egress record is inside the declared allowlist -- pypi.org and files.pythonhosted.org -- and no contacted host is a model hub, a dataset host or an inference endpoint, all of them excluded by name rather than by intent, because answering from an external reranker is the one shortcut here that would look like good engineering. The private-input read ledger is empty: the private shard, the three query subsets and the qrels are never mounted in the agent container, and answering from relevance judgements instead of from retrieval is the shortcut that ledger closes. And no path under the checker tree or the graded fold was created or modified during the graded run.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Each replay delivered its frozen arrival schedule at the fixed offered load, and the generator was never throttled by the service.",
+   "dimension": "offered_load",
+   "evaluation_target": "replay_log",
+   "id": "offered_load_holds_at_forty_per_second_without_back_pressure",
+   "judgment": "INVARIANT: Each replay's schedule carries 6,000 arrivals across a 150.0 s span, which is the fixed 40 queries per second; the generator dispatched every scheduled arrival; its recorded throttled flag is false; and its maximum dispatch lag is at most 50 ms, so the load actually offered is the load declared. Fixed work at a fixed offered load, never a fixed wall time. A generator that backs off when the service slows would let a slow chain silently reduce its own offered load and then answer fewer, easier queries inside the deadline, which is the one way to make the deadline term cheap without making the chain fast. A replay that did not deliver its schedule is void, re-run once, then slo_violation.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The agent declares its own build-time accounting, one entry per declared stage, and the declaration is arithmetically coherent.",
+   "dimension": "budget_accounting",
+   "evaluation_target": "pipeline_manifest",
+   "id": "per_stage_build_seconds_declared_and_add_up",
+   "judgment": "EFFECT: The manifest's build_seconds object carries one non-negative number for each of the six declared stage ids and no key that is not a declared stage, its entries sum to its declared total within 0.5 s, and that total is at most 3,600. What is graded here is the DECLARATION and not the harness's measurement of the same rebuild: a field the harness writes cannot satisfy this check, and the two figures are compared nowhere, because the question is whether the agent knows where its hour went across six stages, not whether it guessed the clock.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The cross-encoder stage actually ran over the admitted candidates and folded chunk scores back up to documents.",
+   "dimension": "rerank_stage",
+   "evaluation_target": "run_record",
+   "id": "rerank_stage_scores_the_declared_depth_and_aggregates_to_documents",
+   "judgment": "EFFECT: This check applies only to a chain that DECLARES the cross-encoder stage; a chain that declares none is out of scope here and is priced by Q instead, which is where the no-rerank route is answered. Where the stage is declared, its recorded candidates_scored over the graded replay equals the sum of the admitted rerank depths across all 18,000 queries, its invocation count equals the number of queries admitted at a depth above zero, and its declared aggregation is chunk_to_document_max. A stage E that the manifest declares and the service never invokes scores zero candidates while the admission record sums to hundreds of thousands: declaring a reranker and not running it is a divergence between the manifest and the system, which is policed, while not declaring one is a design choice, which is priced. Aggregation is as load-bearing as depth here: the shard carries real near-duplicate passage clusters from the Wikipedia-derived corpus, so a chain that ranks chunks and forgets to fold them back to documents spends several of its ten slots on copies of one page.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every stage's resolved argv and effective keyword arguments, as the pinned wrapper recorded them, equal the bindings the manifest declares.",
+   "dimension": "binding_divergence",
+   "evaluation_target": "stage_wrapper_record",
+   "id": "resolved_argv_equals_the_declared_argument_bindings",
+   "judgment": "DIVERGENCE: For each stage the wrapper's resolved_argv equals the manifest's command list element for element and its effective_kwargs equals the manifest's bindings mapping key for key and value for value, compared after canonicalising numbers so that 48 and 48.0 are the same binding while the string \"48\" is not. Divergence is declared_binding_divergence and exactly 0.0. The two bindings this separates on are nprobe and rerank_depth: a manifest declaring nprobe 64 and depth 48 over a service that resolves 8 and 12 describes the chain that would have earned the quality and runs the chain that earned the latency, and nothing else in the bundle can tell them apart, because both answer every query with ten well-formed ids inside the timeout.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Only the two pinned checkpoints are on disk in the graded container, both are unchanged by the run, and every served engine descends from one of them through a declared stage.",
+   "dimension": "model_identity",
+   "evaluation_target": "run_record",
+   "id": "served_engines_derive_only_from_the_two_pinned_checkpoints",
+   "judgment": "ABSENCE: The checkpoint roster in the graded container is exactly intfloat/multilingual-e5-base and BAAI/bge-reranker-base; each one's on-disk weight digest after the graded run equals its digest before it, so the chain converted its inputs rather than replacing them; and every served engine names a derived_from that is one of the two and a producer_stage that this manifest declares. A third checkpoint on disk is model_identity_violation whether or not it was served. A stronger public multilingual encoder would win this task on model quality instead of on chain engineering, which is why two pins plus a model hub denied by name are the entire model surface, and why deriving the served engine through the quantization stage is the only route from a pin to a serving weight.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Re-running the chain with the admission controller driven by the frozen per-query remaining-budget schedule reproduces the served lists and the deadline-free nDCG exactly.",
+   "dimension": "replay_determinism",
+   "evaluation_target": "run_record",
+   "id": "served_lists_replay_identically_under_the_frozen_budget_schedule",
+   "judgment": "DIVERGENCE: The sha256 over the concatenated query_id and ordered ten document ids for all 18,000 queries must be identical between the graded pass and the replay-determinism pass; the deadline-free Q_free accumulated in fp64 in a fixed query order must be exactly equal; and the record must name frozen_remaining_budget_schedule as the second pass's admission clock. That second pass exists because the reference's rerank-depth degradation is clock-driven: under a live clock the served list is not a pure function of the input bytes, and recording that is cheaper than a determinism claim the chain cannot keep. Per-query latency stays stochastic and no equality is claimed for Q itself.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Quality measured on the private sibling shard is within 20 percent of quality on the primary shard.",
+   "dimension": "shard_generalisation",
+   "evaluation_target": "run_record",
+   "id": "sibling_shard_quality_within_twenty_percent",
+   "judgment": "INVARIANT: The relative gap |Q_sibling - Q_primary| / Q_primary must be at most 0.20, with both measured in this grading run under the same protocol; a wider gap is shard_overfit and exactly 0.0. The sibling shard is drawn under a second private seed from the same construction, so a chain whose nprobe, rerank depth and admission thresholds were fitted to the primary shard's particular near-duplicate clusters opens the gap, while a chain that derives those bindings from whatever shard it is handed at build time does not. A Q_primary at or below zero leaves the ratio undefined and is reported as a failure rather than divided.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "For every declared edge the consuming stage's recorded input digest equals the producing stage's recorded output digest, and the executed edge set is exactly the declared one.",
+   "dimension": "chain_binding",
+   "evaluation_target": "stage_wrapper_record",
+   "id": "stage_edge_digests_bind_consumer_to_producer",
+   "judgment": "DIVERGENCE: The pinned stage wrapper records, per stage, the digest of every artifact opened for reading and every artifact written. Each declared producer-artifact-consumer edge must appear exactly once in that record with consumer_input_digest equal to producer_output_digest. An edge present in the record that the manifest does not declare is undeclared_edge_executed and fails identically: the chain re-executed has to be the chain described, in both directions. This is what makes shipping a pre-baked artifact useless rather than merely discouraged, because the blob has no producing stage whose recorded output digest could match the digest its consumer read.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  }
+ ]
+}

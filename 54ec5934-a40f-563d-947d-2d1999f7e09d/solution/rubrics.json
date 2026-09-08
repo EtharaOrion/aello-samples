@@ -1,0 +1,130 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-061f6f6b7b2a54a9210b0e6700581284",
+  "AELLO-CANARY-cd4ebec219f03a949b2629082c125744",
+  "AELLO-CANARY-ae1bbcf0a8a058eee6be875bed4c1963",
+  "AELLO-CANARY-e0fbd2f0bc1ee664455d6ba374c691f1"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "An episode stopped by its per-instance budget still hands the external evaluator something to read.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "budget_exhausted_episode_still_legible",
+   "judgment": "EFFECT: Every record whose terminated_by is action_budget or time_budget carries the same evaluator-legible field its family requires, alongside the action count and the elapsed seconds at which the budget bound. The per-instance gate stops episodes on purpose and stopping one is a legitimate move; abandoning it without a terminal record is not, because that leaves a hole the evaluator cannot score rather than an instance it scores as failed.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every episode ends in a record the vendored WebArena evaluator can read, in the form that instance's own evaluator family requires.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "evaluator_legible_terminal_record",
+   "judgment": "EFFECT: For each graded instance the terminal record carries the one field that instance's declared evaluator family consumes: a non-empty answer string for the exact_match, must_include and fuzzy_match families, a final page URL for url_match, and a post-episode site end-state row-set hash for program_html. Success here is computed by an evaluator the agent does not own and may not amend, so an episode whose record omits the field that evaluator reads is unscoreable rather than merely unsuccessful, and the omission belongs to the scaffold, not to the evaluator.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Task success over the private split, as the external evaluators tally it, clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "evaluator_success_ramp",
+   "judgment": "VALUE: Task success rate over the 300 private held-out instances, tallied by WebArena's own programmatic evaluators over verifier-owned site fixtures and read from the harness tally rather than from anything the scaffold reports, mapped through the floor-to-knee ramp published in tests/constants.json, with the graded-phase wall clock the above-gate ramp rides metered in the same record. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured before it reads a single submitted byte, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The vendored evaluators, the task JSON and the reward code are still the pinned bytes when the graded run ends.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "external_grader_bytes_unmodified",
+   "judgment": "INVARIANT: The run record's post-run digest for each of the evaluator tree, the task JSON and the reward code equals the digest taken when the image was built from the pinned upstream commit, and an unrecorded digest counts as a mismatch. The evaluator is the external grader on this slot: the only admissible way to raise the score is to hand it a better episode, and any byte change to what it reads is harness tamper whatever the intent behind it.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "One terminal episode record lands for every instance of the 300-instance private held-out split, under the verifier's own pod-minted instance ids.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "graded_instance_ids_exact",
+   "judgment": "EFFECT: The submitted ids are exactly the 300 pod-minted instance ids the verifier holds for the private split: same members, no duplicate, none invented and none dropped. The split is re-bound from the upstream intent templates after this bundle is authored, so an id set the scaffold chose for itself names instances that are not the graded ones, and a run reporting 300 episodes of its own choosing has not run the graded split at all.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent declares a per-instance budget, not a run total divided by 300.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "per_instance_budget_declared",
+   "judgment": "EFFECT: The run record carries an agent-authored declaration naming a per-instance action ceiling, a per-instance latency ceiling and the episode concurrency it chose, with both ceilings numeric, positive and at or inside the published gate of 30 actions and 240 s. The declaration is what is graded, not the harness's own metering, and an aggregate budget cannot be checked against a gate that binds on one episode.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every single episode stays inside the per-instance budget; the gate binds per instance, never per run.",
+   "dimension": "compliance",
+   "evaluation_target": "run_record",
+   "id": "per_instance_budget_gate_held",
+   "judgment": "VALUE: Read from the harness's own per-episode metering and never from the agent's reward log: every one of the graded episodes records at most 30 actions and at most 240 s of wall clock, and the 95th percentile of per-episode wall clock is at most 180 s. The gate binds on the worst episode of 300, so a comfortable mean buys nothing, an unmetered episode counts as a violation, and one 241-second episode zeroes the run.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every episode restored its site from the pinned dump, and that restore was metered out of the optimized clock rather than skipped to shorten it.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "reset_metered_out_of_graded_clock",
+   "judgment": "INVARIANT: Each graded episode carries a positive metered site-restore span and a pre-episode site snapshot digest equal to the pinned reset fixture's digest for that site, and the run record's excluded-reset total equals the sum of those per-episode spans. Restore time is excluded from the optimized axis by construction, which is the only reason the axis has resolution; an episode reporting zero restore is claiming a reset that did not run and is inheriting the previous episode's site state.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The deliverable is a scaffold the grader re-runs, and the artifacts it depends on are induced inside that run.",
+   "dimension": "process",
+   "evaluation_target": "submitted_source",
+   "id": "scaffold_rebuilt_its_own_artifacts",
+   "judgment": "EFFECT: agent/policy.py is present and its bytes differ from the shipped starter, and each artifact the scaffold consumes -- the induced workflow memory and the pruned-observation id map -- is recorded as created during the graded run rather than shipped pre-baked beside the module. The grader launches a fresh run of the scaffold against a split it holds, so a workflow memory that arrived as a committed file was induced somewhere the grader cannot replay and is not part of what was graded.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every episode acts on one of the five retained sites and mutates no other.",
+   "dimension": "compliance",
+   "evaluation_target": "run_record",
+   "id": "target_site_within_retained_roster",
+   "judgment": "ABSENCE: Each episode names a target site drawn from shopping, shopping_admin, gitlab, map and wikipedia, and records no state change on any site other than its own target. The Postmill site is excluded by name because its Pushshift-derived content carries no redistributable licence, so an episode naming it is outside the shipped scope rather than merely unlucky; and a write landing on a second site is the mis-decomposed multi-site route that sprays state changes until some evaluator matches.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "No one answer is reused across a whole group of graded instances that share an intent template.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_artifact",
+   "id": "template_rebinding_not_collapsed",
+   "judgment": "ABSENCE: The 300 graded instances are instantiated from 241 upstream intent templates, so 59 of them share a template with another instance, and every such group was re-bound to different real entities in the shipped site databases. No template group of two or more instances submits a single identical answer across all of its members. A scaffold that answers the template rather than the instance, or that replays a published per-instance answer key, produces exactly that collision.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  }
+ ]
+}

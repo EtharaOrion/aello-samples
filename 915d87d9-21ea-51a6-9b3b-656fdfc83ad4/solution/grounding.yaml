@@ -1,0 +1,1067 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: C4-S3
+compilation_floor: 1.0
+compilation_floor_basis: >-
+  PRD section 5.6, met at 1.0 by construction. Every obligation this slot carries that a program
+  can decide from the submitted export manifest, the packed shard bytes on disk, the recipe
+  program and the harness run record is compiled into tests/test_output.py, and that is all twenty
+  of them. What resists compilation here is not a numeric bar but a behavioural one -- whether the
+  per-layer sensitivity evidence was accumulated across attempts, whether the allocation was
+  argued from that evidence rather than copied from the vendor notes, and whether the declared
+  stage order was explained rather than decorated. Those three live under council_rubrics and are
+  graded downstream by the trajectory grader, so the compiled weight share is 1.0 rather than the
+  fraction a judged item inside `items` would have produced.
+deliverable:
+  path: /submission/quant_export/manifest.json
+  kind: json
+  shape: >-
+    an object carrying recipe_stages (the declared stage order as a list), layers (one record per
+    linear projection with name, weight_count, format, group_size, packed_bytes and shard),
+    shards (the packed files with their byte counts), declared_bits_per_weight (self-reported and
+    never trusted), calibration_seconds (the agent's own per-stage accounting) and
+    upstream_checkpoint (the pinned revision and weight digest the recipe converted)
+  companion_paths:
+  - /submission/quant_export/recipe.py
+  - /submission/quant_export/shards/
+  companion_basis: >-
+    The graded deliverable is the recipe and its declared stage order, not only the artifact. The
+    manifest is the graded path because it is the one file that names every other one; recipe.py
+    is what the harness re-executes under C-C5, and the shard directory is what C-C1 recomputes
+    the average bits per weight from. An absent manifest, an absent recipe or a shard the
+    manifest names and disk does not have all resolve to exactly 0.0 with reason
+    deliverable_absent.
+  deliverable_change_note: >-
+    This slot previously declared /submission/confidences.npy, a row-stochastic posterior array.
+    That deliverable belongs to the calibration family and contradicts this slot's own contract
+    record, which grades decode throughput of a model export and whose red line names an absent
+    "recipe or manifest at the declared artifact paths". Predictions are not scored anywhere in
+    this task; a model export is timed. The deliverable is corrected here to the artifact
+    seed/contract.yaml actually describes.
+evaluation_target_vocabulary:
+- export_manifest
+- packed_export
+- recipe_source
+- run_record
+items:
+- id: export_manifest_and_packed_shards_present
+  dimension: deliverable_presence
+  weight: 5
+  knockout: true
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    The recipe program, its manifest and every packed shard the manifest names are all on disk
+    under the declared export root.
+  judgment: >-
+    /submission/quant_export/manifest.json parses as an object, /submission/quant_export/recipe.py
+    exists, and every entry of the manifest's shards list resolves to a real file under
+    /submission/quant_export/shards/. A manifest that names a shard disk does not have is
+    deliverable_absent, not a smaller export: the bits-per-weight recomputation would otherwise
+    read a shorter export than the one that was served.
+- id: layer_roster_covers_all_196_linear_projections
+  dimension: layer_roster
+  weight: 5
+  knockout: true
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The per-layer format map covers every linear projection of the pinned checkpoint exactly once
+    and names no layer the checkpoint does not have.
+  judgment: >-
+    Qwen2.5-1.5B-Instruct has 28 transformer blocks and 7 linear projections in each of them --
+    self_attn.q_proj, self_attn.k_proj, self_attn.v_proj, self_attn.o_proj, mlp.gate_proj,
+    mlp.up_proj and mlp.down_proj -- so the roster is exactly the 196 names model.layers.N.PROJ
+    for N in 0..27. The manifest's layer names, as a set, equal that roster: no duplicate, no
+    omission, and no name outside it. A recipe that quantizes 190 layers and stays silent about
+    six is not a 190-layer export, it is an export whose average bits per weight was computed over
+    the wrong denominator.
+- id: bits_per_weight_recomputed_from_packed_bytes
+  dimension: bit_budget
+  weight: 5
+  knockout: true
+  evaluation_target: packed_export
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    Average bits per weight, recomputed from the shard bytes actually on disk, is at or under the
+    4.10 budget, and the manifest's own figure is checked against that recomputation rather than
+    believed.
+  judgment: >-
+    total_packed_bits / total_weight_count <= 4.10, where total_packed_bits is eight times the sum
+    of the on-disk sizes of the shard files and total_weight_count is the sum of the manifest's
+    per-layer weight_count over the 196-name roster. Two failures are separated. The sum of the
+    manifest's per-layer packed_bytes must equal the on-disk shard total, so bytes that are packed
+    but not declared cannot hide; and the manifest's declared_bits_per_weight must equal the
+    recomputation to within 1e-9, so a padding-inflated packing that reports a compliant average
+    fires padpack_inflated_manifest instead of passing. Over budget is bit_budget_exceeded and
+    exactly 0.0.
+- id: uniform_int4_group128_prices_above_the_budget
+  dimension: format_pricing
+  weight: 3
+  knockout: false
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The published format cost table prices each format from its own payload, scale and zero-point
+    fields, and the price it puts on the vendor notes' majority recommendation is above the budget.
+  judgment: >-
+    Each row of the runtime format contract prices at payload_bits + (scale_bits +
+    zero_point_bits) / group_size. Recomputed that way, int4_group128_sym costs 4 + 16/128 = 4.125
+    bits per weight, which is above the 4.10 budget, so the uniform INT4 group-128 recipe the
+    environment/vendor_notes/ tables recommend by majority is infeasible by arithmetic rather than
+    by prohibition; int4_group256_sym at 4 + 16/256 = 4.0625 is the cheapest uniform row that
+    fits. The check also requires every manifest layer's own priced cost to agree with its table
+    row, so a layer cannot be priced at one format and packed at another.
+- id: every_layer_format_is_inside_the_runtime_envelope
+  dimension: format_envelope
+  weight: 4
+  knockout: true
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Every layer's weight format and group size is a row of the runtime's bound format contract.
+  judgment: >-
+    The (format, group_size) pair of each of the 196 layers is a member of the published contract:
+    bf16_passthrough, fp8_e4m3_per_channel, int4_group256_sym, int4_group128_sym,
+    int4_group128_asym, int3_group64_sym or int3_group32_sym at its own declared group size. A
+    format the provided decode runtime has no kernel for, or a real format at a group size the
+    kernel does not serve, is format_envelope_violation and exactly 0.0 -- the export would not be
+    servable at all, and an unservable export has no throughput to grade.
+- id: pg19_perplexity_ratio_within_the_gate
+  dimension: quality_gate
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    Word-level perplexity of the quantized export on the private PG-19 slice is no worse than
+    1.030 times the bf16 reference measured on the same slice in the same run.
+  judgment: >-
+    p = ppl_pg19_export / ppl_pg19_bf16 <= 1.030, with both perplexities accumulated in fp64 over
+    the same frozen private token list inside the graded run. The denominator must be measured in
+    this run and the run record must say so: a bf16 reference carried over from an earlier attempt
+    is rejected, because the gate is a ratio and only a same-run ratio has the standard error the
+    3 percent margin was sized against.
+- id: sub_gate_band_credit_stays_below_the_graded_axis
+  dimension: reward_banding
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The recorded reward band agrees with the recomputed perplexity ratio, and a submission that
+    only improves perplexity can never out-earn one that improves throughput.
+  judgment: >-
+    Three bands, recomputed here from p rather than read from the run record. p at or above the
+    starter ratio 1.185 is exactly 0.0 with reason no_gain_over_starter, so an unchanged starter
+    copy, an export that quantizes nothing and an empty submission all land at the same zero and
+    there is no per-run floor. Strictly between 1.030 and 1.185 the credit is 0.07 x (1.185 - p) /
+    0.155, which is bounded above by 0.07 and therefore never competitive with the graded axis. At
+    or below 1.030 the quality gate is cleared and the throughput ramp is what is being graded.
+    The band the run record claims must be the band p implies.
+- id: cross_corpus_retention_gap_within_two_hundredths
+  dimension: calibration_transfer
+  weight: 4
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Quality retention on the graded PG-19 slice and on the private C4 sibling slice agree, so a
+    recipe tuned to one corpus is visible rather than assumed away.
+  judgment: >-
+    retention on a slice is ppl_bf16 / ppl_export on that slice, and |retention_pg19 -
+    retention_c4_sibling| <= 0.02. Calibration is C4 and grading is PG-19, two different real
+    corpora, so clipping ranges and smoothing constants fitted to book-like text open the gap on
+    the sibling slice and constants fitted to the shipped calibration seed open it on PG-19. A
+    wider gap resolves to 0.0 with reason calibration_overfit. Both slices are private and the
+    graded run may not open either.
+- id: traced_stage_order_equals_the_declared_recipe_order
+  dimension: stage_ordering
+  weight: 4
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: >-
+    The stage-entry order the instrumented runtime traced is the order the manifest declared, and
+    every declared stage was actually entered.
+  judgment: >-
+    The traced stage-entry sequence equals the manifest's recipe_stages list element for element,
+    in order. Stage composition is not commutative here -- clipping-range search before rounding
+    is a different recipe from rounding before clipping-range search, and group folding last is a
+    different recipe from group folding first -- so a manifest that declares one order while the
+    trace shows another is recipe_order_divergence and exactly 0.0. A declared stage that never
+    appears in the trace fails the same check: a decorative stage is a declaration the harness
+    cannot re-execute.
+- id: reexecution_regenerates_the_format_map_not_the_bytes
+  dimension: recipe_regeneration
+  weight: 5
+  knockout: true
+  evaluation_target: recipe_source
+  mode: compiled
+  outcome_class: DIVERGENCE
+  criterion: >-
+    The harness's own re-execution of the submitted recipe reproduces the export's per-layer
+    format map and its perplexity, and is not asked to reproduce its bytes.
+  judgment: >-
+    Re-executing /submission/quant_export/recipe.py under the same seed must regenerate a
+    196-entry per-layer format map whose sha256 equals the submitted map's, and a PG-19 perplexity
+    within 0.5 percent of the submitted export's. The comparison is deliberately on the map and
+    the perplexity and never on the packed bytes: GPU reduction order makes bitwise equality of
+    packed weights the wrong thing to demand, and demanding it would reject honest submissions.
+    A downloaded pre-quantized checkpoint has no recipe that regenerates it, so this is where that
+    shortcut resolves to 0.0 with reason recipe_export_divergence.
+- id: throughput_is_the_geometric_mean_across_both_batch_sizes
+  dimension: throughput_definition
+  weight: 4
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The graded throughput is the geometric mean of the batch-1 and batch-16 medians, recomputed
+    here from the trial table.
+  judgment: >-
+    T = sqrt(median over 5 trials of batch-1 tokens/second x median over 5 trials of batch-16
+    tokens/second), recomputed from the per-trial rates and required to agree with the recorded T
+    to within one part in a million. The geometric mean is the point: winning batch 1 while losing
+    batch 16 does not help, because the geomean of a doubled rate and a halved rate is the rate
+    you started with, whereas their arithmetic mean is larger. Batch 16 is in the mean precisely
+    to keep the memory-bound regime dominant, since batch-1 decode on a 1.5B model is dominated by
+    kernel launch overhead rather than by weight bytes. T0, the bf16 baseline, is recomputed by
+    the same rule from the same protocol in the same run.
+- id: decode_window_is_512_steps_after_64_warmup
+  dimension: measurement_protocol
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    Every timed trial ran the published decode window and timed only the measured part of it.
+  judgment: >-
+    Each of the 5 trials, at batch 1 and at batch 16 and for the bf16 baseline as well as the
+    export, records exactly 64 warmup steps and exactly 512 measured decode steps, and its
+    tokens/second is measured_steps x batch / measured_elapsed_s using an elapsed time that
+    excludes the warmup. Fixed work rather than fixed time is what makes the rate comparable
+    across trials; a trial that folds warmup into the elapsed time understates a fast export and a
+    trial with a short window measures launch overhead instead of weight bandwidth.
+- id: trial_spread_inside_the_iqr_admissibility_band
+  dimension: measurement_stability
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The five trials at each batch size are tight enough that the median is a measurement rather
+    than a draw.
+  judgment: >-
+    At each batch size the interquartile range of the 5 trial rates is at most 3 percent of their
+    median. A spread outside the band admits up to 3 re-measures, recorded as such in the run
+    record; a fourth is measurement_unstable and exactly 0.0. The band is what caps the per-trial
+    sigma, and through it the sigma of the median-of-5 estimator, so a throughput that clears the
+    ramp clears it by a margin rather than by a lucky trial.
+- id: every_declared_quantized_layer_dequantizes_at_decode
+  dimension: serving_effect
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    Every layer the manifest declares quantized was actually served from its packed buffer during
+    the graded decode.
+  judgment: >-
+    For each of the 196 layers whose declared format is not bf16_passthrough, the runtime's
+    per-layer dequant-invocation counter is strictly positive over the graded decode window; a
+    counter of zero means that layer's packed buffer was never touched and an fp16 copy was served
+    instead, which is unquantized_layer_served and exactly 0.0. This is what makes the bit budget
+    a constraint on what runs rather than on what is claimed: the manifest says a layer is INT3,
+    the counter says the INT3 kernel ran.
+- id: calibration_wall_clock_within_eight_minutes
+  dimension: calibration_budget
+  weight: 4
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The recipe finished inside the 8-minute calibration budget on the grading host, on the
+    harness's clock and not the agent's.
+  judgment: >-
+    recipe_wall_clock_s <= 480.0 with the run record's clock source naming the harness; a
+    self-reported duration is not admissible evidence for the quantity a red line turns on. The
+    calibration budget and the graded run are two different clocks and the check requires the run
+    record to keep them apart: the throughput trials, the perplexity passes and the export write
+    are timed separately and are not charged against the 480 seconds, so exhaustive sensitivity
+    measurement over all 196 layers overruns the budget on its own account rather than being
+    rescued by moving work into the graded phase. Over budget is calibration_budget_exceeded.
+- id: no_foreign_quantized_checkpoint_and_no_private_slice_read
+  dimension: provenance_absence
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    Nothing arrived from outside the recipe: no downloaded quantized checkpoint, no model-hub
+    egress, no read of a private slice and no write into the checker tree.
+  judgment: >-
+    Four absences, each one a red line. The run record's foreign quantized checkpoint list is
+    empty, so no AWQ or GPTQ release of the same model is on disk beside the export. Every
+    contacted host is inside the declared allowlist -- pypi.org and files.pythonhosted.org -- and
+    no contacted host is a model hub, which is why the allowlist excludes them by name rather
+    than relying on intent. No path under tests/heldout/ was opened, so neither the private PG-19
+    book slice nor the private C4 sibling slice was read. And no path under tests/ or the pinned
+    checkpoint directory was written.
+- id: pinned_checkpoint_digest_unchanged_by_the_recipe
+  dimension: upstream_pin
+  weight: 4
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    The recipe converted the pinned upstream checkpoint and did not replace it.
+  judgment: >-
+    The on-disk weight digest of environment/qwen2.5-1.5b-instruct/ after the graded run equals
+    the digest recorded before it, and both equal the pinned digest the manifest's
+    upstream_checkpoint block declares alongside the pinned revision. The checkpoint is an input
+    the recipe reads, not a slot the agent may fill with a different model: a swapped backbone
+    would change the throughput being graded and would make every per-layer sensitivity number in
+    the recipe an argument about a different network.
+- id: calibration_seconds_declared_per_stage_and_add_up
+  dimension: budget_accounting
+  weight: 3
+  knockout: false
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    The agent declares its own calibration budget accounting, stage by stage, and the declaration
+    is arithmetically coherent.
+  judgment: >-
+    The manifest's calibration_seconds object carries one non-negative number per declared recipe
+    stage and no stage the recipe_stages list does not name, its entries sum to the declared total
+    to within 0.5 s, and that total is at most 480. What is graded here is the declaration, not
+    the harness's own measurement of the same run: a field the harness writes cannot satisfy this
+    check, and an accounting that omits a stage the recipe declares is incomplete even when the
+    harness clock is well inside the budget.
+- id: seed_is_derived_from_the_frozen_content_hash
+  dimension: replay_determinism
+  weight: 3
+  knockout: false
+  evaluation_target: recipe_source
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    The seed the recipe ran under is a pure function of the frozen bundle bytes, so the harness
+    re-execution uses the same seed by construction rather than by convention.
+  judgment: >-
+    The run record names canonical_content_hash as the seed source and records the same integer
+    seed for the graded run and for the harness re-execution. A seed drawn from the clock, from
+    the environment or from an attempt counter makes C-C5's regeneration a coincidence rather than
+    a check, because the re-execution could then differ from the submitted run for a reason that
+    has nothing to do with the recipe.
+- id: speedup_over_bf16_baseline_through_the_ramp
+  dimension: throughput_outcome
+  weight: 10
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The normalized decode speedup of the quantized export over the bf16 baseline clears the
+    published bar and is mapped through the ramp.
+  judgment: >-
+    s = T / T0, where T is the geometric mean of the batch-1 and batch-16 medians for the
+    quantized export and T0 is the same statistic for the bf16 baseline measured in the same run
+    under the same protocol, so s0 = 1.00 by construction and the graded quantity is a speedup
+    rather than a machine-dependent rate. UNMEASURED AT PHASE 0: floor, knee and
+    dichotomizing_threshold are null in tests/constants.json, so this check calls require_measured
+    as its first statement and raises ConstantUnmeasured before it opens the run record. That
+    ordering is the whole point -- reading the artifact first would let a missing-file error mask
+    the unmeasured signal, and the verifier would then report gradeable=true with r_det=0.0, which
+    asserts the agent scored zero rather than that this slot is not yet measurable.
+council_rubrics_note: >-
+  These three are judged, not compiled, and they do not live in `items`. Each one asks about the
+  reasoning behind the recipe rather than about a quantity the delivered bytes decide, so folding
+  them into the compiled surface would either invent a decidable proxy for a behavioural question
+  or drag the compiled weight share below the floor. They are graded downstream by the trajectory
+  grader and consumed by the reward gate, never inside r_det.
+council_rubrics:
+- id: sensitivity_evidence_accumulates_across_attempts
+  asks: >-
+    Does the transcript show per-layer sensitivity evidence carried forward between attempts, or
+    is the 196-layer ranking rebuilt from nothing every time? The 8-minute budget cannot measure
+    every layer in one attempt, so a recipe that never accumulates is a recipe that never gets
+    past the subset it can afford in a single run.
+- id: allocation_is_argued_from_measured_sensitivity
+  asks: >-
+    Is the choice of which projections receive FP8 and which receive INT3 argued from the agent's
+    own measured sensitivity ranking, or adopted from the environment/vendor_notes/ majority? Per
+    layer sensitivity is disclosed nowhere in the bundle and no combination of the vendor notes
+    determines it, so an allocation with no measurement behind it is a guess wearing a table.
+- id: declared_stage_order_is_explained_not_decorated
+  asks: >-
+    Does the agent say why clipping-range search precedes rounding and why group folding comes
+    last, and does that explanation match the order it actually declared? An order the agent
+    cannot explain is an order it did not choose, and C-C4 and C-C5 are what turn that from a
+    stylistic complaint into a measured one.
+corpus_layout:
+  status: not_landed
+  status_note: >-
+    Neither environment/data/ nor tests/heldout/ exists in this bundle yet, and neither does the
+    vendored backbone directory. The paths below are AUTHORED here, once, so the compiled checks
+    name them from the derivation source instead of each carrying a guess of its own, and so the
+    corpus lands against a written target. Every check that reads one of them fails closed on an
+    absent path rather than skipping.
+  pinned_checkpoint: environment/qwen2.5-1.5b-instruct/
+  pinned_checkpoint_revision_file: environment/qwen2.5-1.5b-instruct/pinned_revision.json
+  calibration_sequences: environment/data/c4_calibration_512x2048.npz
+  sensitivity_subset: environment/data/c4_sensitivity_64.json
+  vendor_notes: environment/vendor_notes/
+  decode_runtime: environment/runtime/mixed_precision_decode/
+  starter_recipe: environment/starter/starter.py
+  private_pg19_slice: tests/heldout/pg19_private_tokens.npz
+  private_c4_sibling_slice: tests/heldout/c4_sibling_tokens.npz
+  export_root: /submission/quant_export
+  manifest: /submission/quant_export/manifest.json
+  recipe_program: /submission/quant_export/recipe.py
+  shard_dir: /submission/quant_export/shards
+  run_record: run_record.json
+  run_record_basis: >-
+    Written by the graded run beside the bundle root and read by the separate verifier. Every key
+    the compiled checks read is published in instruction.md, so no check grades an obligation the
+    agent was never told to carry, and every quantity a red line turns on is one the harness
+    measures rather than one the recipe reports.
+  guarded_prefixes:
+  - tests/
+  - environment/qwen2.5-1.5b-instruct/
+  - /logs/verifier/
+  heldout_prefix: tests/heldout/
+  declared_egress_allowlist:
+  - pypi.org
+  - files.pythonhosted.org
+  model_hub_hosts:
+  - huggingface.co
+  - cdn-lfs.huggingface.co
+  - hf-mirror.com
+  - modelscope.cn
+  - www.kaggle.com
+  model_hub_basis: >-
+    The pre-quantized-checkpoint shortcut is the lookup shortcut in its purest form and a public
+    AWQ or GPTQ release of this exact model exists, so the hosts that serve one are excluded by
+    name in the declared allowlist rather than left to a general rule about egress.
+runtime_format_contract:
+  basis: >-
+    The formats the provided mixed-precision decode runtime has kernels for. The table is
+    published in instruction.md because difficulty here has to survive disclosure: knowing what
+    each format costs in bits is not knowing which of the 196 layers can afford it.
+  price_rule: bits_per_weight = payload_bits + (scale_bits + zero_point_bits) / group_size
+  rows:
+  - format: bf16_passthrough
+    payload_bits: 16
+    scale_bits: 0
+    zero_point_bits: 0
+    group_size: 1
+  - format: fp8_e4m3_per_channel
+    payload_bits: 8
+    scale_bits: 16
+    zero_point_bits: 0
+    group_size: 1536
+  - format: int4_group256_sym
+    payload_bits: 4
+    scale_bits: 16
+    zero_point_bits: 0
+    group_size: 256
+  - format: int4_group128_sym
+    payload_bits: 4
+    scale_bits: 16
+    zero_point_bits: 0
+    group_size: 128
+  - format: int4_group128_asym
+    payload_bits: 4
+    scale_bits: 16
+    zero_point_bits: 8
+    group_size: 128
+  - format: int3_group64_sym
+    payload_bits: 3
+    scale_bits: 16
+    zero_point_bits: 0
+    group_size: 64
+  - format: int3_group32_sym
+    payload_bits: 3
+    scale_bits: 16
+    zero_point_bits: 0
+    group_size: 32
+  decoy_row: int4_group128_sym
+  decoy_arithmetic: >-
+    4 + 16/128 = 4.125 bits per weight, which is 0.025 bits over the 4.10 budget. The
+    environment/vendor_notes/ A100-era comparison tables and migration guides recommend uniform
+    INT4 group-128 by majority, so the popular route is also the measured-wrong route and it
+    resolves through the bit budget rather than through a rule that forbids it.
+  cheapest_uniform_row_that_fits: int4_group256_sym
+  cheapest_uniform_arithmetic: >-
+    4 + 16/256 = 4.0625 bits per weight. It fits the budget, which is exactly why the budget alone
+    does not make the task: a uniform allocation that fits still has to beat a mixed one on
+    throughput, and it is the per-layer sensitivity, disclosed nowhere, that decides whether it can.
+  per_format_decode_throughput: null
+  per_format_decode_throughput_reason: >-
+    Measured on the grading host at Phase 1 with the runtime's own kernels and published into
+    instruction.md then. Authoring a tokens/second figure here would invent a measurement these
+    bytes have not earned, and the tradeoff the table is supposed to disclose would be a guess.
+published_bounds:
+  basis: >-
+    Authored bounds, every one of them disclosed to the agent in instruction.md. Not one is a
+    measurement: they are the constraint surface, and the four quantities that ARE measured stay
+    null under `constants` below.
+  bit_budget_bits_per_weight: 4.1
+  calibration_budget_seconds: 480
+  perplexity_gate_ratio: 1.03
+  starter_perplexity_ratio: 1.185
+  sub_gate_credit_ceiling: 0.07
+  retention_gap_bound: 0.02
+  reexecution_perplexity_tolerance: 0.005
+  trial_iqr_band: 0.03
+  max_remeasures: 3
+  warmup_steps: 64
+  measured_decode_steps: 512
+  trials: 5
+  batch_sizes:
+  - 1
+  - 16
+  transformer_blocks: 28
+  projections_per_block:
+  - self_attn.q_proj
+  - self_attn.k_proj
+  - self_attn.v_proj
+  - self_attn.o_proj
+  - mlp.gate_proj
+  - mlp.up_proj
+  - mlp.down_proj
+  linear_layer_count: 196
+  linear_layer_count_basis: 28 blocks x 7 linear projections per block.
+  hidden_size: 1536
+  intermediate_size: 8960
+  attention_heads: 12
+  key_value_heads: 2
+  head_dim: 128
+  weight_count_by_projection:
+    self_attn.q_proj: 2359296
+    self_attn.k_proj: 393216
+    self_attn.v_proj: 393216
+    self_attn.o_proj: 2359296
+    mlp.gate_proj: 13762560
+    mlp.up_proj: 13762560
+    mlp.down_proj: 13762560
+  linear_weight_total: 1310195712
+  weight_count_basis: >-
+    The shapes of the pinned checkpoint, published so the denominator of the average bits per
+    weight is a fact about the model rather than a number the manifest supplies about itself.
+    Qwen2.5-1.5B-Instruct carries hidden_size 1536, intermediate_size 8960, 12 attention heads and
+    2 key-value heads at head_dim 128, so q and o are 1536 x 1536 = 2359296, k and v are 1536 x
+    256 = 393216, and each of gate, up and down is 1536 x 8960 = 13762560. Over 28 blocks that is
+    1310195712 linear weights, and the tied 151936 x 1536 embedding is not a linear projection and
+    is not in the roster.
+  recipe_stage_vocabulary:
+  - outlier_extraction
+  - activation_smoothing
+  - clipping_range_search
+  - rounding
+  - group_folding
+  - packing
+contract_recorded_projections:
+  basis: >-
+    COPIED FROM seed/contract.yaml, not measured here. These are the reward-map anchors and the
+    control-ladder projections that slot's record already carries. They are recorded so the
+    derivation source is traceable to the contract rather than to a memory of it, and they are NOT
+    a substitute for the four measured constants below, which stay null: the ramp floor and knee
+    are measured on the grading host at Phase 2 over the real speedup distribution, and a design
+    target is not that measurement under another name.
+  baseline_speedup_s0: 1.0
+  full_reward_speedup_target: 1.9
+  reference_recipe_speedup: 2.4
+  reference_recipe_bits_per_weight: 4.08
+  reference_allocation_weight_mass_shares:
+    fp8_e4m3_per_channel: 0.02
+    int4_group128_sym: 0.7837
+    int3_group32_sym: 0.1963
+  reference_allocation_note: >-
+    Priced through the table those three shares come to 4.080 bits per weight, which is 0.02 bits
+    under the budget and, notably, MORE bits than the 4.0625 the cheapest uniform row costs. The
+    budget is a constraint, not the objective: the reference spends its extra bits on FP8 for the
+    few most sensitive projections and buys them back with INT3 group-32 on the least sensitive
+    MLP down-projections. This block is the oracle's allocation and is deliberately absent from
+    instruction.md.
+  best_uniform_family_projection: 0.463
+  best_uniform_family_note: >-
+    The contract's C4S3-CTL-UNIFORM-FAMILY-BEST control: the best uniform allocation under 4.10
+    with clipping search but no per-layer sensitivity measurement, taken as the maximum over 12
+    draws, projected at s = 1.38 and p = 1.028. It clears the quality gate and reaches the graded
+    axis rather than being zeroed by a constraint, which is what makes it the ladder anchor rather
+    than another zero.
+measurement_tier: gpu
+measurement_tier_basis: trains or runs an LLM backbone
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: >-
+    the three behavioural rubrics under council_rubrics, as a conjunction, applied after r_det is
+    computed and never inside it
+  form: gate
+  ceiling: 0.5
+  ceiling_basis: >-
+    seed/contract.yaml binds this slot's judged reduction as a gate at ceiling 0.50 and records
+    that no multiplicative judged factor survives under any name. The ceiling is strictly below
+    1.0, so the gate binds; it is strictly below the slot's dichotomizing threshold of 0.60, so a
+    run whose recipe was never argued from a measurement cannot report as correct however fast its
+    export decoded.
+  composition: r_final = r_det when every behavioural rubric passes, else min(r_det, ceiling)
+  coverage_rule: >-
+    a verdict collection that does not cover all three ids fails the conjunction; all() over an
+    empty collection is True, so a gate that only inspected the verdicts it was handed would pass
+    exactly when it had been handed nothing
+  missing_verdict_rule: >-
+    a missing, unavailable or unparseable verdict counts as a FAILURE of the conjunction, never as
+    a pass
+  pass_threshold: null
+  pass_threshold_reason: >-
+    The trajectory grader emits averaged fractions and this gate consumes booleans. The fraction at
+    which a rubric counts as passed is a measured calibration this slot has not run, so it stays
+    null with the other three.
+reward_map:
+  full_reward: 1.0
+  graded_quantity: >-
+    s = T / T0, the normalized decode speedup of the quantized export over the bf16 baseline
+    measured in the same run under the same protocol, where each of T and T0 is the geometric mean
+    of the batch-1 and batch-16 medians over 5 trials of 512 decode steps after 64 warmup steps.
+  shape: >-
+    r_det is exactly 0.0 on any red line and on any knockout failure, before any quality is
+    considered. Above that the map has two bands and only the upper one reaches the graded axis: a
+    perplexity ratio p in the open interval (1.030, 1.185) earns 0.07 x (1.185 - p) / 0.155, which
+    is bounded by the sub-gate credit ceiling and never competitive; p at or below 1.030 with every
+    hard constraint holding earns the sub-gate ceiling plus the ramp over s, clamped to the
+    published floor-to-knee interval. Improving perplexity alone therefore cannot out-earn
+    improving throughput, which is what makes throughput the graded quantity rather than one of two.
+  unmeasured: >-
+    floor and knee are null at Phase 0, so the ramp over s is not computable from these bytes yet
+    and the slot is authored but not gradeable. The band arithmetic above IS computable and is
+    compiled: sub_gate_band_credit_stays_below_the_graded_axis grades it today.
+rejected_routes:
+- route: >-
+    Download a pre-quantized checkpoint -- an AWQ or GPTQ release of this exact model exists
+    publicly -- and submit it as the export.
+  controlled_by: >-
+    The declared egress allowlist names pypi.org and files.pythonhosted.org and excludes the model
+    hubs by name; no_foreign_quantized_checkpoint_and_no_private_slice_read proves no such artifact
+    arrived; and reexecution_regenerates_the_format_map_not_the_bytes requires the harness's own
+    re-execution of the submitted recipe to regenerate the per-layer format map and the perplexity.
+    A downloaded artifact has no recipe that regenerates it.
+- route: Apply the published default recipe, uniform INT4 group-128, and stop.
+  controlled_by: >-
+    Arithmetic, not prohibition. INT4 group-128 symmetric costs 4 + 16/128 = 4.125 bits, above the
+    4.10 budget, so bits_per_weight_recomputed_from_packed_bytes zeroes it with reason
+    bit_budget_exceeded. The environment/vendor_notes/ tree recommends exactly this by majority, so
+    the popular route is also the measured-wrong route.
+- route: Calibrate on the evaluation distribution to buy perplexity headroom.
+  controlled_by: >-
+    Calibration is C4 and grading is PG-19, two different real corpora.
+    cross_corpus_retention_gap_within_two_hundredths zeroes a gap above 0.02 with reason
+    calibration_overfit, and the private PG-19 book selection is never exposed, so the read itself
+    is recorded as heldout_read.
+- route: >-
+    Declare layers quantized in the manifest while serving them from an fp16 buffer, or pack
+    padding to make the byte count look compliant.
+  controlled_by: >-
+    bits_per_weight_recomputed_from_packed_bytes recomputes the average from the shard bytes on
+    disk and refuses a declared total that disagrees with them, and
+    every_declared_quantized_layer_dequantizes_at_decode requires a strictly positive dequant
+    invocation counter for every layer the manifest does not call bf16_passthrough.
+- route: >-
+    Declare a stage order that differs from what the recipe executed, or declare an order that is
+    decorative.
+  controlled_by: >-
+    traced_stage_order_equals_the_declared_recipe_order compares the traced stage-entry sequence
+    against the declared list element for element and fails a declared stage that never appears,
+    and reexecution_regenerates_the_format_map_not_the_bytes requires re-execution from that
+    manifest to reproduce the result.
+- route: >-
+    Measure sensitivity exhaustively over all 196 linear layers, then move the overrun into the
+    graded phase so the calibration clock looks compliant.
+  controlled_by: >-
+    calibration_wall_clock_within_eight_minutes reads a harness-measured wall clock, not a
+    self-reported one, and requires the run record to keep the calibration clock and the graded
+    clock apart, so work moved across the boundary is still charged where it ran.
+- route: >-
+    Ship several exports and let the harness pick the fastest one that happens to pass.
+  controlled_by: >-
+    Exactly one declared manifest is regenerated and graded, and every surplus export on disk is a
+    quantized checkpoint of un-recipe origin, which
+    no_foreign_quantized_checkpoint_and_no_private_slice_read reports as an absence violated.
+control_ladder:
+- id: C4S3-CTL-NOOP-EMPTY
+  targets: No export and no recipe at the declared paths. Fires deliverable_absent. Measured on a frozen fixture.
+  recorded_score: 0
+- id: C4S3-CTL-NOOP-NOQUANT
+  targets: >-
+    Recipe that quantizes nothing, so the export is 16 bits per weight; the average recomputed from
+    packed bytes fires bit_budget_exceeded. Measured on a frozen fixture.
+  recorded_score: 0
+- id: C4S3-CTL-NOOP-STARTER
+  targets: >-
+    Unchanged shipped starter recipe, p = the starter ratio 1.185, so no_gain_over_starter. Measured
+    on a frozen fixture.
+  recorded_score: 0
+- id: C4S3-CTL-STALE-SEED
+  targets: >-
+    Allocation and clipping constants fitted to the shipped calibration seed and graded under the
+    harness's own seed and private slices. The clipping ranges are wrong off-seed, p = 1.061 lands
+    inside the sub-gate band, and the run earns 0.07 x (1.185 - 1.061) / 0.155 = 0.056 without ever
+    reaching the graded axis. Projected.
+  recorded_score: 0.056
+- id: C4S3-CTL-DECOY-VENDOR
+  targets: >-
+    Adopts the majority recommendation of the vendor_notes A100-era tables and migration guides,
+    uniform INT4 group-128 at 4.125 bits, and fires bit_budget_exceeded. This is the DEC7 binding.
+    Projected.
+  recorded_score: 0
+- id: C4S3-CTL-LISTALL
+  targets: >-
+    Submission shipping several exports and letting the harness pick a winner. The one declared
+    manifest is a uniform INT4 group-256 export at 4.0625 bits with p = 1.090, landing in the
+    sub-gate band at 0.07 x (1.185 - 1.090) / 0.155 = 0.043, while the surplus exports independently
+    fire the absence check as quantized checkpoints of un-recipe origin. The higher, non-zero branch
+    is reported. Projected.
+  recorded_score: 0.043
+- id: C4S3-CTL-OBVWRONG-PREQUANT
+  targets: >-
+    Downloaded pre-quantized checkpoint served as the export. The absence check finds a quantized
+    checkpoint of un-recipe origin and re-execution fails to regenerate the format map from the
+    declared recipe, so recipe_export_divergence. Projected.
+  recorded_score: 0
+- id: C4S3-CTL-OBVWRONG-FP16SERVED
+  targets: >-
+    Layers declared quantized in the manifest but served in fp16 at runtime. The per-layer dequant
+    invocation counter reads zero on those layers, so unquantized_layer_served. This is the GAM1
+    verifier-aware route. Projected.
+  recorded_score: 0
+- id: C4S3-CTL-OBVWRONG-PADPACK
+  targets: >-
+    Padding-inflated packing that makes the manifest report a compliant average while the packed
+    bytes do not. The average is recomputed from the packed bytes, so bit_budget_exceeded.
+    Projected.
+  recorded_score: 0
+- id: C4S3-CTL-OBVWRONG-CALIBONEVAL
+  targets: >-
+    Calibration performed on the evaluation corpus rather than on the provided C4 sequences. The
+    absence check records the private-slice read as heldout_read, and the cross-corpus retention gap
+    would fire independently. Projected.
+  recorded_score: 0
+- id: C4S3-CTL-SIBLING-OVERFIT
+  targets: >-
+    Recipe whose clipping and smoothing constants are fitted to PG-19-like text, producing a
+    cross-corpus retention gap of 0.071 against the 0.02 bound on the private C4 sibling slice, so
+    calibration_overfit. Projected.
+  recorded_score: 0
+- id: C4S3-CTL-UNIFORM-FAMILY-BEST
+  targets: >-
+    Slot-specific and the highest required control in the slot; it is the LRN1 anchor. The best
+    uniform-format allocation that fits under 4.10 bits with clipping search but with NO per-layer
+    sensitivity measurement, taken as the maximum over 12 draws: s = 1.38 with p = 1.028, so it
+    clears the quality gate and reaches the graded axis rather than being zeroed by a constraint.
+    This is the control that proves the ramp separates real allocation search from format-uniformity
+    tuning; without it nothing in the control set fires on the graded axis at all. Projected.
+  recorded_score: 0.463
+- id: C4S3-CTL-RECIPE-ORDER
+  targets: >-
+    Slot-specific. A recipe whose manifest declares clipping-range search before rounding while the
+    instrumented runtime traces the reverse order, so it scores well while executing a different
+    order. Fires recipe_order_divergence. Without this control the ordering obligation has no
+    targeted shortcut and is inert under invariant 17. Projected.
+  recorded_score: 0
+- id: C4S3-CTL-CALIB-BUDGET
+  targets: >-
+    Slot-specific. A recipe that measures sensitivity exhaustively over all 196 linear layers and
+    overruns the 8-minute calibration budget at 11.4 min. Wall-clock is measured harness-side, so
+    calibration_budget_exceeded. Without this control the budget obligation has no targeted shortcut
+    and is inert. Projected.
+  recorded_score: 0
+truth_narrative:
+  opening: >-
+    This slot grades a speed, not an answer. The agent writes a quantization recipe program that
+    converts the pinned Qwen2.5-1.5B-Instruct checkpoint into an export for the provided
+    mixed-precision decode runtime, and what is measured is how fast that export decodes: T is the
+    geometric mean of tokens per second at batch 1 and at batch 16, over 512 decode steps after 64
+    warmup steps, median of 5 trials, measured host-side. The recipe has 8 minutes of calibration
+    on one H100 to do it in, and the export it produces must average no more than 4.10 bits per
+    weight over all 196 linear projections, recomputed from the packed bytes, while holding
+    private PG-19 held-out perplexity within 1.03x of the bf16 reference. The graded deliverable is
+    the recipe and its declared stage order, not only the artifact the recipe emitted: the harness
+    re-executes the recipe and the regenerated export must match what was submitted.
+  insight: >-
+    The bit budget is a constraint and the perplexity gate is a constraint; neither is the
+    objective, and a submission that satisfies both perfectly can still score zero on the graded
+    axis. What earns reward is throughput, and throughput is bought by putting cheap formats where
+    the network can afford them -- which is a question about per-layer sensitivity, the one
+    quantity this bundle discloses nowhere. Everything else is disclosed on purpose: the format
+    cost table, the 4.10 budget, the 1.030 gate, the 8-minute clock. Difficulty survives that
+    disclosure because knowing that INT3 group-32 costs 3.5 bits and INT4 group-128 costs 4.125 is
+    not knowing which of the 196 projections will tolerate INT3, and the 8-minute budget is too
+    short to find out by measuring all of them. The second thing that matters is that the geometric
+    mean across two batch sizes makes a one-sided win worthless: batch 1 rewards fewer kernel
+    launches and batch 16 rewards fewer weight bytes, and the geomean of a doubled rate and a
+    halved rate is the rate you started with.
+  steps:
+  - heading: Price the table before you touch a weight
+    paragraph: >-
+      Every format in the runtime contract prices at payload_bits + (scale_bits + zero_point_bits)
+      / group_size. Doing that arithmetic first settles the decoy in one line: uniform INT4
+      group-128 costs 4.125 bits and is over budget, so the recipe the vendor notes recommend by
+      majority cannot be submitted at all, while INT4 group-256 at 4.0625 fits and INT3 group-32 at
+      3.5 leaves room to spend elsewhere.
+    satisfies:
+    - uniform_int4_group128_prices_above_the_budget
+    - every_layer_format_is_inside_the_runtime_envelope
+  - heading: Establish the baseline in the same run you are graded in
+    paragraph: >-
+      Both graded quantities are ratios. s is T/T0 against the bf16 baseline throughput and p is
+      perplexity over the bf16 reference perplexity, and both denominators have to be measured in
+      the same run under the same protocol, on the same private slice, or the ratio's standard
+      error is not the one the 3 percent gate margin was sized against.
+    satisfies:
+    - pg19_perplexity_ratio_within_the_gate
+    - throughput_is_the_geometric_mean_across_both_batch_sizes
+  - heading: Spend the 8 minutes on sensitivity, not on completeness
+    paragraph: >-
+      A Fisher-style diagonal sensitivity proxy over a small C4 subset ranks projections far
+      cheaper than measuring all 196, and the budget is a hard cliff rather than a soft cost: the
+      exhaustive route measured at 11.4 minutes is a zero, not a slow pass. Accumulate the ranking
+      across attempts, because the reward history is carried between attempts and the per-attempt
+      budget is not.
+    satisfies:
+    - calibration_wall_clock_within_eight_minutes
+    - calibration_seconds_declared_per_stage_and_add_up
+  - heading: Allocate as a knapsack, not as a choice of one format
+    paragraph: >-
+      With a price per format and a sensitivity per layer, the allocation is a knapsack under 4.10
+      bits: FP8 per-channel on the few most sensitive projections, INT4 on the bulk, INT3 group-32
+      on the least sensitive MLP down-projections. Note that a good mixed allocation can spend MORE
+      bits than the cheapest uniform one and still decode faster, which is the clearest sign that
+      the budget is not the objective.
+    satisfies:
+    - bits_per_weight_recomputed_from_packed_bytes
+    - layer_roster_covers_all_196_linear_projections
+  - heading: Declare the order you actually execute
+    paragraph: >-
+      The stages compose and do not commute. Clipping-range search before rounding is a different
+      recipe from rounding before clipping-range search, and group folding belongs last. Declare
+      the order in the manifest, execute it, and expect the instrumented runtime to have traced it.
+    satisfies:
+    - traced_stage_order_equals_the_declared_recipe_order
+  - heading: Pack the bytes you declare and declare the bytes you pack
+    paragraph: >-
+      The average bits per weight is recomputed from the size of the shard files on disk, so
+      padding that is packed but not declared inflates the recomputed average rather than hiding
+      under a compliant manifest figure. Write the manifest from the packer's own output, not from
+      the allocation you intended.
+    satisfies:
+    - export_manifest_and_packed_shards_present
+    - bits_per_weight_recomputed_from_packed_bytes
+  - heading: Prove the packed buffer is what gets served
+    paragraph: >-
+      A layer declared INT3 that is served from an fp16 copy is fast to write and fails on effect:
+      the runtime keeps a per-layer dequant-invocation counter over the graded decode, and a
+      counter of zero on a layer the manifest does not call bf16_passthrough means the packed
+      buffer was never touched.
+    satisfies:
+    - every_declared_quantized_layer_dequantizes_at_decode
+  - heading: Check the cross-corpus gap before you submit
+    paragraph: >-
+      One wrong constant in the multi-stage numeric pipeline -- a clipping range, a smoothing
+      alpha, a group boundary -- does not raise an error and does not stop the export from emitting
+      fluent text. It shows up as a corpus-dependent quality gap, which is why retention is
+      compared between the graded PG-19 slice and the private C4 sibling slice rather than looked
+      at on one of them.
+    satisfies:
+    - cross_corpus_retention_gap_within_two_hundredths
+  - heading: Measure throughput the way the metric is defined
+    paragraph: >-
+      Fixed work, not fixed time: 64 warmup steps then 512 measured steps at each batch size, five
+      trials, medians, geometric mean across the two batch sizes. Keep the trial spread inside the
+      admissibility band, because a median drawn from a noisy five is a draw rather than a
+      measurement.
+    satisfies:
+    - decode_window_is_512_steps_after_64_warmup
+    - trial_spread_inside_the_iqr_admissibility_band
+  - heading: Make the recipe regenerable, and let it be regenerated
+    paragraph: >-
+      Seed from the frozen bundle bytes so the harness re-execution uses the same seed by
+      construction. Expect the regeneration check to compare the per-layer format map exactly and
+      the perplexity within half a percent, and never the packed bytes, because GPU reduction order
+      makes bitwise equality of packed weights the wrong thing to demand of an honest run.
+    satisfies:
+    - reexecution_regenerates_the_format_map_not_the_bytes
+    - seed_is_derived_from_the_frozen_content_hash
+  - heading: Leave the upstream pin alone and stay off the hubs
+    paragraph: >-
+      The checkpoint is an input the recipe converts, not a slot to fill with a different model, and
+      a public AWQ or GPTQ release of this exact model is the shortest wrong path in the whole slot.
+      The allowlist excludes the hubs by name, the private slices are never opened, and the checker
+      tree is never written.
+    satisfies:
+    - pinned_checkpoint_digest_unchanged_by_the_recipe
+    - no_foreign_quantized_checkpoint_and_no_private_slice_read
+  - heading: Understand which band you are in
+    paragraph: >-
+      Below the quality gate there is a consolation band worth at most 0.07, and at or above the
+      starter perplexity ratio there is nothing at all. Only p at or below 1.030 reaches the ramp
+      over s, so a submission that spends its 8 minutes buying perplexity headroom it did not need
+      has bought nothing.
+    satisfies:
+    - sub_gate_band_credit_stays_below_the_graded_axis
+    - speedup_over_bf16_baseline_through_the_ramp
+  traps:
+  - >-
+    Perplexity measurement noise exceeds the 3 percent gate margin. Guard: the gate is a ratio
+    against the bf16 reference measured on the same private slice in the same run, and the slice is
+    sized at 400k tokens or more so the ratio's standard error is well under 0.005.
+  - >-
+    Throughput at batch 1 on a 1.5B model is dominated by kernel launch overhead rather than by
+    weight bytes, which would collapse the graded axis. Guard: batch 16 is in the geometric mean
+    precisely to keep the memory-bound regime dominant, and the authoring gate refuses the slot
+    unless the measured T0-to-T1 range separates the reference from the tuned uniform family by the
+    margin the ramp needs.
+  - >-
+    The 4.10 budget is satisfiable by one obvious allocation, which would collapse the search.
+    Guard: INT4 group-256 at 4.0625 fits, so the budget alone does not force a mixture; what forces
+    it is that the best uniform allocation has to sit far below the full-reward floor on
+    THROUGHPUT, which is what the uniform-family control on the ladder is there to anchor.
+  - >-
+    Recipe re-execution is nondeterministic because GPU reduction order is, so an exact-bytes
+    regeneration check would reject honest submissions. Guard: the regeneration check compares the
+    per-layer format map exactly and the perplexity within 0.5 percent, never the packed bytes, and
+    the runtime pins deterministic reduction for the calibration path.
+  - >-
+    The provided runtime becomes the bottleneck, so every allocation measures the same and the
+    tradeoff disappears. Guard: the per-format kernels are measured on the grading host at Phase 1
+    and the cost table is published with those figures, so the tradeoff is real and disclosed
+    rather than assumed.
+  - >-
+    Download a pre-quantized checkpoint -- an AWQ or GPTQ release of this exact model exists -- and
+    submit it. This is the lookup shortcut in its purest form. Guard: the allowlist excludes model
+    hubs by name, the absence check proves no such artifact arrived, and the regeneration check
+    requires the harness's own re-execution of the submitted recipe to reproduce the export's
+    per-layer format map and perplexity. A downloaded artifact has no recipe that regenerates it.
+  - >-
+    Apply the published default recipe, uniform INT4 group-128, and stop. Guard: arithmetic, not
+    prohibition. 4 + 16/128 = 4.125 bits is over the 4.10 budget, so it zeroes with reason
+    bit_budget_exceeded, and the decoy vendor_notes tree recommends exactly this by majority.
+  - >-
+    Calibrate on the evaluation distribution to buy perplexity headroom. Guard: calibration is C4
+    and grading is PG-19, two different real corpora; a cross-corpus retention gap above 0.02 zeroes
+    with reason calibration_overfit, and the private PG-19 book selection is never exposed.
+  - >-
+    Declare layers quantized in the manifest while serving them from an fp16 buffer, or pack padding
+    to game the byte count. Guard: the average is recomputed from the packed bytes rather than from
+    the manifest, and every layer declared quantized must show a nonzero runtime dequant-invocation
+    counter.
+  - >-
+    Declare a stage order that differs from what the recipe executed, or declare an order that is
+    decorative. Guard: the traced stage-entry order is compared against the declared manifest
+    element for element, and re-execution from that manifest has to reproduce the result, so a
+    decorative order fails reproduction.
+provenance:
+  corpus: 'REAL, two named corpora plus one pinned model, all vendored at image build. (1) C4 English
+    validation (HF `allenai/c4`, config `en`, pinned revision; ODC-BY 1.0 with Common Crawl terms, permits
+    redistribution of a modified derivative with attribution) supplies 512 real calibration sequences
+    of 2048 tokens and the private sibling slice for the cross-corpus check. (2) PG-19 (HF `deepmind/pg19`,
+    pinned revision; Apache-2.0 release, underlying Project Gutenberg texts public domain) supplies
+    the private held-out book slice on which graded perplexity is measured - deliberately a different
+    corpus from calibration, so calibration overfit is detectable rather than assumed away. Model: Qwen2.5-1.5B-Instruct,
+    Apache-2.0, pinned by revision SHA and on-disk weight digest.'
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: 'REAL, two named corpora plus one pinned model, all vendored at image build.
+      (1) C4 English validation (HF `allenai/c4`, config `en`, pinned revision; ODC-BY 1.0 with Common
+      Crawl terms, permits redistribution of a modified derivative with attribution) supplies 512 real
+      calibration sequences of 2048 tokens and the private sibling slice for the cross-corpus check.
+      (2) PG-19 (HF `deepmind/pg19`, pinned revision; Apache-2.0 release, underlying Project Gutenberg
+      texts public domain) supplies the private held-out book slice on which graded perplexity is measured
+      - deliberately a different corpus from calibration, so calibration overfit is detectable rather
+      than assumed away. Model: Qwen2.5-1.5B-Instruct, Apache-2.0, pinned by revision SHA and on-disk
+      weight digest.'
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-984f0bb9464dd324952dbd7d9fad7601
+  - AELLO-CANARY-6bd7f7dd136f19f5856e9f97a07752ba
+  - AELLO-CANARY-6a1fe153309429d4a4f5408c6b2efb52
+  - AELLO-CANARY-ad3cfdc08b790d8bc1f5c6b3a110df31

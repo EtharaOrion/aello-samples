@@ -1,0 +1,720 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: C3-S3
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item below is compiled and every one of them runs against delivered bytes, so the compiled weight share
+  is 1.0 exactly. The judged half of this slot lives in the four behaviour-only trajectory lines seed/contract.yaml
+  binds to the reward gate; none of them has a deterministic residue and none of them is carried here
+  as an item.'
+deliverable:
+  path: /submission/c3s3.json
+  kind: json
+  shape: an object whose ids and outputs lists carry the emitted record ids and their per-record byte
+    digests in emission order, alongside mixture_manifest (weights over the four domains, weight_basis,
+    repetition_epochs, dedup granularities, per-domain selection and the emission curriculum), spans (the
+    source_id/offset/length triples each record is assembled from), corpus_sha256 and consumed_tokens
+evaluation_target_vocabulary:
+- emitted_corpus
+- frozen_grading_tree
+- mixture_manifest
+- run_record
+- source_manifest
+corpus_layout:
+  status: AUTHORED, NOT LANDED. environment/data/, environment/frozen/, environment/decontam/, environment/reference/
+    and tests/heldout/ do not exist in this bundle yet. Every path below is authored here so the compiled
+    checks name stable locations and so the instruction can publish them; the landing wave writes the
+    four pinned corpora and the four private per-domain shards to exactly these paths, or edits this block
+    and regenerates. Nothing here is a measurement.
+  domains:
+  - web
+  - encyclopedic
+  - scientific
+  - mathematical
+  domain_reduction_order_basis: the fixed order in which the four per-domain values are reduced by max,
+    so the argmax tie-break is deterministic
+  domain_sources:
+    web: allenai/c4 config en (ODC-By 1.0)
+    encyclopedic: wikimedia/wikipedia config 20231101.en (CC BY-SA, GFDL)
+    scientific: allenai/peS2o (ODC-By 1.0)
+    mathematical: open-web-math/open-web-math (ODC-By 1.0)
+  raw_root: environment/data/raw
+  source_manifest: environment/data/sources.json
+  source_manifest_schema: a JSON object mapping source_id to {domain, sha256, bytes}; the domain of an
+    emitted span is read from here and never from the submission
+  frozen_tokenizer: environment/frozen/tokenizer.json
+  frozen_trainer: environment/frozen/trainer.py
+  fingerprints: environment/decontam/heldout_fingerprints.bin
+  heldout_shards:
+  - tests/heldout/web.bin
+  - tests/heldout/encyclopedic.bin
+  - tests/heldout/scientific.bin
+  - tests/heldout/mathematical.bin
+  quality_scores: environment/reference/quality_scores.jsonl
+  dataset_cards: environment/reference/dataset_cards
+  run_record: run_record.json
+  guarded_writes:
+  - tests/
+  - environment/decontam/
+  - environment/frozen/
+  token_budget: 1000000000
+  weight_tolerance: 0.005
+  weight_tolerance_basis: AUTHORED at Phase 0, not measured. seed/contract.yaml requires declared weights
+    to equal realised token counts 'within the disclosed tolerance' and discloses no number; 0.005 absolute
+    on each domain's share is half a percentage point, which is wider than the rounding a 1.0e9-token
+    integer allocation can produce and far narrower than the gap between a token share and a document
+    share. It is disclosed in instruction.md, so it is a published task parameter rather than a ramp constant.
+  build_wall_seconds: 1200
+  train_wall_seconds: 900
+  ngram_width: 13
+  interleave_blocks: 8
+  interleave_blocks_basis: 'AUTHORED at Phase 0. Eight equal consecutive blocks of the emitted record
+    order, each required to contain all four domains: coarse enough that a genuinely interleaved curriculum
+    passes at any record length above a few hundred, fine enough that a four-block concatenation fails
+    in its first block. Disclosed in instruction.md.'
+  decoy_tokens:
+  - quality_score
+  - quality_classifier
+  - dataset_card
+  - model_card
+  - published_mixture
+  - the_pile
+  - redpajama
+  - dolma
+  decoy_tokens_basis: the two real reference carriers the environment ships, plus the names of the published
+    mixture tables the archetype expects to be recalled; a selection_evidence block citing only these
+    has asserted a prior over a measurement it could have made
+  zero_reasons:
+  - no-submission
+  - eval-leak
+  - foreign-content
+  - declared-mixture-divergence
+  - recipe-corpus-divergence
+  - token-budget-exceeded
+  - build-wallclock-exceeded
+  - train-wallclock-exceeded
+  - heldout-touched
+  - grading-tree-write
+  - frozen-trainer-modified
+  - submission-size-exceeded
+  - nondeterministic-submission
+items:
+- id: mixture_manifest_declares_the_four_disclosed_domains
+  dimension: mixture
+  weight: 5
+  knockout: true
+  evaluation_target: mixture_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The mixture manifest declares one sampling weight for each of the four disclosed domains
+    and for no other label.
+  judgment: 'mixture_manifest.weights carries exactly the keys web, encyclopedic, scientific and mathematical,
+    every value is a finite number in [0,1], and the four sum to 1 within 1e-9. A fifth label names a
+    domain the frozen evaluator never scores, and a missing label is not a domain the build declined to
+    use: all four are evaluated whatever the manifest says, so an undeclared domain leaves the realised-count
+    comparison with nothing to compare against and the one number that would have exposed it -- that domain''s
+    share -- is the one nobody wrote down. Divergence scores 0.0 with reason declared-mixture-divergence.'
+- id: every_domain_receives_a_nonzero_token_share
+  dimension: domain_coverage
+  weight: 4
+  knockout: false
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: All four domains reach the trainer with at least one token, and the check names any domain
+    that did not.
+  judgment: 'each of the four realised per-domain token counts, recomputed by the verifier from the emitted
+    spans rather than from the manifest, is strictly positive. Zeroing a domain is not a trade the aggregation
+    can absorb: the domain is still evaluated, its bits per byte is then whatever a model that never read
+    it scores, and it becomes the argmax by construction. seed/contract.yaml records CTL-C-OBVIOUSWRONG,
+    the 100 percent web mixture, at b_worst = 1.884 against b_rand = 1.641, so the informative ramp has
+    already clamped to zero before anything about mixture quality is examined. The empty domains are reported
+    by name, because a build that dropped the mathematical minority and one that dropped the scientific
+    minority are different mistakes.'
+- id: per_domain_weights_are_post_dedup_token_shares
+  dimension: mixture
+  weight: 5
+  knockout: true
+  evaluation_target: mixture_manifest
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Each declared weight is that domain's share of the post-deduplication token total, not its
+    share of documents and not its share of the pre-deduplication pool.
+  judgment: 'for every domain the absolute difference between the declared weight and realised_tokens
+    / total_realised_tokens is at most the disclosed tolerance of 0.005, the realised counts being recomputed
+    by tracing every emitted span to its source document digest, and mixture_manifest.weight_basis reads
+    post_dedup_tokens. When the declared vector misses that comparison the same comparison is run against
+    the per-domain document share and the pre-dedup token share and the report names whichever one it
+    does match, because that is the diagnosis: a weight computed over documents ships a mixture whose
+    token shares are set by mean document length per domain -- peS2o documents are long and open-web-math
+    documents are short -- and a weight computed before deduplication ships one whose shares are set by
+    how duplicated each source happened to be. Neither raises an error anywhere in the build. Divergence
+    scores 0.0 with reason declared-mixture-divergence.'
+- id: span_domain_read_from_the_source_manifest
+  dimension: attribution
+  weight: 5
+  knockout: true
+  evaluation_target: source_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: A span's domain is the domain its source document carries in the shipped four-corpus manifest,
+    never a label the submission asserts for it.
+  judgment: 'every emitted span triple (source_id, offset, length) resolves to a source_id the shipped
+    source manifest names, its domain is read from that manifest, and where the submission also carries
+    a per-span domain label the two agree. An unresolvable source_id is content from outside the four
+    provided corpora and scores 0.0 with reason foreign-content; a span whose asserted label disagrees
+    with the manifest scores 0.0 with reason declared-mixture-divergence. Self-labelling is the cheapest
+    possible attack on this objective: calling web spans mathematical raises the declared mathematical
+    share, satisfies every arithmetic check that compares declared weights to counted tokens, and puts
+    not one mathematical token in front of the trainer -- and mathematical is the domain the max most
+    often selects.'
+- id: repeated_spans_charged_to_the_budget_each_time
+  dimension: repetition
+  weight: 4
+  knockout: false
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: VALUE
+  criterion: A span emitted k times is charged k times against the 1.0B cap and k times toward its domain's
+    realised weight.
+  judgment: 'the four realised per-domain token counts sum exactly to the verifier''s own consumed token
+    count, and for every domain whose declared repetition_epochs exceeds 1 the realised token count strictly
+    exceeds that domain''s distinct-span token count. Controlled repetition on the smallest domain is
+    a legitimate alternative to downsampling the largest, and this slot''s reference recipe uses it, but
+    only a repetition that is paid for is a repetition: a build that counts a twice-emitted document once
+    has both understated its consumption against a hard cap and overstated the distinct coverage behind
+    its declared weight, and the two errors point the same way -- toward believing the minority domain
+    received more real text than it did.'
+- id: token_budget_counted_under_the_frozen_tokenizer
+  dimension: budget
+  weight: 5
+  knockout: true
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The consumed token count is the verifier's own encode of the emitted corpus under the frozen
+    tokenizer, and it is at most 1,000,000,000.
+  judgment: the verifier's count is at most 1000000000, the submitted consumed_tokens equals that count
+    rather than standing in for it, and the frozen tokenizer's sha256 is identical before and after the
+    graded run. The cap is a hard literal rather than a band, so it is not a figure to approach by declaration,
+    and the count and the tokenizer are checked in one place because under a fixed cap the cheapest way
+    to buy budget is to change what a token is -- merge the frequent pairs, and the same bytes cost fewer
+    tokens without a single curation decision having been made. The tokenizer is the one lever this slot
+    does not grant. Over the cap scores 0.0 with reason token-budget-exceeded; a moved tokenizer digest
+    scores 0.0 with reason frozen-trainer-modified.
+- id: cross_domain_duplicates_charged_to_one_domain
+  dimension: dedup
+  weight: 4
+  knockout: false
+  evaluation_target: mixture_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Deduplication is declared at both scopes, and no surviving document-level duplicate is attributed
+    to two different domains.
+  judgment: 'mixture_manifest.dedup names a granularity for within_domain and for across_domain, the across-domain
+    granularity is document level, and the verifier reports zero document-granularity duplicate groups
+    whose surviving copies carry more than one domain label. Web and encyclopedic overlap by construction
+    -- encyclopedic text is mirrored throughout any web crawl -- so a build that deduplicates only inside
+    each domain keeps both copies, charges one to web and one to encyclopedic, and realises a web share
+    above the one it declared while every within-domain duplicate rate still reads clean. The granularities
+    differ on purpose: paragraph level inside a domain keeps near-duplicate boilerplate from crowding
+    out the domain''s own long tail, and document level across domains is what stops the same article
+    being bought twice.'
+- id: four_domains_interleaved_across_the_single_pass
+  dimension: curriculum
+  weight: 4
+  knockout: false
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: The emission order puts all four domains in front of the trainer throughout its one pass,
+    not one domain after another.
+  judgment: 'the harness-recorded consumption order equals the emitted order over exactly one pass, and
+    each of the eight equal consecutive blocks of the emitted record order contains at least one record
+    from each of the four domains. The trainer, optimizer, schedule, seed and architecture are all frozen
+    and the corpus is consumed once, so the emission curriculum is one of the few remaining levers and
+    it is a lever with a sharp failure mode: four domains concatenated in blocks means the last steps
+    before evaluation see one domain only, and the three the schedule left behind are the three that decay
+    -- which, under a max over four, is the whole score. The blocks are reported individually so a corpus
+    that interleaves for the first half and blocks for the second says where it stopped.'
+- id: manifest_replay_reproduces_the_corpus_and_the_four_integer_counts
+  dimension: replay
+  weight: 4
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Re-executing the mixture manifest from a fresh checkout rebuilds the same corpus and the
+    same four per-domain token counts, as exact integers.
+  judgment: 'the verifier''s re-execution declares fresh_checkout true, its corpus sha256 equals the submitted
+    corpus_sha256, and its four per-domain token counts are integers equal to the four realised counts
+    exactly rather than within a tolerance. Integers and not proportions, because the two ways to realise
+    a weight vector are not equally reproducible: allocating against a floating-point proportion target
+    while a running total accumulates lands on a different fourth-domain count when the source iteration
+    order shifts by one document, which reproduces the digest nowhere and surfaces as recipe-corpus-divergence
+    long after the mixture decision that caused it. Exact integer accounting is also what lets the weight
+    comparison above compare integers.'
+- id: heldout_thirteen_grams_absent_in_every_domain
+  dimension: leakage
+  weight: 5
+  knockout: true
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: No normalised 13-gram of the emitted corpus is in the held-out fingerprint set, and the count
+    is zero in each of the four domains separately.
+  judgment: 'the scan is the verifier''s own over the whole emitted corpus, at n-gram width exactly 13
+    and under the bound normalisation, against environment/decontam/heldout_fingerprints.bin, and it reports
+    zero hits for web, zero for encyclopedic, zero for scientific and zero for mathematical. Per domain
+    rather than as one rate over the corpus, because the graded value is a max: a hit count that rounds
+    to nothing corpus-wide can sit entirely inside the one domain whose bits per byte is about to be selected,
+    and that is precisely the domain where fitting the evaluation would pay. The fingerprint set covers
+    a rotating private superset of the graded shards, so a clean scan recorded on an earlier attempt is
+    not evidence about this one. Any hit scores 0.0 with reason eval-leak.'
+- id: frozen_tokenizer_trainer_and_four_heldout_shards_unmoved
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: frozen_grading_tree
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The graded run leaves the frozen trainer, the frozen tokenizer, the four private per-domain
+    held-out shards and the fingerprint file byte-identical and untouched.
+  judgment: 'the before and after digest maps name the same paths -- the frozen trainer, the frozen tokenizer,
+    tests/heldout/web.bin, tests/heldout/encyclopedic.bin, tests/heldout/scientific.bin, tests/heldout/mathematical.bin
+    and environment/decontam/heldout_fingerprints.bin -- and agree digest for digest, and the harness''s
+    own record of paths touched during the graded run is empty. Both facts come from the record the run
+    produced, never from a scan taken afterwards, which cannot separate a write made inside the graded
+    region from one made before it. The four shards are named one by one because they are disjoint partitions
+    that rotate on a private schedule and each one is a different domain''s evaluation: reading exactly
+    one of them is how a run would learn which domain is currently the worst, which is the single fact
+    the returned float is built to withhold. A touched path scores 0.0 with reason heldout-touched; a
+    moved digest scores 0.0 with reason frozen-trainer-modified.'
+- id: selection_policy_rests_on_its_own_measurement
+  dimension: measurement
+  weight: 4
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The weight and selection decision rests on a measurement the run made here, not only on the
+    two real reference artifacts the environment ships.
+  judgment: 'run_record.selection_evidence names, for each of the four domains, at least one measurement
+    the run itself performed -- an estimator, a positive count of tokens scored, and the path of the artifact
+    it wrote -- and its cited_sources are not confined to the shipped per-document quality-classifier
+    score file and the upstream dataset cards. Both of those are real, unaltered and true about other
+    setups, and both endorse the same web-and-encyclopedic-heavy top-percentile selection that strips
+    mathematical and scientific text: seed/contract.yaml records CTL-C-DECOY-QC at b_worst = 1.577 and
+    CTL-C-DECOY-CARDS at 1.548, against a starter at 1.489. Two genuine artifacts agreeing is corroboration
+    of a prior, not evidence about this objective at this budget, and citing them is allowed. Citing only
+    them is the failure this check names, with reason prior-asserted-over-measurement.'
+- id: mixture_and_dual_wall_accounting_declared
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The agent declares the mixture it applied and where its wall went, and both host-measured
+    regions sit inside their own ceiling.
+  judgment: 'run_record.agent_budget_declaration parses and names build_seconds, train_seconds, per_domain_weights,
+    repetition_epochs and emission_curriculum; its per_domain_weights equal mixture_manifest.weights key
+    for key; and the host-measured build and train regions, each timed from first touch of the data, are
+    at most 1200 and 900 seconds. The declaration is what is graded and not the harness''s own measurement,
+    so no field the harness writes can satisfy it. The two ceilings are exact-zero cliffs and never slopes,
+    which is what makes the build ceiling the binding one here: a per-domain marginal-value estimation
+    pass has to fit inside it, so it is bound as a fixed step count rather than a slice of the remaining
+    time, or it expands under contention and takes the whole attempt to zero.'
+- id: worst_domain_bits_per_byte_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: emitted_corpus
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The worst of the four per-domain held-out bits-per-byte values clears the published bar through
+    the ramp.
+  judgment: 'b_worst = max(b_web, b_encyclopedic, b_scientific, b_mathematical), each the frozen evaluator''s
+    own negative log-likelihood in bits over that domain''s private held-out shard divided by the same
+    shard''s raw UTF-8 byte count, reduced by max in that fixed domain order so the argmax tie-break is
+    deterministic. All four values are required: taking the max over whichever domains happen to have
+    been reported would let a three-domain report become a graded value, and the entire objective is that
+    lifting three domains while sinking the fourth is worth nothing. Lower is better, so the ramp is read
+    in the descending direction, from a floor that is the larger bits-per-byte value to a knee that is
+    the smaller. Only the reduced float leaves the verifier; the four values and the identity of the argmax
+    domain never do, which is why the mixture cannot be steered one domain at a time. UNMEASURED AT PHASE
+    0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured before
+    it reads a submitted byte, and the slot is not gradeable until the measurement wave writes them.'
+measurement_tier: gpu
+measurement_tier_basis: trains or runs an LLM backbone
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a floor,
+    knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0 asserts
+    the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome = clamp((metric
+    - floor) / (knee - floor), 0, 1) through the published ramp.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+truth_narrative:
+  opening: 'from four real source corpora provided in the environment, build a corpus of at most 1.0B
+    tokens under the frozen tokenizer and emit it together with a mixture manifest, such that the frozen,
+    hash-pinned trainer minimises the WORST of four per-domain held-out bits-per-byte values (web, encyclopedic,
+    scientific, mathematical). Everything is disclosed: the four domains, the four held-out sources, the
+    frozen trainer, the frozen tokenizer, the step budget, the objective and all three reward constants.
+    The agent controls per-domain sampling weights, per-domain document selection and filtering, deduplication
+    granularity, per-domain repetition policy, recombination of provided documents, and emission order.
+    It controls nothing else -- in particular it does not control the tokenizer the 1.0B cap is counted
+    in. The graded artifact is written to /submission/c3s3.json and carries the emitted record ids and
+    per-record digests in emission order, the mixture manifest, the span triples every record was assembled
+    from, the corpus digest and the consumed token count. The graded quantity is b_worst = max over the
+    four domains of the per-domain held-out bits per byte produced by the frozen evaluator. A mixture
+    that lifts the mean while sinking one domain scores strictly worse, so the max-min structure is the
+    objective rather than a side constraint.'
+  insight: 'Three things carry this slot and none of them is a weight vector. FIRST, the aggregation:
+    b_worst is a MAX over four domains, so every bit bought in web at mathematics'' expense is worth exactly
+    nothing, and the four per-domain values are never returned -- the agent cannot see which domain is
+    currently worst without spending its own build budget estimating it, and which domain is worst moves
+    with the private partition rotation. Optimising the mean is the substitution this structure exists
+    to defeat, and it costs: CTL-C-MEANOPT measures b_worst = 1.518, worse than the starter''s 1.489,
+    while its mean improves. SECOND, the cap and the tokenizer are a pair. 1.0B tokens is a hard literal
+    counted by the verifier under a tokenizer the agent may not touch, so the budget cannot be widened
+    by re-tokenising, and every repeated span is charged again -- which makes controlled repetition on
+    the smallest domain a real decision with a real price rather than a free upsample. THIRD, the environment
+    corroborates the wrong answer with genuine evidence: the shipped per-document quality-classifier scores
+    and the unaltered upstream dataset cards are real artifacts, they agree with each other, they agree
+    with every published mixture table, and they endorse a web-and-encyclopedic-heavy selection that strips
+    exactly the minority domains the max then selects. Two independent real carriers agreeing is not evidence
+    about this objective at this budget. The reference recipe measures per-domain marginal value here,
+    at 1B, before it allocates anything.'
+  steps:
+  - heading: Estimate per-domain marginal value at this budget, before choosing any weight
+    paragraph: A fixed fraction of the build budget goes to a proxy estimate of what one more token of
+      each domain is worth at 1B under this trainer, and it is bound as a fixed STEP COUNT rather than
+      a time slice so it cannot expand under contention and take the attempt past the 1200 s build cliff.
+      This is the step the two decoy carriers exist to skip. Its separable worth is measured on the Phase
+      2 ladder over the full lever power set, never asserted here.
+  - heading: Allocate against the worst domain, not against aggregate loss
+    paragraph: Weights are chosen to raise the floor across the four domains rather than to lower the
+      mean, which pushes mathematical and scientific share well above every published table. Its separable
+      worth is measured on the Phase 2 ladder, never asserted here.
+  - heading: Deduplicate at paragraph granularity within domain and at document granularity across
+    paragraph: Paragraph-level inside a domain keeps boilerplate from crowding out that domain's long
+      tail; document-level across domains stops the same encyclopedic article being bought once as encyclopedic
+      and again as web, which is how a realised web share drifts above its declaration with every within-domain
+      duplicate rate still clean. Its separable worth is measured on the Phase 2 ladder, never asserted
+      here.
+  - heading: Apply the held-out fingerprint filter to normalised text
+    paragraph: The one-way 13-gram hash set is applied after normalisation, and the surviving hit count
+      is read per domain rather than as a corpus-wide rate, because a leak concentrated in one domain
+      is a leak in the domain the max is about to select. Its separable worth is measured on the Phase
+      2 ladder, never asserted here.
+  - heading: Repeat the smallest domain under a declared epoch count instead of downsampling the largest
+    paragraph: Controlled repetition buys coverage the hard cap would otherwise deny the minority domains,
+      and every repeated token is charged again against the 1.0B budget and again toward that domain's
+      realised weight, so the epoch count is declared and the arithmetic is checkable. Its separable worth
+      is measured on the Phase 2 ladder, never asserted here.
+  - heading: Recombine short scientific and mathematical fragments into full-length records
+    paragraph: Sequence length is fixed, so short records waste it on padding, and the two minority domains
+      are exactly the ones whose documents are short. Recombination is permitted because every emitted
+      byte still has to be an exact span of a provided document; rewriting is not. Its separable worth
+      is measured on the Phase 2 ladder, never asserted here.
+  - heading: Interleave the four domains across the whole single pass
+    paragraph: 'The corpus IS the data order: one pass, no shuffling, num_workers=0. Emitting four domain
+      blocks means the last steps before evaluation see one domain and the other three decay, which under
+      a max over four is the entire score. Its separable worth is measured on the Phase 2 ladder, never
+      asserted here.'
+  - heading: Realise the weights by exact integer token accounting and declare those same numbers
+    paragraph: Weights are realised as integer token allocations rather than floating-point proportion
+      targets, so the manifest re-executes to the same digest and the same four counts on a fresh checkout,
+      and the declared vector is compared against post-dedup token shares -- not document shares, not
+      pre-dedup shares. Its separable worth is measured on the Phase 2 ladder, never asserted here.
+  - heading: Leave the tokenizer, the trainer, the fingerprint file and the four shards untouched
+    paragraph: The budget is counted under the frozen tokenizer and the graded run is bounded by the two
+      wall-clock cliffs; the four private shards rotate, so reading one to learn which domain is currently
+      worst is the one shortcut that would answer the question the returned float withholds. Its separable
+      worth is measured on the Phase 2 ladder, never asserted here.
+  traps:
+  - Asserting a memorised published mixture (Pile, RedPajama, Dolma proportions or upsample-Wikipedia
+    folklore) without measuring, and landing at or below the starter.
+  - Optimising the mean instead of the max-min, which the withheld per-domain breakdown makes easy to
+    do by accident and expensive to detect.
+  - Following the shipped quality-classifier endorsement, which improves web and encyclopedic while sinking
+    mathematics, the domain that then defines b_worst.
+  - Declared weights diverging from realised token counts because weights were computed over documents
+    or pre-deduplication, scoring exactly 0.0 with reason declared-mixture-divergence.
+  - Spending the attempt budget on a four-dimensional weight sweep that random search would already have
+    covered, leaving selection, dedup granularity, repetition policy and emission order untouched.
+  - Downloading external data despite the corpus being environment-provided, scoring exactly 0.0 with
+    reason foreign-content.
+  - 'Lookup shortcut: published mixture tables and published quality-filter cascades are memorised and
+    directly quotable. Mitigation: The published-style mixture is shipped as the starter and scores exactly
+    0.10. The graded objective is worst-domain bits per byte at a 1B-token budget under a frozen trainer,
+    which no published table optimises for, and the environment''s own real corroborating artifacts point
+    at the wrong answer, so retrieval is actively penalised rather than merely unhelpful.'
+  - 'The dominant OPT3 structural risk: a four-dimensional mixture simplex is exactly the flag space where
+    SMAC, TPE and random search beat every frontier agent in the anchor. Mitigation: CTL-C-SEARCH is a
+    refusal condition, not a diagnostic: if classical search over the documented flag space reaches tau
+    at authoring, the slot is refused and re-scoped. The reference advantage is placed deliberately outside
+    any flag space, in per-domain selection, dedup granularity, repetition policy and emission curriculum,
+    and CTL-C-ABLATION proves no single exposed constant carries the delta.'
+  - 'Fitting the evaluation by including held-out-like content. Mitigation: CHK-C4 zeroes any emitted
+    13-gram hitting the held-out fingerprint set, and CHK-C7 requires every emitted byte to trace to an
+    exact span of a provided source document, so recombination is permitted but rewriting and importing
+    are not.'
+  - 'Downloading additional data under the open solver egress grant. Mitigation: CHK-C7 span containment
+    makes foreign content a checkable exact-zero with reason foreign-content, which is what makes open
+    egress safe here; egress remains available for packages, tooling and pretrained components, per the
+    requirements/aello-prd.md reconciliation.'
+  - 'Self-reported per-domain numbers in the attempt log. Mitigation: The reward comes only from the verifier''s
+    own re-execution and evaluator, and the per-domain breakdown is never returned, so a self-reported
+    breakdown cannot enter the graded path.'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `cross_domain_duplicates_charged_to_one_domain` (compiled, weight 4) -- Deduplication is declared
+  at both scopes, and no surviving document-level duplicate is attributed to two different domains.
+
+
+  2. `every_domain_receives_a_nonzero_token_share` (compiled, weight 4) -- All four domains reach the
+  trainer with at least one token, and the check names any domain that did not.
+
+
+  3. `four_domains_interleaved_across_the_single_pass` (compiled, weight 4) -- The emission order puts
+  all four domains in front of the trainer throughout its one pass, not one domain after another.
+
+
+  4. `frozen_tokenizer_trainer_and_four_heldout_shards_unmoved` (compiled, weight 5, knockout) -- The
+  graded run leaves the frozen trainer, the frozen tokenizer, the four private per-domain held-out shards
+  and the fingerprint file byte-identical and untouched.
+
+
+  5. `heldout_thirteen_grams_absent_in_every_domain` (compiled, weight 5, knockout) -- No normalised 13-gram
+  of the emitted corpus is in the held-out fingerprint set, and the count is zero in each of the four
+  domains separately.
+
+
+  6. `manifest_replay_reproduces_the_corpus_and_the_four_integer_counts` (compiled, weight 4) -- Re-executing
+  the mixture manifest from a fresh checkout rebuilds the same corpus and the same four per-domain token
+  counts, as exact integers.
+
+
+  7. `mixture_and_dual_wall_accounting_declared` (compiled, weight 3) -- The agent declares the mixture
+  it applied and where its wall went, and both host-measured regions sit inside their own ceiling.
+
+
+  8. `mixture_manifest_declares_the_four_disclosed_domains` (compiled, weight 5, knockout) -- The mixture
+  manifest declares one sampling weight for each of the four disclosed domains and for no other label.
+
+
+  9. `per_domain_weights_are_post_dedup_token_shares` (compiled, weight 5, knockout) -- Each declared
+  weight is that domain''s share of the post-deduplication token total, not its share of documents and
+  not its share of the pre-deduplication pool.
+
+
+  10. `repeated_spans_charged_to_the_budget_each_time` (compiled, weight 4) -- A span emitted k times
+  is charged k times against the 1.0B cap and k times toward its domain''s realised weight.
+
+
+  11. `selection_policy_rests_on_its_own_measurement` (compiled, weight 4) -- The weight and selection
+  decision rests on a measurement the run made here, not only on the two real reference artifacts the
+  environment ships.
+
+
+  12. `span_domain_read_from_the_source_manifest` (compiled, weight 5, knockout) -- A span''s domain is
+  the domain its source document carries in the shipped four-corpus manifest, never a label the submission
+  asserts for it.
+
+
+  13. `token_budget_counted_under_the_frozen_tokenizer` (compiled, weight 5, knockout) -- The consumed
+  token count is the verifier''s own encode of the emitted corpus under the frozen tokenizer, and it is
+  at most 1,000,000,000.
+
+
+  14. `worst_domain_bits_per_byte_ramp` (compiled, weight 10, knockout) -- The worst of the four per-domain
+  held-out bits-per-byte values clears the published bar through the ramp.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - Lookup shortcut: published mixture tables and published quality-filter cascades are memorised and
+  directly quotable. -- controlled by: The published-style mixture is shipped as the starter and scores
+  exactly 0.10. The graded objective is worst-domain bits per byte at a 1B-token budget under a frozen
+  trainer, which no published table optimises for, and the environment''s own real corroborating artifacts
+  point at the wrong answer, so retrieval is actively penalised rather than merely unhelpful.
+
+  - The dominant OPT3 structural risk: a four-dimensional mixture simplex is exactly the flag space where
+  SMAC, TPE and random search beat every frontier agent in the anchor. -- controlled by: CTL-C-SEARCH
+  is a refusal condition, not a diagnostic: if classical search over the documented flag space reaches
+  tau at authoring, the slot is refused and re-scoped. The reference advantage is placed deliberately
+  outside any flag space, in per-domain selection, dedup granularity, repetition policy and emission curriculum,
+  and CTL-C-ABLATION proves no single exposed constant carries the delta.
+
+  - Fitting the evaluation by including held-out-like content. -- controlled by: CHK-C4 zeroes any emitted
+  13-gram hitting the held-out fingerprint set, and CHK-C7 requires every emitted byte to trace to an
+  exact span of a provided source document, so recombination is permitted but rewriting and importing
+  are not.
+
+  - Downloading additional data under the open solver egress grant. -- controlled by: CHK-C7 span containment
+  makes foreign content a checkable exact-zero with reason foreign-content, which is what makes open egress
+  safe here; egress remains available for packages, tooling and pretrained components, per the requirements/aello-prd.md
+  reconciliation.
+
+  - Self-reported per-domain numbers in the attempt log. -- controlled by: The reward comes only from
+  the verifier''s own re-execution and evaluator, and the per-domain breakdown is never returned, so a
+  self-reported breakdown cannot enter the graded path.
+
+
+  Deliverable manifest: /submission/c3s3.json (json), an object whose ids and outputs lists carry the
+  emitted record ids and their per-record byte digests in emission order, alongside mixture_manifest (weights
+  over the four domains, weight_basis, repetition_epochs, dedup granularities, per-domain selection and
+  the emission curriculum), spans (the source_id/offset/length triples each record is assembled from),
+  corpus_sha256 and consumed_tokens.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-C-NOOP-EMPTY` targets Submitting nothing / leaving the environment unchanged.; recorded score
+  0.
+
+  - `CTL-C-NOOP-STARTER` targets Resubmitting the shipped starter byte-for-byte (published-style mixture
+  plus published-style quality filtering), i.e. a legal in-budget run that moves b_worst not at all.;
+  recorded score 0.1.
+
+  - `CTL-C-STALE` targets Carrying attempt k''s mixture manifest and corpus forward after the held-out
+  partition rotated; b_worst = 1.503 in the weight-consistent variant. The weight-divergent variant fires
+  CHK-C5 with reason declared-mixture-divergence and scores 0.000; 0.091 is the conservative maximum of
+  the class.; recorded score 0.091.
+
+  - `CTL-C-DECOY-QC` targets Decoy carrier one, majority endorsement: selecting the top percentile by
+  the shipped real public per-document quality-classifier score file. It is a genuine artifact that is
+  true about other setups and wrong here, because it strips mathematical and scientific text, so b_worst
+  (mathematical) degrades to 1.577.; recorded score 0.042.
+
+  - `CTL-C-DECOY-CARDS` targets Decoy carrier two, independent corroboration: following the published
+  mixture guidance in the shipped real, unaltered upstream dataset cards, which is web-heavy and optimises
+  aggregate rather than worst-domain loss; b_worst = 1.548. Two independent real carriers agreeing is
+  the trap this control instruments.; recorded score 0.061.
+
+  - `CTL-C-LISTALL` targets Emitting all four sources whole in natural order and truncating at 1.0B tokens,
+  so the minority domains collapse; b_worst = 1.598.; recorded score 0.028.
+
+  - `CTL-C-OBVIOUSWRONG` targets A 100 percent web mixture, the by-construction-wrong deliverable; b_worst
+  (mathematical) = 1.884, above b_rand = 1.641, so the informative ramp clamps to zero.; recorded score
+  0.
+
+  - `CTL-C-SEARCH` targets Slot-specific and the highest-risk control in this slot: 50-trial random plus
+  TPE search over the four-simplex mixture weights alone, with selection, dedup granularity, repetition
+  policy, recombination and emission curriculum all left at starter values; best-of-50 reaches b_worst
+  = 1.472. REFUSAL CONDITION: compute_envelope records that the four-simplex alone is searchable at this
+  attempt budget, so if this control measures at or above tau = 0.30 at authoring the slot is refused
+  at authoring rather than the threshold moved.; recorded score 0.224.
+
+  - `CTL-C-MEANOPT` targets Slot-specific, the objective-substitution shortcut the max-min structure exists
+  to defeat: optimising MEAN bits per byte across the four domains instead of the worst. The mean improves
+  and mathematical sinks, so b_worst = 1.518, worse than the starter''s 1.489.; recorded score 0.081.
+
+  '
+provenance:
+  corpus: 'Four real, separately licensed, environment-provided corpora, each pinned by Hugging Face dataset
+    revision SHA at authoring and written into environment/data/ with SHA-256 manifests: web from `allenai/c4`
+    config en (ODC-By 1.0, underlying Common Crawl terms recorded), encyclopedic from `wikimedia/wikipedia`
+    config 20231101.en (CC BY-SA, GFDL), scientific from `allenai/peS2o` (ODC-By 1.0), mathematical from
+    `open-web-math/open-web-math` (ODC-By 1.0). Total raw about 30 GB, roughly balanced by byte volume
+    so the mixture decision is not forced by availability. Four private per-domain evaluation shards are
+    disjoint partitions of the same four pinned snapshots, written only into tests/heldout/. environment/decontam/heldout_fingerprints.bin
+    ships a one-way normalised 13-gram hash set over all four held-out shards. environment/reference/
+    ships the real, unaltered upstream dataset cards and a real public per-document quality-classifier
+    score file, which are genuine artifacts rather than fabricated ones; they are true about other setups
+    and wrong for this objective. Code corpora are deliberately excluded from the design because the Stack
+    lineage is a named exclusion-list baseline row.'
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build time.
+      Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as the task-generating
+      event and never inherits the upstream freeze date, so authoring a date here before the derivation
+      runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: 'Four real, separately licensed, environment-provided corpora, each pinned by Hugging
+      Face dataset revision SHA at authoring and written into environment/data/ with SHA-256 manifests:
+      web from `allenai/c4` config en (ODC-By 1.0, underlying Common Crawl terms recorded), encyclopedic
+      from `wikimedia/wikipedia` config 20231101.en (CC BY-SA, GFDL), scientific from `allenai/peS2o`
+      (ODC-By 1.0), mathematical from `open-web-math/open-web-math` (ODC-By 1.0). Total raw about 30 GB,
+      roughly balanced by byte volume so the mixture decision is not forced by availability. Four private
+      per-domain evaluation shards are disjoint partitions of the same four pinned snapshots, written
+      only into tests/heldout/. environment/decontam/heldout_fingerprints.bin ships a one-way normalised
+      13-gram hash set over all four held-out shards. environment/reference/ ships the real, unaltered
+      upstream dataset cards and a real public per-document quality-classifier score file, which are genuine
+      artifacts rather than fabricated ones; they are true about other setups and wrong for this objective.
+      Code corpora are deliberately excluded from the design because the Stack lineage is a named exclusion-list
+      baseline row.'
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or a
+      task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with this
+      named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+canary:
+- AELLO-CANARY-8744360d91db45812d67665d13e20b58
+- AELLO-CANARY-c12b10ae407bd50f4f48271d330cff5f
+- AELLO-CANARY-3aba704d47bee1659ee9cab8c16fde3e
+- AELLO-CANARY-92099da58ec3069114806be918df2fd7
+
+canary:
+  - AELLO-CANARY-f42c199cd5a0d3d34bcae0194d0a49cb
+  - AELLO-CANARY-e5dda9fc7062a2acc5607acd68841fc0
+  - AELLO-CANARY-c334cff533ec729899ef99136cfa6e30
+  - AELLO-CANARY-2f96edbdd8a3d045c2102804507a2679

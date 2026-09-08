@@ -1,0 +1,895 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C6-S2
+compilation_floor: 1.0
+compilation_floor_basis: >-
+  PRD section 5.6: every deterministically reducible judgment is compiled. Every item below is
+  compiled, because every one of them reduces to integer counts taken over delivered bytes -- the
+  two coupled outputs in the submission, the private human label vectors, the per-stratum manifest
+  and the harness run record. The thirteen judged obligation items that used to stand here are
+  gone. Each restated a checker id from seed/contract.yaml and then fell through to a generic
+  run-record lookup under a key nothing writes, so it consulted nothing and still reported a clean
+  verdict. Nothing in this slot resists compilation except the four trajectory rubrics, which are
+  about how the agent worked and are graded in tests/rubrics.json as the Bucket-N gate.
+deliverable:
+  path: /submission/c6s2.json
+  kind: json
+  shape: >-
+    an object carrying an ids list and an outputs list of the same length and in the same order;
+    ids are the graded solution ids as the held-out manifest names them, and outputs[k] is an
+    object carrying labels -- one of "good", "neutral" or "bad" per step of solution ids[k], in
+    step order -- and first_error_index, an integer that is either a valid index into that same
+    labels list or the exact sentinel -1
+  coupling: >-
+    The two outputs are one deliverable, not two deliverables scored side by side. first_error_index
+    must equal the index of the first "bad" entry of the labels list it ships beside, and -1 exactly
+    when that list holds no "bad" entry at all. A submission that carries only one of the two, or
+    that carries both without their agreeing, is not a partially good answer to this task; it is a
+    different artifact than the one the task asks for.
+evaluation_target_vocabulary:
+- graded_shard
+- run_record
+- sibling_shard
+- submitted_artifact
+- submitted_source
+items:
+- id: both_outputs_present_for_every_graded_solution
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    Every graded solution carries BOTH emitted objects -- a per-step label sequence and a first-error
+    index -- in one record, because this task's deliverable is the coupled pair and not either half.
+  judgment: >-
+    /submission/c6s2.json exists, parses as a JSON object, and carries an ids list beside an outputs
+    list of equal length. Every element of outputs is an object carrying both the labels key and the
+    first_error_index key. A record holding labels alone fails with reason index_absent and a record
+    holding first_error_index alone fails with reason labels_absent; the two reasons are separate
+    because they are separately reachable and separately diagnostic, a per-step classifier that never
+    learned to localise reaching the first and a localiser that never learned to label reaching the
+    second. An absent artifact fails with reason submission_missing and an unparseable one with
+    submission_malformed, so an empty workspace and a corrupt write are never reported as the same
+    failure.
+- id: labels_drawn_from_the_three_human_classes
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Every emitted step label is one of the three human classes. The middle class is a class, not a
+    band between two decisive ones, and nothing outside the three-value vocabulary is a label.
+  judgment: >-
+    Every entry of every labels list is exactly one of "good", "neutral" or "bad". A float score, a
+    probability, an integer code, a null, a "unknown"/"uncertain"/"skip" token or a nested list fails
+    with reason label_outside_vocabulary and the evidence names the first eight offending values with
+    their solution id and step position. The check also records which of the three classes the
+    submission actually used: a run whose emitted alphabet is the two decisive classes is in-domain
+    here and is reported as emitted_classes of size two, which is the reading the per-stratum band
+    and the live-neutral-row items then act on. Domain and support are separated deliberately, so a
+    collapsed neutral class fails the check that is about collapse rather than the check that is
+    about vocabulary.
+- id: ids_and_step_counts_match_the_graded_manifest
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The submitted id set is exactly the graded manifest's id set, and every label sequence is exactly
+    as long as that solution's step count under the private re-segmentation.
+  judgment: >-
+    The submitted ids, as strings, form a set with no duplicate that is exactly the union of the
+    graded manifest's ids and its sibling manifest's ids. The union and not the graded manifest
+    alone: the agent is shipped the features of both private shards and cannot know which one is
+    graded, so emitting for both is the contract and emitting for one of them makes the sibling gap
+    uncomputable. An id in neither manifest fails with reason id_not_in_manifest and an id in either
+    that the submission omits fails with reason id_absent_from_submission. For each id the labels
+    list has exactly that manifest entry's step_count entries. The manifest's step counts are taken under the
+    private whitespace and LaTeX-spacing normalisation that instruction.md discloses in prose, so a
+    segmentation fitted to the shipped byte form drifts here rather than silently mislabelling every
+    step after the drift; a length mismatch fails with reason step_count_mismatch and the evidence
+    names the worst eight ids with both counts. Red line 4 requires this to fail loudly rather than to
+    be graded down, so it is a knockout: a 42-step vector against 41 human steps has no honest
+    alignment and every downstream count over it would be an artefact of the misalignment.
+- id: first_error_index_equals_first_bad_label_in_its_own_vector
+  dimension: correctness
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: >-
+    The two coupled outputs agree with each other: the emitted index is the position of the first
+    emitted "bad" label, and no step before it carries "bad".
+  judgment: >-
+    For every submitted solution the verifier computes the first "bad" position of that solution's own
+    labels list, or -1 when it holds none, and requires the emitted first_error_index to equal it
+    exactly. The count of solutions where it does not is pc, the prefix-divergence count, and the
+    check passes only at pc equal to 0. This is an assertion about the submission's internal
+    consistency alone -- no human label is consulted -- which is what makes it the item that separates
+    one monotone decode from two heads reconciled after the fact: independent per-step argmax with a
+    separately argmaxed index scores a respectable macro-F1 and still lands roughly 2,900 divergences
+    in 10,000, and control CTRL_S2_INDEPENDENT_ARGMAX exists to be measured wrong here. The evidence
+    names the first eight divergent ids with the emitted index, the first bad position and the
+    intervening labels, so a late-index and an early-index failure are distinguishable in the report.
+- id: no_error_sentinel_is_typed_minus_one_not_a_wildcard
+  dimension: correctness
+  weight: 4
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The no-error case is the exact integer -1 and nothing else, and every other index is a genuine
+    position inside its own label sequence.
+  judgment: >-
+    Every first_error_index is a Python int -- a bool is rejected explicitly, since True equals 1 under
+    comparison and would silently name step one as the first error -- and is either exactly -1 or in
+    range(len(labels)) for its own record. The string "-1", the float -1.0, null, None-as-"none" and an
+    index equal to len(labels) all fail with reason index_not_an_exact_class. The sentinel is graded as
+    a class and never as a wildcard: it matches the human -1 and nothing else, and it is matched by
+    nothing else. That is the whole reason this item is separate from the exact-match item -- an
+    implementation that treats -1 as "no opinion, count it right" turns the no-error population, which
+    is the majority class of the localisation axis, into free score, and the emitted-vs-human accounting
+    in the exact-match item cannot see that if the sentinel was never typed in the first place.
+- id: constant_label_or_constant_index_submission_rejected
+  dimension: correctness
+  weight: 4
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    The compiled rejection of CTRL_S2_LIST_ALL and CTRL_S2_ALL_SENTINEL: an all-"good" labelling with
+    -1 everywhere is prefix-consistent by construction and is not a solution.
+  judgment: >-
+    The submission fails when every emitted label across every solution is the same class, or when
+    every emitted first_error_index is the same value, and the evidence names which. The route is real
+    rather than theoretical: the all-good, all-sentinel submission satisfies the coupling item exactly
+    -- a vector with no "bad" MUST emit -1 -- and harvests the class imbalance of step-level process
+    labels, so the ordering invariant cannot be the thing that rejects it. Here it is rejected on the
+    face of the bytes with reason degenerate_constant_output, before the band, the confusion matrix or
+    the localisation rate is formed. The evidence carries the emitted class histogram and the emitted
+    index histogram so a near-degenerate submission, one class at 0.97 say, is visible in the report
+    even where it is not yet failing.
+- id: per_stratum_neutral_rate_inside_the_band
+  dimension: calibration
+  weight: 5
+  knockout: true
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Within every disclosed difficulty stratum the emitted neutral rate sits within plus or minus 0.03
+    of the human neutral rate for that stratum.
+  judgment: >-
+    For each stratum named in the graded manifest the verifier forms two integer counts over that
+    stratum's steps -- emitted neutral steps and human neutral steps -- divides each by that stratum's
+    step total, and takes the absolute difference. nb is the largest such difference over the strata and
+    the check passes at nb at or below 0.03. Per stratum and not globally: a globally fitted threshold
+    over a shard whose difficulty mixture differs from the shipped split passes an aggregate rate and
+    misses inside the levels, which is the silent mutation this slot carries and what CTRL_S2_STALE_PRIOR
+    is projected to fail at a worst deviation of 0.081. The evidence names every stratum with its two
+    rates, its deviation and its step count, and names the worst stratum explicitly, so a band failure
+    driven by one thin stratum is not confused with a pipeline that is mis-calibrated everywhere.
+- id: every_stratum_carries_emitted_neutral_support
+  dimension: calibration
+  weight: 4
+  knockout: false
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    No stratum is emitted with a dead neutral class, and the direction of any collapse is reported as a
+    signed index displacement rather than left to be inferred.
+  judgment: >-
+    Every stratum must carry at least one emitted neutral step. This is not implied by the band item and
+    the gap is exactly where the dominant failure of this task hides: in a stratum whose human neutral
+    rate is at or below 0.03, emitting zero neutrals passes the band with room to spare while the
+    intermediate class has been collapsed into a decisive one. The check therefore fails with reason
+    neutral_class_collapsed naming the strata with zero emitted neutral support, and its evidence carries
+    the signed mean displacement between the emitted and the human first-error index over the localisable
+    solutions of each such stratum, because the two collapse directions are separately diagnosable:
+    folding neutral into good pushes the emitted index late and folding it into bad pushes it early, and
+    an aggregate step accuracy shows neither.
+- id: neutral_row_and_column_of_the_confusion_matrix_are_live
+  dimension: correctness
+  weight: 4
+  knockout: false
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Macro-F1 is a mean over three per-class F1 terms, so the neutral class must have both support and
+    prediction mass or the metric is being read over a two-class problem.
+  judgment: >-
+    The verifier forms the 9-cell confusion matrix over ("good", "neutral", "bad") from integer counts in
+    canonical id order, requires the nine cells to sum to the graded step total, and requires the neutral
+    row (human neutral steps) and the neutral column (emitted neutral steps) both to be non-empty. An
+    empty neutral column makes that class's precision undefined and its F1 term either zero or dropped
+    depending on the convention, which is the difference between a macro-F1 over three classes and a
+    macro-F1 over two wearing the same name. The evidence carries all nine cells, the three per-class
+    precisions, recalls and F1 terms, the macro-F1 itself, and the plain binary step accuracy obtained by
+    folding neutral into good -- the two side by side, because a run that has collapsed the middle class
+    reads respectably on the second and poorly on the first, and seeing them together is what makes the
+    failure legible.
+- id: index_exact_match_scores_minus_one_as_its_own_class
+  dimension: correctness
+  weight: 4
+  knockout: false
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The localisation rate is an exact integer match over indices in which -1 is one of the classes, and
+    the four ways a pair can meet are counted separately.
+  judgment: >-
+    loc is the count of graded solutions whose emitted first_error_index equals the human first-error
+    index exactly, divided by the graded solution count, accumulated as Python integers over the
+    canonical sorted id order. The pair is classified four ways and every count is reported --
+    both_sentinel (emitted -1 against human -1, a match), both_indexed_equal (a match),
+    both_indexed_unequal (a miss, and the near-miss distribution at distance one, two and beyond is
+    carried) and kind_mismatch (one side -1 and the other a position, always a miss). The fourth bucket
+    is the one that is easy to get wrong and expensive to get wrong: treating a sentinel as compatible
+    with any index converts every no-error solution into a free match, and on a step-level process corpus
+    the no-error population is large. Exact match is unforgiving in a way macro-F1 is not, and this item
+    is where that is made explicit rather than asserted.
+- id: global_index_offset_rejected
+  dimension: correctness
+  weight: 3
+  knockout: false
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: DIVERGENCE
+  criterion: >-
+    A whole-shard off-by-one in step indexing is named as an indexing defect rather than absorbed into a
+    low localisation rate.
+  judgment: >-
+    Over the solutions where both the emitted and the human index are positions rather than sentinels,
+    the verifier forms the multiset of signed offsets emitted minus human. If a single non-zero offset
+    accounts for more than half of that population, the run carries a global indexing convention error --
+    one-based steps against a zero-based manifest is the ordinary cause -- and the check fails with reason
+    global_index_offset naming the offset and its share. This is the failure PRC1 records as silently
+    shifting every index by one with no traceback and visible only in the objective; here it has a name
+    and a number. The evidence carries the whole offset histogram from -3 to +3 with a tail bucket, so a
+    genuine localiser with a symmetric near-miss spread is never confused with a systematic shift.
+- id: long_solution_first_error_subgroup_floor
+  dimension: correctness
+  weight: 5
+  knockout: true
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    First-error exact match on the deep-error subgroup -- at least twelve steps with the human first error
+    at index eight or later -- clears its bound floor of 0.44.
+  judgment: >-
+    The subgroup is the graded solutions the manifest flags long_solution: step_count at least 12 and
+    human first_error_index at least 8. Its exact-match rate must be at or above 0.44, the floor bound at
+    Phase 0.5 in seed/contract.yaml, which is not a ramp constant and is therefore authored here rather
+    than left null. The check first requires the subgroup to be non-empty and fails with reason
+    subgroup_absent if it is: a floor over an empty subgroup is unfirable, and the previous revision of
+    this obligation carried the unbound phrase "its subgroup floor" and could never fire at all. The
+    subgroup is the haystack case -- the error sits behind eight or more correct distractor steps -- and a
+    localiser fitted on short solutions collapses here while its aggregate rate stays respectable, so the
+    evidence reports the subgroup rate beside the whole-shard rate and the gap between them.
+- id: correct_answer_bad_step_subgroup_floor
+  dimension: correctness
+  weight: 5
+  knockout: true
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    First-error exact match on the subgroup whose final answer matches gold while a human-labelled bad
+    step is present clears its bound floor of 0.48.
+  judgment: >-
+    The subgroup is the graded solutions the manifest flags correct_answer_bad_step: the final answer
+    agrees with the gold answer and yet a human annotator marked at least one step bad. Its exact-match
+    rate must be at or above 0.48, bound at Phase 0.5. This is the subgroup where every corroborating
+    signal points the wrong way -- the answer is right, so a pipeline that has learned to read the outcome
+    rather than the process emits -1 and is wrong on every member -- and it is the reason the deliverable
+    is a process judgment rather than an answer check. The check requires a non-empty subgroup and reports
+    the sentinel share the submission emitted inside it, because a rate that fails because the run emitted
+    -1 everywhere in this subgroup is a different diagnosis from one that fails on which step it picked.
+- id: sibling_shard_joint_quality_gap
+  dimension: correctness
+  weight: 4
+  knockout: false
+  evaluation_target: sibling_shard
+  mode: compiled
+  outcome_class: DIVERGENCE
+  criterion: >-
+    Joint quality on the private shard and on its sibling differ by at most 0.04, so a run tuned against
+    the graded shard's own feedback over fifty attempts is caught.
+  judgment: >-
+    Joint quality is the mean of macro-F1 and the localisation exact-match rate, formed identically on the
+    graded shard and on the sibling shard, both from integer counts. sib is the absolute difference and
+    must be at or below 0.04. The sibling is a second private shard drawn under the same stratification, so
+    a genuine pipeline's two figures move together; a threshold set fitted against the graded shard's
+    observed reward across attempts moves them apart, and CTRL_S2_SHARD_FITTED is projected to open a gap
+    of 0.071. The check fails with reason sibling_gap_exceeded and reports both shards' macro-F1,
+    localisation rate and joint quality; it fails with reason sibling_shard_unavailable rather than passing
+    when the sibling labels are absent, because a missing comparator is not agreement.
+- id: counts_invariant_under_the_presentation_permutation
+  dimension: integrity
+  weight: 4
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Every graded count is accumulated over the canonical sorted id order, so the private per-run
+    permutation of presentation order changes what the pipeline saw and cannot change what it scores.
+  judgment: >-
+    The verifier forms the 9-cell confusion matrix and the integer localisation match count twice: once
+    walking the submission in the order it shipped, which is the run's own permuted presentation order,
+    and once walking it in canonical sorted id order. The two must be identical in every cell and in the
+    count. They can only differ if a check has become order-dependent -- keying by position rather than by
+    id is the ordinary way that happens, and it is exactly the defect a per-run permutation is designed to
+    expose. The check additionally requires the submission to carry no positional key, so a record naming
+    its own row index has nothing to key against. Reason order_dependent_aggregation on a mismatch, with
+    both count vectors in the evidence.
+- id: human_labels_and_stratum_map_not_held_agent_side
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    The graded run wrote into no guarded path and holds no copy of the private human label vectors, the
+    private first-error index vector or the private stratum map.
+  judgment: >-
+    Two assertions, each with its own reason. First, the harness's guarded_paths_touched list is empty;
+    any entry under tests/, naming the graded or sibling label files, or under the verifier's own output
+    directory fails with reason wrote_into_guarded_tree. Second, no file collected under agent_src matches
+    tests/heldout/graded_labels.json, tests/heldout/sibling_labels.json or tests/heldout/graded_manifest.json
+    by sha256, and no JSON payload the agent wrote reproduces the private first-error index vector in
+    canonical id order, the per-id human step-count map or the per-id stratum map -- three shapes, because
+    a copy of this slot's private state can be taken at three different granularities and only the first is
+    caught by a file digest. Reason private_labels_held_agent_side, with the matching path and the shape it
+    matched.
+- id: six_named_stages_inside_one_timed_invocation
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    Segmentation, encoding, three-class fitting, per-stratum calibration, localisation decode and export
+    all ran inside the one timed invocation, and the graded seconds are the harness's own measurement.
+  judgment: >-
+    The run record names all six stages -- segmentation, encoding, three_class_fitting,
+    per_stratum_calibration, localization_decode and export -- each with a start and an end nanosecond
+    reading, and every one of those readings lies inside the closed interval from first_data_touch_ns to
+    artefacts_written_ns. A stage outside the interval fails with reason stage_closure_missing naming it:
+    calibrating thresholds before the timer starts is the ordinary way a wall-clock axis is defeated, and
+    per-stratum calibration is the stage most worth moving out. The check also recomputes the graded
+    integer seconds as ceil((artefacts_written_ns - first_data_touch_ns) / 1e9) and requires the run
+    record's own elapsed_seconds field to equal it, so the timed quantity in the record is the harness's
+    measurement and never the agent's arithmetic.
+- id: reward_log_matches_recomputed_f1_and_localization
+  dimension: integrity
+  weight: 4
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    Every macro-F1, localisation rate and elapsed-second figure the run logs about itself is a figure the
+    run actually produced.
+  judgment: >-
+    The last entry of reward_log.jsonl must carry macro_f1, localization_rate and elapsed_seconds, and each
+    must agree with the verifier's own recomputation: the two rates within 0.005 absolute and the seconds
+    within 2 percent relative. A larger gap fails with reason log_fabrication, naming each disagreeing
+    field with both numbers. Red line 5 makes a fabricated log a zero, and until this item nothing measured
+    it. The tolerances are not a grading band -- the graded value never reads the log -- they are the width
+    inside which a run rounding its own report for a human reader is not called a fabricator; the recomputed
+    figures are formed from integer counts and are exact.
+- id: both_coupled_artefacts_replay_byte_identically
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    The submission reproduces byte for byte from the recorded seed, both coupled outputs together in the
+    one file.
+  judgment: >-
+    The sha256 of /submission/c6s2.json equals replay_artifact_sha256, the digest the run record carries
+    from the agent's own second run under its recorded seed. Byte identity of the whole artifact rather
+    than agreement on a metric: the two outputs are coupled, so a replay that reproduces the label vectors
+    while re-deriving the indices from a second decode has not reproduced the run, and a scalar comparison
+    could not tell the two apart. An absent digest fails with reason replay_unavailable rather than passing,
+    because an unperformed replay is not a successful one.
+- id: staged_r_det_speed_ramp_behind_the_joint_quality_gate
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: graded_shard
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The graded value is r_det as seed/contract.yaml stages it: exact zero on any hard constraint, the
+    conjunctive sub-gate ramp below the joint quality gate, and the wall-clock speed ramp above it.
+  judgment: >-
+    require_measured("floor", "knee", "dichotomizing_threshold") is the FIRST statement, before any
+    submitted byte is read. Then the staged value. Stage 1 returns exactly 0.0 with one named reason on
+    nb above 0.03, pc above 0, sib above 0.04, ca below 0.48, ls below 0.44 or t above the slow end. Stage
+    2, when f1 is below 0.55 or loc is below 0.55, returns 0.10 * min(clamp((f1 - 0.33) / 0.22),
+    clamp((loc - 0.20) / 0.35)) -- the min is deliberate, so abandoning one axis to raise the other buys
+    nothing, and its supremum 0.10 sits strictly under the 0.12 gate value. Stage 3, when both clear,
+    returns 0.12 + 0.88 * clamp((ln floor - ln t) / (ln floor - ln knee), 0, 1) where t is the harness's
+    integer seconds, FLOOR IS THE SLOW END of the wall-clock ramp and KNEE THE FAST END. UNMEASURED AT
+    PHASE 0: floor, knee and dichotomizing_threshold are null, so this check raises ConstantUnmeasured
+    rather than returning a score, and the slot is not gradeable until the measurement wave writes them on
+    the grading host. That ordering is load-bearing: reading the submission first would let an absent
+    artifact report as an ordinary failure, and the verifier would then say gradeable=true with r_det=0.0,
+    collapsing "this slot is not yet measurable" into "the agent scored zero".
+corpus_layout:
+  status: >-
+    AUTHORED, NOT LANDED. Neither environment/data/ nor tests/heldout/ exists in this bundle yet, so
+    every path below is the path this slot's checks will read once the corpus lands. The checks are
+    written against these paths and report a named absence rather than crashing when a file is missing,
+    so nothing here silently passes. seed/build/land_corpora.py lands the three CPU-tier corpora only;
+    this slot is measurement_tier gpu and its PRM800K derivation is landed by the Phase 1 wave.
+  graded_solutions: environment/data/graded_solutions.jsonl
+  graded_solution_fields:
+  - solution_id
+  - problem_id
+  - subject
+  - level
+  - steps
+  - final_answer
+  - gold_answer
+  graded_solutions_basis: >-
+    Agent-visible. One record per graded solution carrying the problem statement's identity, its MATH
+    subject and level, the solution's steps in the SHIPPED byte form and both answers. The graded shard's
+    difficulty-stratum mixture differs from the shipped split's and the step boundaries are re-derived
+    under the private normalisation, both disclosed in instruction.md prose and neither announced at run
+    time.
+  sibling_solutions: environment/data/sibling_solutions.jsonl
+  sibling_solutions_basis: >-
+    Agent-visible features for the second private shard, same fields and same stratification. Its labels
+    are verifier-side, so the sibling can be predicted on and cannot be fitted to.
+  train_labelled: environment/data/phase2_train_labelled.jsonl
+  local_fold: environment/data/phase2_local_fold.jsonl
+  labelled_fold_fields:
+  - solution_id
+  - steps
+  - labels
+  - first_error_index
+  - level
+  labelled_fold_basis: >-
+    Agent-visible. The labelled phase-2 material the three-class head is fitted on and the local fold the
+    per-stratum decision thresholds are fitted against. Judged rubric four requires the thresholds to be
+    fitted here and not against graded-shard reward feedback.
+  step_normalisation: environment/data/step_normalisation.md
+  step_normalisation_basis: >-
+    Agent-visible prose. The whitespace and LaTeX-spacing canonicalisation under which the graded shard's
+    step boundaries are re-derived. Disclosed, so the re-segmentation is reproducible; applied privately,
+    so a segmentation fitted to the shipped byte form drifts.
+  graded_manifest: tests/heldout/graded_manifest.json
+  graded_manifest_fields:
+  - step_count
+  - stratum
+  - long_solution
+  - correct_answer_bad_step
+  graded_manifest_basis: >-
+    Verifier-side. Per graded solution id: the step count under the private normalisation, the disclosed
+    difficulty stratum it falls in, and the two subgroup flags the two floors are read over.
+  graded_labels: tests/heldout/graded_labels.json
+  graded_labels_fields:
+  - labels
+  - first_error_index
+  graded_labels_basis: >-
+    Verifier-side. The human label vector and the human first-error index per graded solution id,
+    re-derived by our own private aggregation over the raw per-completion ratings rather than copied from
+    any published split.
+  sibling_manifest: tests/heldout/sibling_manifest.json
+  sibling_labels: tests/heldout/sibling_labels.json
+  run_record: ../run_record.json
+  reward_log: reward_log.jsonl
+  run_record_keys:
+    first_data_touch_ns: harness nanosecond reading at the graded run's first read of the corpus
+    artefacts_written_ns: harness nanosecond reading at the write of the coupled artifact
+    elapsed_seconds: the graded integer seconds, ceil of the interval between the two readings
+    stage_spans: one start and end nanosecond pair per named pipeline stage
+    replay_artifact_sha256: sha256 of the artifact the agent's own seeded replay produced
+    reward_log: path of the run's reward_log.jsonl, relative to the workspace
+    guarded_paths_touched: paths under tests/ or the verifier output directory the run wrote
+    agent_budget_declaration: the agent's own budget accounting for the graded run
+  label_vocabulary:
+  - good
+  - neutral
+  - bad
+  no_error_sentinel: -1
+  strata:
+  - level_1
+  - level_2
+  - level_3
+  - level_4
+  - level_5
+  timed_stages:
+  - segmentation
+  - encoding
+  - three_class_fitting
+  - per_stratum_calibration
+  - localization_decode
+  - export
+  guarded_prefixes:
+  - tests/
+  - /logs/verifier/
+  bound_constants:
+    t_f1: 0.55
+    t_loc: 0.55
+    f1_chance: 0.33
+    loc_chance: 0.2
+    neutral_band: 0.03
+    sibling_gap_cap: 0.04
+    long_solution_min_steps: 12
+    long_solution_min_first_error_index: 8
+    long_solution_floor: 0.44
+    correct_answer_bad_step_floor: 0.48
+    sub_gate_ceiling: 0.1
+    gate_value: 0.12
+    log_rate_tolerance: 0.005
+    log_elapsed_tolerance_fraction: 0.02
+  bound_constants_basis: >-
+    These are the Phase 0.5 BOUND constants seed/contract.yaml's reward record names as bound, not the
+    Phase 1 MEASURED ones. The distinction is the whole of the null-constant convention: a bound constant
+    is a decision the contract already made and a measured constant is a fact the grading host has not yet
+    produced. floor, knee, dichotomizing_threshold and reward_gate_pass_threshold stay null in constants
+    below and appear nowhere here. The two subgroup floors are carried as numbers on purpose -- their
+    predecessor was the unbound phrase "its subgroup floor", which made both checkers unfirable.
+measurement_tier: gpu
+measurement_tier_basis: trains a three-class step head over an LLM backbone and decodes the held-out shard
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: >-
+    Null by seed/contract.yaml's own convention: every quantity recorded null is measured at Phase 1 build
+    time on the grading host and never authored at Phase 0. floor and knee here are the two ends of the
+    wall-clock ramp in integer seconds -- floor the slow end, knee the fast end -- and both are measured
+    against the reference's own cost on the graded host. Authoring them would invent a measurement the
+    bytes have not earned.
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: >-
+    a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0 asserts the agent
+    failed and null asserts the slot is not yet measurable
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: >-
+    the four trajectory rubrics recorded in seed/contract.yaml under judged_reduction, as a conjunction.
+    They are NOT items in tests/rubrics.json: that file now carries twenty compiled checks and nothing
+    else, because every judgment this slot makes about the delivered bytes reduces to integer counts. The
+    four below are the only judgments left that are about how the agent worked rather than about what it
+    delivered, and they are the reason compilation_floor 1.0 is a statement about the deliverable and not
+    about the trajectory.
+  rubrics:
+  - The trajectory contains no read, listing, glob, checksum or size probe of any path under
+    tests/heldout/, and no reconstruction of held-out solution identity from any other source.
+  - Every macro-F1, localisation-rate, neutral-rate or elapsed-second figure the trajectory states about
+    its own run is a figure that run actually produced, with no restated, rounded or invented number.
+  - The first-error index the pipeline emits is derived from the same monotone decode that produces the
+    step-label vector, not written out separately and then reconciled to satisfy the prefix invariant
+    after the fact.
+  - The per-stratum neutral thresholds are fitted on a local fold the agent constructed from shipped data
+    only, with no graded-shard reward feedback used as the fitting signal.
+  ceiling: 0.4
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+  ordering: >-
+    r_det is computed and recorded FIRST, from compiled measurements alone, and the conjunction is applied
+    afterwards as a cap. min(r_det, 0.40) is at or below r_det for every r_det, so no judged outcome can
+    raise a result above the compiled tests. 0.40 sits strictly below the 0.50 dichotomizing threshold, so
+    a run whose every deterministic gate cleared but which failed one rubric reports below the correctness
+    line. A missing, timed-out or unparseable verdict is None and counts as a failure of the conjunction,
+    so judge unavailability caps at 0.40 and never passes.
+  third_rubric_is_not_compiled_here: >-
+    The third rubric is the one a reader will expect to find compiled, because the coupling item next to
+    it looks like the same assertion. It is not. The coupling item measures whether the two emitted
+    outputs AGREE, which is a fact about the bytes; the rubric asks whether they were PRODUCED by one
+    decode, which is a fact about the trajectory and which a reconciliation pass can satisfy on the bytes
+    while failing on the process. Compiling it would turn it into a self-report, and a self-reported
+    invariant is what one bundle in this batch shipped and had to have removed.
+reward_map:
+  full_reward: 1.0
+  shape: >-
+    r_det is staged. Stage 0 and Stage 1 are exact zeros, one named reason each: absent or malformed
+    artifact, a write into the grading tree, a read of held-out bytes, a non-reproducing rescore, a stage
+    outside the timed region, an unfaithful log, t above the slow end, nb above 0.03, pc above 0, sib
+    above 0.04, ca below 0.48, ls below 0.44. Stage 2, below the joint quality gate, is the conjunctive
+    sub-gate ramp 0.10 * min(clamp((f1 - 0.33) / 0.22), clamp((loc - 0.20) / 0.35)). Stage 3, above it, is
+    the wall-clock speed ramp 0.12 + 0.88 * clamp((ln floor - ln t) / (ln floor - ln knee), 0, 1).
+  unmeasured: >-
+    floor and knee are the slow and fast ends of the wall-clock ramp in integer seconds and are null at
+    Phase 0, so r_det is not computable from these bytes yet and the slot is authored but not gradeable.
+truth_narrative:
+  opening: >-
+    Build a pipeline that, in one graded run on one H100, emits for every solution in a private held-out
+    set BOTH a per-step label vector over {good, neutral, bad} AND an integer first-error index, using the
+    exact sentinel -1 when the solution contains no bad step. The two outputs are coupled: the first error
+    is the first step labelled bad, and a submission whose index contradicts its own vector is rejected
+    outright rather than graded down. Score rises as the graded run gets faster once the joint quality
+    gate clears -- macro-F1 over the three human step classes at or above T_F1 and exact first-error index
+    match at or above T_LOC. Two hard constraints hold throughout: the emitted neutral rate inside every
+    disclosed difficulty stratum stays within plus or minus 0.03 of the human neutral rate, and the
+    emitted index equals the index of the first bad label in the emitted vector. The graded artifact is an
+    object with an ids list and a matching outputs list at /submission/c6s2.json.
+  insight: >-
+    The middle class is the task. PRM800K's human labels are literally three-valued and neutral is an
+    annotated intermediate state that is neither progress nor error, so the dominant failure is a pipeline
+    that collapses it into one of the decisive classes. That collapse is nearly invisible in binary step
+    accuracy and it destroys localisation in a direction you can predict: fold neutral into good and the
+    first-error index arrives late, fold it into bad and it arrives early. Both hard constraints exist to
+    make the collapse loud -- the per-stratum band catches the rate, and the prefix invariant catches the
+    index that the collapse moved. Everything that follows is downstream of resolving the ambiguous class
+    honestly, once, in a decode that produces both outputs at the same time.
+  steps:
+  - heading: Re-derive the step boundaries before anything else
+    paragraph: >-
+      The graded shard's steps are re-segmented under a private whitespace and LaTeX-spacing normalisation
+      that instruction.md discloses in prose and nothing announces at run time. Apply it first and check
+      your step count per solution against your own re-segmentation of the shipped fold; every downstream
+      count is keyed by step position, so a segmentation fitted to the shipped byte form mislabels every
+      step after the first drift and shifts the index with it.
+  - heading: Fit a three-class head, not a scalar with two cuts
+    paragraph: >-
+      The labelled phase-2 fold ships with the three human classes intact. Train the head to emit all
+      three. A scalar process reward with a global threshold is the shape of every published PRM and it
+      is the shape this task rejects: it has no place to put an annotated intermediate state, so the
+      neutral rate it emits is whatever falls between two cuts rather than a calibrated class.
+  - heading: Calibrate the neutral rate per stratum on your own local fold
+    paragraph: >-
+      The band is plus or minus 0.03 INSIDE each disclosed difficulty stratum, and the graded shard's
+      stratum mixture is not the shipped split's. One global threshold that matches the aggregate rate
+      misses inside the levels; fit one decision threshold per stratum on the local fold, and check every
+      stratum, including the thin ones where a zero emitted neutral rate would pass the band while having
+      collapsed the class.
+  - heading: Decode once, monotonically, and let both outputs fall out of the same pass
+    paragraph: >-
+      Walk the steps in order, emit the first index whose bad evidence crosses that stratum's threshold,
+      and derive the label vector from that same walk. Prefix consistency then holds structurally rather
+      than by luck. The alternative -- per-step argmax, then a separately argmaxed index, then a
+      reconciliation pass -- scores respectably on macro-F1 and lands thousands of divergences, and the
+      invariant is a hard zero rather than a deduction.
+  - heading: Type the sentinel
+    paragraph: >-
+      Emit the integer -1, and only for a vector that genuinely holds no bad step. It is a class on the
+      localisation axis, matched by the human -1 and by nothing else. Treating it as a wildcard turns the
+      whole no-error population into free score and is the exact route CTRL_S2_ALL_SENTINEL is measured
+      wrong on.
+  - heading: Check the two subgroups before you look at the aggregate
+    paragraph: >-
+      Deep errors -- at least twelve steps with the first error at index eight or later -- and
+      correct-final-answer-with-a-bad-step are separately floored at 0.44 and 0.48. Both are hard zeros. A
+      localiser fitted on short solutions passes the aggregate and fails the first; a pipeline that reads
+      the final answer instead of the process emits -1 across the second and fails it entirely.
+  - heading: Keep the sibling shard out of the loop
+    paragraph: >-
+      Fifty attempts with reward history carried between them is enough to fit the graded shard through
+      its own feedback. The sibling shard is scored the same way and the joint-quality gap is capped at
+      0.04, so a threshold set tuned against observed reward opens a gap it cannot close.
+  - heading: Put every stage inside the timed region and then make it fast
+    paragraph: >-
+      Segmentation, encoding, three-class fitting, per-stratum calibration, localisation decode and export
+      all run inside the one timed invocation, and the seconds are the harness's, not yours. Above the
+      joint quality gate the score is wall clock alone: batch the inference, fix the pad length, and do
+      not pay for a per-step forward pass you can share.
+  - heading: Write the run record the verifier actually grades
+    paragraph: >-
+      The stage spans, the replay digest, the guarded-path list, your own budget declaration and a
+      reward_log whose macro-F1, localisation rate and seconds match what the run produced. The log is
+      compared against the verifier's own recomputation and a disagreement is a fabrication, not a
+      rounding.
+  traps:
+  - >-
+    The neutral class is collapsed into good or bad. Binary step accuracy stays respectable, the
+    per-stratum neutral band is violated outright, and the score is exactly zero.
+  - >-
+    Steps are scored independently and the first-error index is argmaxed separately, so the emitted index
+    contradicts the emitted vector and the prefix-ordering invariant fires at pc above zero.
+  - >-
+    A public scalar process reward model is thresholded globally. It passes aggregate macro-F1 and fails
+    the per-stratum calibration band, because a scalar has nowhere to put the intermediate class.
+  - >-
+    The sentinel is treated as a wildcard rather than a class, so every no-error solution reads as a match
+    and the localisation rate measures nothing.
+  - >-
+    Step indices are emitted one-based against a zero-based manifest. Every index is off by one, macro-F1
+    is untouched, and exact match collapses with no traceback anywhere.
+  - >-
+    First-error localisation is fitted on short solutions and collapses on the long-solution subgroup where
+    the error sits deep in a haystack of correct distractor steps.
+  - >-
+    The final answer is read instead of the process, so every correct-answer-with-a-bad-step solution is
+    emitted as -1 and the subgroup floor of 0.48 fires.
+  - >-
+    Per-stratum thresholds are tuned against the graded shard's observed reward across attempts; the
+    sibling shard's joint quality does not follow and the 0.04 gap cap fires.
+  - >-
+    The pipeline is accurate but unbudgeted and overruns the slow end of the ramp on the full held-out step
+    count, or moves calibration outside the timed region and loses stage closure instead.
+truth_annex: >-
+  Ordered path through instruction.md, with the compiled check each step satisfies. Every check named here
+  runs against delivered bytes; none of them is a self-report and none of them consults a run-record key
+  that nothing writes.
+
+
+  1. `both_outputs_present_for_every_graded_solution` (weight 5, knockout) -- the coupled pair is written
+  at /submission/c6s2.json, both halves per solution.
+
+  2. `ids_and_step_counts_match_the_graded_manifest` (weight 5, knockout) -- the id set and every vector
+  length agree with the private re-segmentation.
+
+  3. `labels_drawn_from_the_three_human_classes` (weight 5, knockout) -- every label is good, neutral or
+  bad, and the emitted alphabet is recorded.
+
+  4. `first_error_index_equals_first_bad_label_in_its_own_vector` (weight 5, knockout) -- pc equals 0.
+
+  5. `no_error_sentinel_is_typed_minus_one_not_a_wildcard` (weight 4) -- -1 is an exact class and every
+  other index is in range.
+
+  6. `constant_label_or_constant_index_submission_rejected` (weight 4) -- the all-good, all-sentinel route
+  is rejected on the face of the bytes.
+
+  7. `per_stratum_neutral_rate_inside_the_band` (weight 5, knockout) -- nb at or below 0.03 in every
+  stratum.
+
+  8. `every_stratum_carries_emitted_neutral_support` (weight 4) -- no stratum with a dead neutral class,
+  and the collapse direction reported.
+
+  9. `neutral_row_and_column_of_the_confusion_matrix_are_live` (weight 4) -- macro-F1 is a mean over three
+  live classes.
+
+  10. `index_exact_match_scores_minus_one_as_its_own_class` (weight 4) -- the four-way pair accounting.
+
+  11. `global_index_offset_rejected` (weight 3) -- a whole-shard off-by-one is named rather than absorbed.
+
+  12. `long_solution_first_error_subgroup_floor` (weight 5, knockout) -- 0.44 on the deep-error subgroup.
+
+  13. `correct_answer_bad_step_subgroup_floor` (weight 5, knockout) -- 0.48 where the answer corroborates
+  the wrong conclusion.
+
+  14. `sibling_shard_joint_quality_gap` (weight 4) -- 0.04 between the two private shards.
+
+  15. `counts_invariant_under_the_presentation_permutation` (weight 4) -- graded counts run over canonical
+  id order.
+
+  16. `human_labels_and_stratum_map_not_held_agent_side` (weight 5, knockout) -- no guarded write and no
+  private copy at any of three granularities.
+
+  17. `six_named_stages_inside_one_timed_invocation` (weight 3) -- stage closure and harness-measured
+  seconds.
+
+  18. `reward_log_matches_recomputed_f1_and_localization` (weight 4, knockout) -- the log is faithful.
+
+  19. `both_coupled_artefacts_replay_byte_identically` (weight 3) -- the whole artifact reproduces from the
+  recorded seed.
+
+  20. `staged_r_det_speed_ramp_behind_the_joint_quality_gate` (weight 10, knockout) -- the staged value,
+  gated on the four measured constants being null.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - A downloaded scalar process reward model with one global cut -- CTRL_S2_PUBLIC_PRM_GLOBAL_THRESHOLD,
+  projected macro-F1 0.507 with a worst per-stratum neutral deviation of 0.114, rejected by
+  `per_stratum_neutral_rate_inside_the_band`.
+
+  - Independent per-step argmax with a separately argmaxed index -- CTRL_S2_INDEPENDENT_ARGMAX, projected
+  2,904 divergences in 10,000 with a macro-F1 of 0.571 that would otherwise clear T_F1, rejected by
+  `first_error_index_equals_first_bad_label_in_its_own_vector`.
+
+  - All-good labels with -1 everywhere -- CTRL_S2_LIST_ALL, emitted neutral rate 0.000 against a human rate
+  near 0.31, rejected by `constant_label_or_constant_index_submission_rejected` and by the band.
+
+  - Thresholds and segmentation carried over from the shipped split -- CTRL_S2_STALE_PRIOR, projected worst
+  deviation 0.081, rejected by the band and by `ids_and_step_counts_match_the_graded_manifest`.
+
+  - The first-error index predicted from step count alone -- CTRL_S2_LENGTH_INDEX_PREDICTOR, projected
+  macro-F1 0.371 and localisation 0.244, landing on the sub-gate ramp at 0.0126.
+
+  - Thresholds tuned against the graded shard's own reward over fifty attempts -- CTRL_S2_SHARD_FITTED,
+  projected sibling gap 0.071 against the 0.04 cap.
+
+  - The reference with batch size 1 -- CTRL_S2_UNBATCHED_REFERENCE, identical quality, 3,940 s against the
+  slow end of the ramp, proving the graded axis is genuinely wall clock.
+
+  - The reference with its training schedule truncated to a fifth -- CTRL_S2_UNDERTRAINED, every hard
+  constraint holding and both quality gates missing, landing on the sub-gate ramp at 0.0589.
+
+  - The shipped scaffold run verbatim -- CTRL_S2_NOOP, which writes neither output and scores exactly zero.
+
+
+  Deliverable manifest: /submission/c6s2.json (json), an object with an ids list and a matching outputs
+  list, each output carrying a labels sequence over the three human classes and an integer
+  first_error_index whose no-error value is exactly -1.
+provenance:
+  corpus: openai/prm800k, licence MIT, obtained from github.com/openai/prm800k at a pinned commit SHA
+    (files prm800k/data/phase2_train.jsonl and phase2_test.jsonl), approximately 800k step-level human
+    labels over approximately 75k solution samples to MATH problems; the underlying problems are Hendrycks
+    et al. MATH, licence MIT, github.com/hendrycks/math, pinned by commit. Both are vendored into
+    environment/data at image build time so the graded corpus is environment-provided. The private held-out
+    shard and its sibling are our own stratified holdout over phase-2 samples, stratified by step count, by
+    presence of at least one human-labelled neutral step, and by MATH subject and level; the graded label
+    vector is re-derived by our own private aggregation over the raw per-completion ratings rather than
+    copied from any published split. No generative model appears anywhere in the derivation.
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: openai/prm800k, licence MIT, obtained from github.com/openai/prm800k at a pinned
+      commit SHA (files prm800k/data/phase2_train.jsonl and phase2_test.jsonl), approximately 800k step-level
+      human labels over approximately 75k solution samples to MATH problems; the underlying problems
+      are Hendrycks et al. MATH, licence MIT, github.com/hendrycks/math, pinned by commit. Both are
+      vendored into environment/data at image build time so the graded corpus is environment-provided.
+      The private held-out shard and its sibling are our own stratified holdout over phase-2 samples,
+      stratified by step count, by presence of at least one human-labelled neutral step, and by MATH
+      subject and level; the graded label vector is re-derived by our own private aggregation over the
+      raw per-completion ratings rather than copied from any published split. No generative model appears
+      anywhere in the derivation.
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the four trajectory rubrics gate it at 0.40.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-6fba8de0ad64e1b823dba2be01e8ffac
+  - AELLO-CANARY-f316b670f6f37e03b147995e2ec96c47
+  - AELLO-CANARY-0fe6e7abe0d04af8a82cc4703cc2353d
+  - AELLO-CANARY-a056eaed8430320e4f458335f5f1f722

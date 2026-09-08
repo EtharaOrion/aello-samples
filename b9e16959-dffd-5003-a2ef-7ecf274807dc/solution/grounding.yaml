@@ -1,0 +1,745 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: C1-S2
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled, and
+  on this slot every judgment is deterministically reducible, so the compiled weight share is 1.0 and
+  no item is left judged. A harness stamp is a number, the earliest clearing checkpoint is a scan in stamp
+  order, a mixture is a dictionary that sums to one, a stage boundary is an integer token offset compared
+  at a fixed tolerance, and the ordered bar family is a sorted comparison: none of these needs a reader''s
+  opinion. The single item that names a numeric bar Phase 0 does not author is the outcome check, and
+  it refuses with ConstantUnmeasured rather than being demoted to judged.'
+deliverable:
+  path: /submission/c1s2.json
+  kind: json
+  shape: an object carrying checkpoint_series (every emitted checkpoint with its harness stamp and held-out
+    bits-per-byte), bar_crossings (the earliest clearing checkpoint for each bar of the ordered family
+    1.09 / 1.02 / 0.96), recipe (the ordered stages with their per-domain mixtures and token boundaries,
+    mirroring recipe.json), clock (the first-corpus-read origin, the graded seconds to the bar, the declared
+    emission interval and the phase ledger) and init_spec (master seed, vocabulary entry count and step-0
+    tensor digests)
+evaluation_target_vocabulary:
+- checkpoint_series
+- domain_token_trace
+- heldout_shards
+- recipe_declaration
+- run_record
+- submitted_artifact
+- submitted_source
+corpus_layout:
+  domains:
+  - crec
+  - pes2o
+  - pg19
+  domains_basis: 'The three licence-clean corpora combined for this slot, each shipped as its own uint32
+    memmap with a bytelen table so the agent can mix at any ratio while the harness counts every consumed
+    token by domain: crec is the United States Congressional Record (a US Government work, 17 U.S.C. 105),
+    pes2o is peS2o v2 (ODC-By 1.0), pg19 is the PG-19 release of Project Gutenberg public-domain books.
+    Per-document domain labels are what make mixture weighting a lever here rather than an assumption.'
+  train_shards:
+    crec: environment/data/train_crec.bin
+    pes2o: environment/data/train_pes2o.bin
+    pg19: environment/data/train_pg19.bin
+  document_labels: environment/data/document_domain_labels.jsonl
+  run_archive: environment/runs/
+  harness_timeline: tests/heldout/harness_timeline.json
+  private_shard: tests/heldout/private.bin
+  sibling_shard: tests/heldout/sibling.bin
+  run_record: run_record.json
+  heldout_shares:
+    crec: 0.55
+    pes2o: 0.3
+    pg19: 0.15
+  heldout_shares_basis: Disclosed in instruction.md and deliberately different from the shipped training
+    mixture, so no graded obligation is withheld and the shift is a thing to price rather than a thing
+    to discover.
+  vocab_entries: 49152
+  context: 2048
+  token_budget: 600000000
+  param_cap: 180000000
+  boundary_tolerance_tokens: 3000000
+  sibling_tolerance_bpb: 0.04
+  bar_family:
+  - 1.09
+  - 1.02
+  - 0.96
+  graded_bar_bpb: 1.02
+  sequence_lengths:
+  - 1024
+  - 2048
+  - 4096
+  submission_sections:
+  - bar_crossings
+  - checkpoint_series
+  - clock
+  - init_spec
+  - recipe
+  corpus_status: NOT YET LANDED. environment/data/, environment/runs/ and tests/heldout/ do not exist
+    in this staged tree at the time these items were authored, so every path above is AUTHORED here rather
+    than read off a shipped file, and every compiled check degrades to a recorded failure with a named
+    reason -- no_stamped_emission, no_domain_trace, heldout_manifest_unrecorded -- instead of raising,
+    when its instrument is absent. The corpus build in solution/recompute.py's dataset note is what fills
+    them.
+items:
+- id: emitted_checkpoint_series_is_stamped
+  dimension: checkpoint_emission
+  weight: 5
+  knockout: true
+  evaluation_target: checkpoint_series
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The graded run emitted at least one checkpoint and every emitted checkpoint carries the harness
+    stamp the score is read off.
+  judgment: /submission/c1s2.json carries checkpoint_series, bar_crossings, recipe, clock and init_spec;
+    checkpoint_series is a non-empty list whose records each name a checkpoint_id, a harness_stamp_s and
+    a bpb_private, with stamps strictly increasing in emission order. No emitted checkpoint at all is
+    the no-deliverable red line, and an unstamped checkpoint can never be the earliest crossing one because
+    the graded quantity is read off the stamp and nowhere else.
+- id: recipe_declares_order_mixture_and_token_boundaries
+  dimension: recipe_declaration
+  weight: 5
+  knockout: true
+  evaluation_target: recipe_declaration
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: recipe.json declares an ordered stage sequence, a per-stage mixture over the three labelled
+    corpora, and stage boundaries expressed as token offsets.
+  judgment: recipe.stages is a non-empty ordered list of distinctly named stages; each stage's mixture
+    keys are exactly crec, pes2o and pg19 with non-negative weights summing to one within 1e-6; each token_boundary
+    is a positive integer token offset, boundaries strictly increase across stages, and the final boundary
+    equals the declared token_budget, which is at or below 6.0e8. Per-document domain labels are what
+    make a mixture declarable at all, so a stage that names no mixture over the three domains has declared
+    nothing this task can verify.
+- id: declared_crossing_is_the_earliest_checkpoint_to_clear_the_bar
+  dimension: bar_crossing
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The crossing the submission declares at the 1.02 bar is the earliest-stamped emitted checkpoint
+    the harness measured at or below that bar.
+  judgment: 'The harness timeline is scanned in stamp order for the first checkpoint whose bpb_private
+    is at or below 1.02; the submission''s bar_crossings entry for 1.02 must name that same checkpoint_id
+    and that same harness_stamp_s within 1 ms. Naming a later clearing checkpoint prices the run slower
+    than it was; naming an earlier checkpoint that never cleared claims a bar that was never crossed.
+    Earliest, not best: a checkpoint that models better after the crossing moves nothing, and a checkpoint
+    that never crosses is worth nothing.'
+- id: clock_opens_at_first_corpus_read
+  dimension: clock_boundary
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The graded seconds run from the harness's first read of the shipped corpus, not from the
+    first optimizer step.
+  judgment: The harness stamp first_corpus_read_stamp_s is the origin and the crossing checkpoint's stamp
+    is the terminus; clock.graded_seconds_to_bar in the submission must equal that difference within 1
+    ms, and clock.first_corpus_read_stamp_s must equal the harness origin. Tokenizer construction, memmap
+    open and dataloader warm-up all fall inside the interval, so an agent that starts its own timer at
+    the first step understates the span by exactly the setup it declined to pay for, and the check reports
+    that difference.
+- id: no_phase_escapes_the_graded_interval
+  dimension: clock_boundary
+  weight: 4
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: Every phase the run accounts for lies inside the interval the clock measures, and setup is
+    one of them.
+  judgment: No phase in clock.phases starts before the harness first-corpus-read stamp; the union of phase
+    spans clipped at the crossing stamp covers the graded interval with an unaccounted gap of at most
+    1 s; and at least one phase is not a training phase. A ledger made only of training phases has hidden
+    the corpus read that opened the clock, which is the one span this task charges for that a throughput-graded
+    task would not.
+- id: checkpoint_cadence_bounds_the_time_to_bar
+  dimension: checkpoint_emission
+  weight: 4
+  knockout: false
+  evaluation_target: checkpoint_series
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The emission cadence the run declares is the cadence the harness stamped, so the resolution
+    of the score is a declared quantity.
+  judgment: 'clock.checkpoint_interval_s is positive and the widest harness-stamped gap up to the crossing
+    -- counting the gap from the clock opening to the first emission -- is at most 1.05 times it. Because
+    the graded quantity is the stamp of the first clearing checkpoint, that widest gap is the granularity
+    of the score: a run that reaches 1.02 but only emits every 600 s is charged for up to 600 s it had
+    already earned, so emitting often is itself a lever on the axis.'
+- id: bits_per_byte_excludes_each_window_first_position
+  dimension: bpb_accounting
+  weight: 5
+  knockout: true
+  evaluation_target: heldout_shards
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The bar is evaluated at context 2048 over non-overlapping windows, scoring every position
+    but the first of each window, in nats over ln 2 over shard bytes.
+  judgment: 'The harness window accounting must report context 2048 and 2047 scored positions per window
+    -- each window''s first position has no in-window context to condition on and is not scored -- with
+    the window count tiling the shard without overlap. The reported bits-per-byte must satisfy the identity
+    against total shard BYTES and, where the two totals differ, must not satisfy it against scored positions:
+    dividing by positions instead of bytes moves the number the bar is set on without any modelling having
+    changed.'
+- id: ordered_bar_family_crossed_in_non_decreasing_time
+  dimension: bar_ordering
+  weight: 5
+  knockout: true
+  evaluation_target: checkpoint_series
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: The easier bars of the ordered family are crossed no later than the harder ones.
+  judgment: 'Earliest clearing stamps derived from the harness timeline for the family 1.09, 1.02 and
+    0.96 are non-decreasing in that order, with a bar that was never crossed sorting after every bar that
+    was, and the submission''s bar_crossings agree with the derived stamps to within 1 ms on both the
+    crossed and the uncrossed rows. An uncrossed 1.09 beside a crossed 1.02 is the target-order-inverted
+    red line, not a missing row: bits-per-byte falls monotonically along one training trajectory, so an
+    inversion says the stamps did not come from one.'
+- id: executed_domain_segments_match_declared_stage_order
+  dimension: domain_mixture
+  weight: 5
+  knockout: true
+  evaluation_target: domain_token_trace
+  mode: compiled
+  outcome_class: ORDERING
+  criterion: The domain-majority segments the harness observed are the stages the recipe declared, in
+    the declared order and at the declared boundaries.
+  judgment: The majority domain of each declared stage is its argmax mixture weight over crec, pes2o and
+    pg19; that sequence must equal the sequence of domain-majority segments in the harness memmap shim's
+    per-domain token trace, and each observed segment end must sit within 3.0e6 tokens -- 0.5 percent
+    of the 6.0e8 budget -- of the declared boundary. A smoothly annealed mixture declares discrete boundaries
+    it never executes and diverges here even when the model is good; the slug is recipe-divergence.
+- id: stage_boundaries_counted_in_tokens_not_sequences
+  dimension: token_accounting
+  weight: 4
+  knockout: false
+  evaluation_target: domain_token_trace
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Stage boundaries are token offsets, not sequence counts scaled by the packing length.
+  judgment: 'The final declared token_boundary reconciles with the summed per-domain served tokens the
+    shim counted, within 3.0e6 tokens; and no declared sequence length among 1024, 2048 and 4096 reconciles
+    the two by multiplication. The starter accounts the budget in sequences, so a boundary copied from
+    it is the right number in the wrong currency: every boundary shifts by the packing factor while the
+    run completes cleanly, and the check names the factor that reconciles.'
+- id: per_domain_served_tokens_within_the_budget
+  dimension: token_accounting
+  weight: 5
+  knockout: true
+  evaluation_target: domain_token_trace
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The tokens that count against the 6.0e8 budget are the ones the harness shim counted, by
+    domain.
+  judgment: 'The shim''s per-domain counters cover exactly crec, pes2o and pg19, each non-negative, summing
+    to more than zero and to at most 6.0e8. The agent''s own declared_served_tokens is recorded as evidence
+    and never substituted for the counters: per-document domain labels are what make a per-domain count
+    possible, and a counter naming a domain the corpus does not ship has not counted this corpus. Over
+    the cap is the token-budget-exceeded red line.'
+- id: heldout_shards_carry_the_disclosed_shifted_mixture
+  dimension: heldout_shift
+  weight: 4
+  knockout: false
+  evaluation_target: heldout_shards
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The graded shards are built at the disclosed held-out mixture, which is not the shipped training
+    mixture.
+  judgment: The harness manifest's per-domain document shares for the held-out shards equal the disclosed
+    55 percent Congressional Record, 30 percent peS2o, 15 percent Gutenberg within 0.005, and both private
+    and sibling shards carry distinct recorded digests. The check also records the token-weighted aggregate
+    of the declared training mixture and its largest per-domain distance from the graded shares, because
+    optimising against the shipped mixture and never re-anchoring to the shifted one is what plateaus
+    a run just above the bar.
+- id: sibling_shard_agrees_within_four_hundredths_bpb
+  dimension: heldout_shift
+  weight: 4
+  knockout: false
+  evaluation_target: heldout_shards
+  mode: compiled
+  outcome_class: DIVERGENCE
+  criterion: The crossing is a property of the held-out distribution, not of one shard.
+  judgment: At the checkpoint that first cleared 1.02, the absolute difference between bits-per-byte on
+    the private shard and on the same-distribution sibling shard is at most 0.04. Both shards are built
+    by the same private document-id hash partition at the same shifted mixture, so a wider gap says the
+    bar was crossed on one draw of documents rather than on the distribution the bar is set on; the slug
+    is sibling-divergence.
+- id: model_py_imports_confined_to_the_allowlist
+  dimension: import_envelope
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: model.py reaches only torch, math and safetensors, and reaches no module that could fetch
+    weights.
+  judgment: The harness AST scan of model.py reports at least one import, every imported root inside torch,
+    math, safetensors, and no attribute path rooted at os, sys, socket, subprocess, urllib, requests,
+    ctypes or importlib. The lane grants the solver open egress, so the envelope is what keeps a downloaded
+    checkpoint from reaching the bar in a time no training run could; the slug is import-envelope-violation.
+- id: step_zero_digests_reproduce_under_the_declared_seed
+  dimension: init_reproducibility
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Step zero was reached by initialising from the declared seed over the shipped vocabulary,
+    not by loading weights.
+  judgment: Every step-0 parameter tensor digest the harness recomputes from the declared master seed
+    and bound init ops equals the digest declared beside it in init_spec, and init_spec.vocab_entries
+    is 49152. The shipped and graded shards are written in a private permuted 49,152-entry byte-level
+    BPE, so an embedding table of any other row count was not initialised against the vocabulary the graded
+    bytes are in, whatever seed it declares; the slug is init-not-reproducible.
+- id: reward_log_claims_no_better_than_the_harness_saw
+  dimension: reporting_integrity
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: DIVERGENCE
+  criterion: No logged record claims a bits-per-byte the harness never observed.
+  judgment: The run record carries at least one reward_log record, and no record's claimed bpb_private
+    is below the best bits-per-byte the harness observed across the emitted checkpoints by more than 1e-6.
+    Lower is better here, so a claim under the best observation is a claim about a checkpoint that was
+    never emitted -- and on a time-to-bar axis that is precisely the claim that pays, because it moves
+    the crossing earlier; the slug is log-fabrication.
+- id: parameter_count_recomputed_from_the_shipped_weights
+  dimension: param_budget
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The parameter count that grades is the one recounted from weights.safetensors.
+  judgment: 'The harness recount from weights.safetensors is positive and at most 1.8e8, and the param_count
+    the submission records beside the crossing checkpoint equals the recount exactly. The recount is never
+    replaced by the declaration: on a time-to-bar axis a larger model is the fastest way to reach the
+    bar in fewer steps, so the cap is what keeps the axis about the recipe; over it is the param-budget-exceeded
+    red line.'
+- id: seconds_to_the_bar_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: checkpoint_series
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Harness-measured seconds from the first corpus read to the earliest clearing checkpoint,
+    mapped through the published descending ramp.
+  judgment: 'Seconds are the harness crossing stamp minus the harness first-corpus-read stamp. Fewer seconds
+    is better, so the ramp descends: S_outcome = clamp((floor - t) / (floor - knee), 0, 1), and the item
+    passes when t is at or below the dichotomizing threshold. A run whose checkpoints never reach 1.02
+    has no crossing to time and scores zero on the axis rather than an arbitrarily large time. UNMEASURED
+    AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning
+    a score, and the slot is not gradeable until the measurement wave writes them.'
+- id: harness_stamping_instruments_unwritten
+  dimension: instrument_integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The instruments that assign the graded stamp and record the domain trace are byte-identical
+    either side of the graded run.
+  judgment: 'Every digest under the pinned verifier tree is unchanged between the before and after records,
+    no guarded path was touched, and the roster actually digested includes aello_emit.py and the harness
+    memmap shim. On this slot those two files ARE the measurement: the emitter assigns the checkpoint
+    stamp the score is read off and the shim writes the per-domain token trace the recipe is checked against,
+    so editing them would forge the graded instant rather than earn it. An empty digest map would pass
+    vacuously, which is why the instruments must be present in it; the slug is grading-tree-written.'
+measurement_tier: gpu
+measurement_tier_basis: trains or runs an LLM backbone
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a floor,
+    knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0 asserts
+    the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the knockout rubrics in tests/rubrics.json, as a conjunction; every item in this slot is
+    compiled, so no judged rubric stands between r_det and the gate
+  ceiling: 0.05
+  composition: r_final = r_det if every knockout rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise, because fewer harness-measured
+    seconds to the bar is better, S_outcome = clamp((floor - t) / (floor - knee), 0, 1) through the published
+    descending ramp, with t the harness crossing stamp minus the harness first-corpus-read stamp. A run
+    with no clearing checkpoint has no t at all and takes zero on the axis.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+truth_narrative:
+  opening: 'minimize the harness-measured wall-clock seconds, from the first read of the shipped corpus
+    to the harness timestamp of the earliest emitted checkpoint whose bits-per-byte on the private held-out
+    shard is at or below 1.02, for a from-scratch decoder-only language model trained on one H100 under
+    a hard budget of 6.0e8 consumed tokens, at most 1.8e8 parameters, and a hard 3600 s ceiling. The submission
+    must also declare recipe.json naming its ordered stage sequence, per-stage domain mixture weights,
+    and stage token boundaries, and the harness verifies the executed data order against that declaration.
+    The held-out mixture is disclosed as 55 percent Congressional Record, 30 percent peS2o, 15 percent
+    Gutenberg, deliberately different from the shipped training mixture, so no graded obligation is withheld.
+    The graded artifact is an object with an ids list and a matching outputs list, written to /submission/c1s2.json.
+    The graded quantity is Harness-measured wall-clock seconds to the earliest emitted checkpoint scoring
+    bits-per-byte <= 1.02 on tests/heldout/private.bin, evaluated at context 2048 over non-overlapping
+    windows excluding each window''s first position, in nats divided by ln(2) and by total shard bytes.
+    Secondary, disclosed: best bits-per-byte achieved, used only for the sub-gate ramp. Additionally recorded
+    for grading, not for the reward axis: the executed per-domain token trace from the harness memmap
+    shim, compared against the declared recipe.json.'
+  insight: 'The reward is deterministic under frozen bytes and is zero on any red line before any quality
+    is considered, so the first thing that matters is that the artifact exists, has the declared shape,
+    and was produced without touching the checker tree or the graded fold. Only then does Harness-measured
+    wall-clock seconds to the earliest emitted checkpoint scoring bits-per-byte <= 1.02 on tests/heldout/private.bin,
+    evaluated at context 2048 over non-overlapping windows excluding each window''s first position, in
+    nats divided by ln(2) and by total shard bytes. Secondary, disclosed: best bits-per-byte achieved,
+    used only for the sub-gate ramp. Additionally recorded for grading, not for the reward axis: the executed
+    per-domain token trace from the harness memmap shim, compared against the declared recipe.json move
+    the score.'
+  steps:
+  - heading: Open the clock before you can lose to it.
+    paragraph: The graded interval begins at the harness's first read of the shipped corpus, not at the
+      first optimizer step, so tokenizer construction, memmap open, dataloader warm-up and any corpus
+      statistics pass are all charged. Read the three memmaps once, lazily, and do the mixture arithmetic
+      on the bytelen tables rather than on the token streams. Measured host overhead on this grading machine
+      is 0.2355 s against a reference crossing at 1450 s, so setup is not where the seconds are -- but
+      a full statistics pass over 6.0e8 tokens before step one is, and it is inside the interval.
+  - heading: 'Price the axis: it is time-to-bar, not quality.'
+    paragraph: The score is the stamp of the FIRST checkpoint at or below 1.02 bits per byte on the private
+      held-out shard. A checkpoint that models beautifully after the crossing moves nothing and a checkpoint
+      that never crosses is worth nothing, so the target is not the best model reachable in 3600 s but
+      the earliest moment the bar is provably behind you. Every design decision is priced in seconds-to-1.02,
+      which is a different objective from loss-at-budget and selects different recipes.
+  - heading: Emit often, because the cadence is the resolution of the score.
+    paragraph: The harness stamps checkpoints you emit; it cannot stamp a crossing that happened between
+      two emissions. If you emit every 600 s you are charged for up to 600 s you had already earned, and
+      if you emit every 30 s you are charged for at most 30. Emission is cheap relative to that overshoot,
+      so a dense cadence near the expected crossing is a direct, unglamorous win on the graded axis and
+      it is a lever no quality-graded slot has.
+  - heading: Anchor on the shifted mixture, not the shipped one.
+    paragraph: The held-out shards are built at 55 percent Congressional Record, 30 percent peS2o, 15
+      percent Gutenberg -- disclosed, and deliberately unlike the shipped training mixture. A validation
+      split carrying the training mixture will improve while the graded number does not, which is what
+      plateaus a run just above the bar for the whole budget. Build your own validation shard at the disclosed
+      shares from held-back training documents and steer on that.
+  - heading: Use the per-document domain labels as the lever they are.
+    paragraph: Three labelled corpora with per-document labels mean the mixture is yours to choose at
+      any ratio, per stage. The shifted target makes Congressional Record weight the dominant single term,
+      but weighting it uniformly for the whole run is not the same as ordering the stages so that it arrives
+      where it compounds. Order is the axis the reward actually rewards, and it is measured against a
+      trace the agent cannot write.
+  - heading: Declare the recipe you will actually execute.
+    paragraph: recipe.json names the ordered stage sequence, the per-stage mixture weights and the stage
+      boundaries in TOKENS. The harness memmap shim records the executed per-domain trace and compares
+      it against that declaration at 0.5 percent of the 6.0e8 budget, or 3.0e6 tokens. A smooth anneal
+      with no discrete boundaries diverges from any three-stage declaration and zeroes the run even when
+      the model is good; declare what you execute, and if you want an anneal, declare its boundaries.
+  - heading: Count in tokens; the starter counts in sequences.
+    paragraph: The shipped starter accounts the budget in sequences. Copy that accounting and every boundary
+      is displaced by the packing factor -- 1024, 2048 or 4096 -- while the run completes cleanly and
+      the loss curve looks merely disappointing. The failure is attributed to mixture weights and the
+      attempt budget is spent on the wrong axis. Reconcile your final boundary against the shim's summed
+      per-domain counters before you trust any stage result.
+  - heading: Keep the ordered family monotone and the sibling close.
+    paragraph: Crossing stamps for 1.09, 1.02 and 0.96 must be non-decreasing, which one training trajectory
+      gives for free and a spliced set of runs does not. The private and sibling shards are the same shifted
+      distribution under one document-id hash partition, so a gap wider than 0.04 bits per byte at the
+      crossing says you cleared one draw of documents rather than the distribution the bar is set on.
+  - heading: Carry the state between attempts, in units you can replay.
+    paragraph: Fifty attempts, reward history carried, and the only per-attempt signal arrives at the
+      crossing or not at all. Record for each attempt the stage order, the boundary placement in tokens,
+      the mixture per stage and the resulting crossing stamp, so a promising order can be reconstructed
+      rather than remembered. An attempt whose configuration you cannot rebuild has contributed a number
+      and no knowledge.
+  traps:
+  - Agent measures a promising stage order early, does not record the boundary placement that produced
+    it, and after twenty attempts cannot reconstruct which of its own configurations was responsible -
+    the state it accumulated collapses into the summary.
+  - Agent optimizes bits-per-byte on the shipped validation split, which carries the training mixture,
+    and never re-anchors to the disclosed shifted held-out mixture, plateauing just above the gate for
+    the whole budget.
+  - Agent adopts the archive's 38-of-60 majority order because it is the modal recommendation, lands at
+    0.18, and reads the plateau as evidence the curriculum axis is exhausted rather than that the majority
+    is wrong for this target.
+  - Agent declares a three-stage recipe.json and implements a smoothly annealed mixture with no discrete
+    boundaries; the executed trace does not match the declaration within 0.5 percent and the run zeroes
+    with recipe-divergence even though the model is good.
+  - Agent spends the attempt budget on optimizer and architecture rather than on the data recipe, because
+    those axes give faster legible feedback, and never prices the ordering that the reward actually rewards.
+  - Agent computes stage boundaries in sequences rather than tokens after copying the starter's accounting,
+    silently displacing every boundary, and attributes the resulting loss to mixture weights.
+  - 'The published curriculum heuristic - anneal toward the highest-quality domain in the final stage
+    - is genuinely in the public literature and transfers partially to this task. Mitigation: Partially
+    closed, and recorded honestly as partial. Control published-heuristic executes the anneal-to-quality
+    recipe and is measured at 0.25, above the ramp but far below the gate-plus-speed band, because the
+    shifted held-out mixture is 55 percent Congressional Record, the domain that heuristic anneals away
+    from, and because the heuristic prices no stage boundary and no sequence-length schedule. This is
+    the weakest-closed shortcut in the slot and it is named rather than claimed shut; if the measured
+    control lands above 0.40 at feasibility, the slot is re-scoped rather than shipped.'
+  - 'Declare a simple recipe.json to satisfy the ORDERING checker while executing an unrelated adaptive
+    data policy, harvesting both the declaration reward and the adaptive gains. Mitigation: CK-RECIPE
+    compares the declared stage boundaries against the harness memmap shim''s own per-domain token trace,
+    which the agent cannot write, at a 0.5 percent-of-budget tolerance; divergence is the recipe-divergence
+    red line at exactly 0.0. CK-TREE additionally zeroes any attempt to edit the shim.'
+  - 'Import a pretrained model or a public checkpoint under the open solver egress the Optimization lane
+    mandates. Mitigation: CK-INIT recomputes step-0 tensor digests from the declared seed and bound init
+    ops; CK-IMPORTS AST-scans the emitted model.py; the private 49,152-entry vocabulary permutation makes
+    any external embedding table a random relabelling; CK-TOKENS caps consumed tokens harness-side.'
+  - 'A public speedrun recipe for the boarded nanoGPT/FineWeb configuration is retrieved and transferred.
+    Mitigation: No axis of the boarded configuration survives: three-domain ordered curriculum rather
+    than a single web corpus, a shifted evaluation mixture, a private vocabulary and permutation, private
+    held-out bytes, one H100, and time bounds anchored to our own measured reference. Control public-recipe-transfer
+    executes the published recipe on this corpus and must land below the gate before Phase 0.5 binds.'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `bits_per_byte_excludes_each_window_first_position` (compiled, weight 5, knockout) -- The bar is
+  evaluated at context 2048 over non-overlapping windows, scoring every position but the first of each
+  window, in nats over ln 2 over shard bytes.
+
+  2. `checkpoint_cadence_bounds_the_time_to_bar` (compiled, weight 4) -- The emission cadence the run
+  declares is the cadence the harness stamped, so the resolution of the score is a declared quantity.
+
+  3. `clock_opens_at_first_corpus_read` (compiled, weight 5, knockout) -- The graded seconds run from
+  the harness''s first read of the shipped corpus, not from the first optimizer step.
+
+  4. `declared_crossing_is_the_earliest_checkpoint_to_clear_the_bar` (compiled, weight 5, knockout) --
+  The crossing the submission declares at the 1.02 bar is the earliest-stamped emitted checkpoint the
+  harness measured at or below that bar.
+
+  5. `emitted_checkpoint_series_is_stamped` (compiled, weight 5, knockout) -- The graded run emitted at
+  least one checkpoint and every emitted checkpoint carries the harness stamp the score is read off.
+
+  6. `executed_domain_segments_match_declared_stage_order` (compiled, weight 5, knockout) -- The domain-majority
+  segments the harness observed are the stages the recipe declared, in the declared order and at the declared
+  boundaries.
+
+  7. `harness_stamping_instruments_unwritten` (compiled, weight 5, knockout) -- The instruments that assign
+  the graded stamp and record the domain trace are byte-identical either side of the graded run.
+
+  8. `heldout_shards_carry_the_disclosed_shifted_mixture` (compiled, weight 4) -- The graded shards are
+  built at the disclosed held-out mixture, which is not the shipped training mixture.
+
+  9. `model_py_imports_confined_to_the_allowlist` (compiled, weight 3) -- model.py reaches only torch,
+  math and safetensors, and reaches no module that could fetch weights.
+
+  10. `no_phase_escapes_the_graded_interval` (compiled, weight 4) -- Every phase the run accounts for
+  lies inside the interval the clock measures, and setup is one of them.
+
+  11. `ordered_bar_family_crossed_in_non_decreasing_time` (compiled, weight 5, knockout) -- The easier
+  bars of the ordered family are crossed no later than the harder ones.
+
+  12. `parameter_count_recomputed_from_the_shipped_weights` (compiled, weight 3) -- The parameter count
+  that grades is the one recounted from weights.safetensors.
+
+  13. `per_domain_served_tokens_within_the_budget` (compiled, weight 5, knockout) -- The tokens that count
+  against the 6.0e8 budget are the ones the harness shim counted, by domain.
+
+  14. `recipe_declares_order_mixture_and_token_boundaries` (compiled, weight 5, knockout) -- recipe.json
+  declares an ordered stage sequence, a per-stage mixture over the three labelled corpora, and stage boundaries
+  expressed as token offsets.
+
+  15. `reward_log_claims_no_better_than_the_harness_saw` (compiled, weight 3) -- No logged record claims
+  a bits-per-byte the harness never observed.
+
+  16. `seconds_to_the_bar_ramp` (compiled, weight 10, knockout) -- Harness-measured seconds from the first
+  corpus read to the earliest clearing checkpoint, mapped through the published descending ramp.
+
+  17. `sibling_shard_agrees_within_four_hundredths_bpb` (compiled, weight 4) -- The crossing is a property
+  of the held-out distribution, not of one shard.
+
+  18. `stage_boundaries_counted_in_tokens_not_sequences` (compiled, weight 4) -- Stage boundaries are
+  token offsets, not sequence counts scaled by the packing length.
+
+  19. `step_zero_digests_reproduce_under_the_declared_seed` (compiled, weight 3) -- Step zero was reached
+  by initialising from the declared seed over the shipped vocabulary, not by loading weights.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - The published curriculum heuristic - anneal toward the highest-quality domain in the final stage -
+  is genuinely in the public literature and transfers partially to this task. -- controlled by: Partially
+  closed, and recorded honestly as partial. Control published-heuristic executes the anneal-to-quality
+  recipe and is measured at 0.25, above the ramp but far below the gate-plus-speed band, because the shifted
+  held-out mixture is 55 percent Congressional Record, the domain that heuristic anneals away from, and
+  because the heuristic prices no stage boundary and no sequence-length schedule. This is the weakest-closed
+  shortcut in the slot and it is named rather than claimed shut; if the measured control lands above 0.40
+  at feasibility, the slot is re-scoped rather than shipped.
+
+  - Declare a simple recipe.json to satisfy the ORDERING checker while executing an unrelated adaptive
+  data policy, harvesting both the declaration reward and the adaptive gains. -- controlled by: CK-RECIPE
+  compares the declared stage boundaries against the harness memmap shim''s own per-domain token trace,
+  which the agent cannot write, at a 0.5 percent-of-budget tolerance; divergence is the recipe-divergence
+  red line at exactly 0.0. CK-TREE additionally zeroes any attempt to edit the shim.
+
+  - Import a pretrained model or a public checkpoint under the open solver egress the Optimization lane
+  mandates. -- controlled by: CK-INIT recomputes step-0 tensor digests from the declared seed and bound
+  init ops; CK-IMPORTS AST-scans the emitted model.py; the private 49,152-entry vocabulary permutation
+  makes any external embedding table a random relabelling; CK-TOKENS caps consumed tokens harness-side.
+
+  - A public speedrun recipe for the boarded nanoGPT/FineWeb configuration is retrieved and transferred.
+  -- controlled by: No axis of the boarded configuration survives: three-domain ordered curriculum rather
+  than a single web corpus, a shifted evaluation mixture, a private vocabulary and permutation, private
+  held-out bytes, one H100, and time bounds anchored to our own measured reference. Control public-recipe-transfer
+  executes the published recipe on this corpus and must land below the gate before Phase 0.5 binds.
+
+
+  Deliverable manifest: /submission/c1s2.json (json), an object carrying checkpoint_series (every emitted
+  checkpoint with its harness stamp and held-out bits-per-byte), bar_crossings (the earliest clearing
+  checkpoint for each bar of the ordered family 1.09 / 1.02 / 0.96), recipe (the ordered stages with their
+  per-domain mixtures and token boundaries, mirroring recipe.json), clock (the first-corpus-read origin,
+  the graded seconds to the bar, the declared emission interval and the phase ledger) and init_spec (master
+  seed, vocabulary entry count and step-0 tensor digests).
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-NOOP-STARTER` targets the unchanged starter''s single-stage uniform mixture, the shortcut of
+  doing nothing; best bpb at 6.0e8-token exhaustion 1.074, never reaching 1.02; recorded score 0.0526.
+
+  - `CTL-NOOP-EMPTY` targets no recipe.json and no emitted checkpoint, the degenerate empty submission;
+  recorded score 0.
+
+  - `CTL-STALE-EMBEDDING` targets reuse a shipped or externally obtained embedding table instead of initialising
+  from the declared seed; rejected by CK-INIT with slug init-not-reproducible; recorded score 0.
+
+  - `CTL-STALE-SHARD` targets grade against a prior attempt''s held-out shard bytes; rejected by CK-DIGEST
+  with slug heldout-tampered; recorded score 0.
+
+  - `CTL-DECOY-MAJORITY` targets the 38-of-60 archived stage order endorsed by the report majority, the
+  shortcut of following the plurality of the haystack; best bpb 1.055 at exhaustion; recorded score 0.0552.
+
+  - `CTL-DISTRACTOR-HAYSTACK` targets the best recipe minable from the 60-report archive, the shortcut
+  of mining instead of measuring; best bpb 1.062; recorded score 0.0543.
+
+  - `CTL-LISTALL-ORDERINGS` targets execute all six stage permutations inside one graded run and report
+  the best, the list-all shortcut; trips CK-TOKENS with slug token-budget-exceeded; recorded score 0.
+
+  - `CTL-OW-SINGLE-DOMAIN` targets train exclusively on Congressional Record, the dominant held-out domain,
+  the shortcut of matching the evaluation mixture directly; best bpb 1.128; recorded score 0.0453.
+
+  - `CTL-OW-BUDGET-MISCOUNT` targets reproduce the starter''s sequence-unit token accounting so the declared
+  budget is silently mis-scaled; best bpb 1.089; recorded score 0.0506.
+
+  - `CTL-ORDER-PERMUTED` targets stage contents and mixture weights held fixed, ORDER permuted only, the
+  direct NOV2 order-sensitivity control and the strongest required control in the slot; best bpb 1.033,
+  missing L* by 0.013 bpb; recorded score 0.0582.
+
+  - `CTL-PUBLISHED-HEURISTIC` targets the anneal-toward-the-highest-quality-domain-last curriculum from
+  the public literature, the slot''s named partially-closed shortcut; best bpb 1.041 at exhaustion, missing
+  L* by 0.021 bpb; recorded score 0.0571.
+
+  - `CTL-PUBLIC-RECIPE-TRANSFER` targets the published nanoGPT/FineWeb-lineage speedrun recipe transferred
+  verbatim; best bpb 1.101; recorded score 0.049.
+
+  - `CTL-SINGLE-CLUE-BEST` targets each archived report taken alone as the whole recipe, 60 runs, the
+  shortcut that one report suffices; strongest single report best bpb 1.048; recorded score 0.0562.
+
+  - `CTL-ATK-HELDOUT-READ` targets read tests/heldout/ and fit to the graded bytes; recorded score 0.
+
+  - `CTL-ATK-SHIM-REWRITE` targets rewrite the harness memmap shim so the per-domain token trace matches
+  a declaration it did not execute; recorded score 0.
+
+  - `CTL-ATK-RECIPE-POSTEDIT` targets post-edit recipe.json after the run so the declaration matches the
+  trace rather than the plan; recorded score 0.
+
+  - `CTL-ATK-NONDET-KERNEL` targets disable the deterministic-kernel envelope (re-enable TF32 or a nondeterministic
+  reduction) to buy throughput at the cost of replayability; recorded score 0.
+
+  '
+provenance:
+  corpus: Three real, licence-clean corpora combined by us with per-document domain labels. (1) peS2o
+    v2, Allen Institute for AI, ODC-By 1.0, from https://huggingface.co/datasets/allenai/peS2o pinned
+    by revision sha. (2) Project Gutenberg public-domain books via the PG-19 release, DeepMind, books
+    are US public domain and the release tooling is Apache-2.0, from https://github.com/deepmind/pg19
+    and its published GCS bucket, pinned by manifest sha256. (3) United States Congressional Record, U.S.
+    Government Publishing Office, a U.S. Government work in the public domain under 17 U.S.C. 105, from
+    https://www.govinfo.gov/bulkdata/CREC pinned to a named package-date range. solution/recompute.py
+    performs a private document-id hash partition into shipped shards and into tests/heldout/private and
+    sibling, trains a private 49,152-entry byte-level BPE, applies a private vocab-id permutation, and
+    emits per-domain uint32 memmaps (train_pes2o.bin, train_pg19.bin, train_crec.bin, each with a bytelen
+    table) so the agent can mix at any ratio while the harness counts every consumed token by domain.
+    The held-out shards are built at the disclosed shifted mixture. No generative model is used; the derivation
+    is selection, mixture construction and label-space remapping.
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build time.
+      Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as the task-generating
+      event and never inherits the upstream freeze date, so authoring a date here before the derivation
+      runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: Three real, licence-clean corpora combined by us with per-document domain labels.
+      (1) peS2o v2, Allen Institute for AI, ODC-By 1.0, from https://huggingface.co/datasets/allenai/peS2o
+      pinned by revision sha. (2) Project Gutenberg public-domain books via the PG-19 release, DeepMind,
+      books are US public domain and the release tooling is Apache-2.0, from https://github.com/deepmind/pg19
+      and its published GCS bucket, pinned by manifest sha256. (3) United States Congressional Record,
+      U.S. Government Publishing Office, a U.S. Government work in the public domain under 17 U.S.C. 105,
+      from https://www.govinfo.gov/bulkdata/CREC pinned to a named package-date range. solution/recompute.py
+      performs a private document-id hash partition into shipped shards and into tests/heldout/private
+      and sibling, trains a private 49,152-entry byte-level BPE, applies a private vocab-id permutation,
+      and emits per-domain uint32 memmaps (train_pes2o.bin, train_pg19.bin, train_crec.bin, each with
+      a bytelen table) so the agent can mix at any ratio while the harness counts every consumed token
+      by domain. The held-out shards are built at the disclosed shifted mixture. No generative model is
+      used; the derivation is selection, mixture construction and label-space remapping.
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or a
+      task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with this
+      named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+canary:
+- AELLO-CANARY-72d05a4c8a700cb5b2dd380d915973f0
+- AELLO-CANARY-8a826d489be6b17621540f9b4483864e
+- AELLO-CANARY-69beabd69bc394c009872678193ca26b
+- AELLO-CANARY-dcd8b475c0b096ba59046c10e489bc6b
+
+canary:
+  - AELLO-CANARY-db8b1b3ed618b1b560f45ca25e91ec57
+  - AELLO-CANARY-45914acb9cc37312a164ee7b509ad070
+  - AELLO-CANARY-8ec4a1b6c989d9006c88fd0fa7ddf649
+  - AELLO-CANARY-32f7fc7c78381adbde8d73756d0bae61

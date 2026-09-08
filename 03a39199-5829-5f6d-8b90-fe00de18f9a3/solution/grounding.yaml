@@ -1,0 +1,1123 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S2
+compilation_floor: 1.0
+compilation_floor_basis: >-
+  PRD section 5.6: every deterministically reducible judgment is compiled. Every item below is
+  compiled, because every one of them reduces to a computation over delivered bytes -- the
+  submitted program's own source, the byte-capped carry store, the harness attempt record and the
+  agent's reward log. The outcome item is compiled too and refuses to score rather than scoring
+  from a constant Phase 0 has not measured.
+deliverable:
+  path: /submission/train.py
+  kind: python_source
+  shape: >-
+    the single-file training program the verifier executes once per graded configuration as
+    `python train.py --data <private data dir> --out <export path> --init-seed <integer>
+    --config-id <id> --carry carry/notes.json`, delivered together with the optional carry store
+    at carry/notes.json
+  shape_basis: >-
+    Nothing this task submits is scored on its contents. The graded object is a PROGRAM that the
+    verifier runs, plus a 2,048-byte store that survives between runs of it, and the graded
+    quantity is how long each run takes once its accuracy bar is cleared. So the compiled checks
+    grade the program as a program -- does it parse, does it consume the flags the verifier
+    passes, does it smuggle weights through its own source -- and grade the store as a memory
+    channel with a capacity, a schema and an expiry rule, rather than opening an array and
+    checking its shape.
+evaluation_target_vocabulary:
+- agent_reward_log
+- delivered_carry_store
+- harness_attempt_record
+- proposed_carry_store
+- submitted_program
+items:
+- id: train_program_lands_and_compiles
+  dimension: submitted_program
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_program
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    The program the verifier is asked to execute lands at the declared path, decodes as text and
+    parses as Python.
+  judgment: >-
+    /submission/train.py exists, decodes as UTF-8 and compiles under the Python compiler. This is
+    the one deliverable in this batch that is executed rather than read: a program that will not
+    parse is not a slow trainer, it is no trainer at all, and it fails every graded configuration
+    of the attempt at once rather than one of them. Absent or unparseable scores zero with reason
+    no_submission.
+- id: program_consumes_every_flag_the_verifier_passes
+  dimension: submitted_program
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_program
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The program accepts the five flags the launcher passes, and the recorded launch of every
+    graded configuration passed all five with the configuration's own identifier.
+  judgment: >-
+    The submitted source names each of --data, --out, --init-seed, --config-id and --carry, and
+    for every graded configuration the harness-recorded argv carries all five, its --config-id
+    equals that block's config_id and its --carry equals the published carry path. A program that
+    ignores --config-id trains the same model on thirty-two differently parameterized
+    configurations; a program that ignores --init-seed reproduces identical parameters across the
+    verifier's two seeds and trips C4-SEED; a program that ignores --carry has no memory and pays
+    the discovery probe inside the timed region on every run, which is what NC-AMNESIC measures.
+- id: source_tree_carries_no_smuggled_weights
+  dimension: submitted_program
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_program
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    The submitted source is a program, not a serialized model wearing one.
+  judgment: >-
+    The submitted source is at most 128 KB, decodes as text, and its syntax tree carries no
+    numeric literal array above 1,024 elements and no base64-shaped string literal above 4 KB.
+    Both bounds are recomputed here from the delivered bytes rather than read from a declaration.
+    A 6.5M-parameter net will not fit, but a distilled few-thousand-parameter head would, and it
+    would convert a task about training fast into a task about pasting a checkpoint. Violation
+    scores the attempt exactly 0 with reason source_payload_violation.
+- id: hardcoded_per_configuration_constants_are_provenanced
+  dimension: submitted_program
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_program
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    A configuration identifier written into the program's own source is backed by an observed
+    carry entry for that configuration.
+  judgment: >-
+    Every live config_id appearing as a string literal in train.py, whether as a dict key or a
+    comparison, has an entry in the submitted carry store marked src=observed. This is checker
+    C17-CONST, which seed/contract.yaml names in control CTRL-PCAM-JOIN and then omits from its
+    own checker roster. It closes the route where per-configuration geometry is recovered outside
+    the graded run -- by hash-joining the served crops against a public archive in the
+    egress-enabled sandbox, or by mining the shipped decoy logs -- and pasted into the source to
+    bypass the 2,048-byte channel entirely. Hardcoding constants the run actually observed stays
+    admissible; asserting constants no run of this attempt's history ever measured does not, and
+    scores the attempt exactly 0 with reason constants_unprovenanced.
+- id: carry_store_fits_the_two_kilobyte_channel
+  dimension: carry_store
+  weight: 5
+  knockout: true
+  evaluation_target: proposed_carry_store
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The submitted carry store is at most 2,048 bytes of valid UTF-8 JSON, and an oversize store
+    fails loudly rather than being truncated.
+  judgment: >-
+    carry/notes.json, when present, is at most 2,048 bytes on disk, decodes as UTF-8, parses as a
+    JSON object and carries at most one entry per configuration in the thirty-two-entry family.
+    An absent store is admissible and is not a failure -- the first attempt has none, and the
+    NC-AMNESIC control runs with none deliberately -- but a present one is capped. Thirty-two
+    entries against 2,048 bytes leaves 64 bytes an entry, so the full table does not fit as raw
+    JSON floats and the agent must choose an encoding rather than accumulate; that is what control
+    CTL-NAIVE-DUMP measures. Violation scores the attempt exactly 0 with reason
+    carry_store_invalid and the previous valid store is what carries forward.
+- id: carry_entries_carry_the_six_named_scalars_and_nothing_else
+  dimension: carry_store
+  weight: 5
+  knockout: true
+  evaluation_target: proposed_carry_store
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Every carry entry is one configuration's six named scalars plus the one-bit src field and an
+    optional short encoder tag, and nothing else.
+  judgment: >-
+    Each entry is keyed by a config_id of the live thirty-two-configuration family and carries
+    exactly the six published scalar fields -- flip, rho, ofs, scale, chan, amb -- each a finite
+    number rather than a list, object or string; a src field that is exactly 0 for observed or 1
+    for predicted; and at most one optional tag of at most 32 bytes. flip is a bit, ofs is the
+    packed crop-offset lattice index in 0..255, and scale lies inside the published band. No
+    unknown key, no array field and no base64 field is admitted. The closed schema is what keeps
+    the memory channel a calibration table rather than a weight store or an unbounded scratchpad:
+    without it the 2,048-byte cap could be spent on a serialized tensor and the whole memory
+    pressure the slot is built on would dissolve. Violation scores the attempt exactly 0 with
+    reason carry_store_invalid.
+- id: agent_store_writes_no_last_confirmed_stamp
+  dimension: carry_store
+  weight: 5
+  knockout: true
+  evaluation_target: proposed_carry_store
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    The store the agent submits carries no freshness stamp anywhere in it.
+  judgment: >-
+    No entry of the submitted carry/notes.json carries a last_confirmed field, at any depth. The
+    stamp is the one field only the verifier writes, and only for a configuration this attempt
+    actually graded and whose bar it actually cleared; an agent-written stamp would let a table
+    assert its own freshness and would make the eight-attempt expiry unenforceable from inside.
+    Any last_confirmed in the submitted store scores the attempt exactly 0 with reason
+    carry_stamp_forged.
+- id: observed_entries_name_configurations_this_run_graded
+  dimension: carry_store
+  weight: 3
+  knockout: false
+  evaluation_target: proposed_carry_store
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    An entry marked observed names a configuration this run has graded, and its constants match
+    what the verifier measured on the configurations this attempt graded.
+  judgment: >-
+    Every src=observed entry names a config_id in the harness-recorded graded history of this run,
+    and for each configuration this attempt graded, each stored scalar lies inside the published
+    per-field tolerance of the verifier's own measurement -- flip and ofs exact, scale 0.01, rho
+    0.05, chan 0.02, amb 0.05. Entries marked src=predicted are exempt from both arms by
+    construction, so generalizing across the latent family is a legitimate and rewarded route and
+    only the provenance claim is policed. This is what separates a memory that compounds from one
+    that is confidently wrong: mining the shipped decoy corpus, or resolving a configuration by
+    majority vote over records of the retired parameterization, produces exactly the entries this
+    check rejects. Violation scores the attempt exactly 0 with reason carry_fabricated.
+- id: stamps_are_verifier_written_and_expire_after_eight_attempts
+  dimension: carry_lifecycle
+  weight: 3
+  knockout: false
+  evaluation_target: delivered_carry_store
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Every stamp in the delivered store names an attempt at which that configuration was graded and
+    cleared its bar, and no stamp is more than eight attempts old.
+  judgment: >-
+    In the store delivered to this attempt, every last_confirmed is an integer attempt index at or
+    before the current one, appears in the harness's record of the attempts at which that
+    configuration cleared its bar, and is at most eight attempts old. Every observed entry carries
+    a stamp and every unstamped entry is marked predicted: an unstamped prediction has no
+    observation to go stale and survives, an observation that is not being refreshed does not.
+    That asymmetry is the decay rule the whole slot turns on, and under the published schedule
+    every one of the final attempt's eight configurations was last visited at attempt 29 through
+    36, so none of them can still be live as an observation at attempt 50 by the schedule alone.
+- id: carry_lifecycle_validates_stamps_expires_persists_then_reports
+  dimension: carry_lifecycle
+  weight: 3
+  knockout: false
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The carry lifecycle ran in the bound order, and the expired identifiers reported back equal
+    the ones the expiry rule selects.
+  judgment: >-
+    The recorded lifecycle trace is exactly validate, stamp, expire, persist, report, in that
+    order with no step missing, repeated or transposed, and the reported expired-identifier set
+    equals the recomputation over the incoming store's stamps at the eight-attempt time to live.
+    The order is load-bearing rather than decorative: stamping after expiry would revive an entry
+    the rule had just dropped, and persisting before expiry would carry it forward anyway. The
+    reported set is the agent's only feedback about what it lost, which is why it is checked
+    against a recomputation rather than taken from the report. Any inversion or mismatch scores
+    the attempt exactly 0 with reason carry_lifecycle_violation.
+- id: delivered_store_is_byte_identical_to_the_persisted_one
+  dimension: carry_lifecycle
+  weight: 3
+  knockout: false
+  evaluation_target: delivered_carry_store
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    What the previous attempt's verifier persisted is byte-for-byte what this attempt was handed.
+  judgment: >-
+    The sha256 of the delivered carry/notes.json equals the digest the harness recorded when it
+    persisted the validated, stamped, expiry-filtered store at the end of the previous attempt.
+    The first attempt of a run is delivered no store and records no previous digest, and that
+    case passes. The canonical store lives outside the agent's writable workspace, so this is the
+    one check that verifies the memory channel itself rather than what the agent put in it: every
+    other item in this bundle is meaningless if what compounds between attempts is not what was
+    saved. A mismatch scores the attempt exactly 0 with reason carry_delivery_mismatch.
+- id: timer_opens_at_the_first_private_data_read
+  dimension: timing_boundary
+  weight: 5
+  knockout: true
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Each configuration's clock opens at that run's first read of its private data directory and
+    closes at that run's export write, and the graded seconds are the difference.
+  judgment: >-
+    For every graded configuration the recorded timer_open stamp coincides with the first read of
+    that configuration's private data directory within the published epsilon, the timer_close
+    stamp is at or after the export write, the recorded elapsed equals close minus open within
+    the same epsilon, and every stage the run declares before the clock opens -- decoding the
+    carry store, importing torch, creating the CUDA context -- is stamped before that first read
+    rather than after it. Setup before the first private-data read is legitimate and is stated as
+    such in instruction.md; what is not legitimate is reading the private data before the clock
+    that is supposed to be timing that read. Inversion scores the attempt exactly 0 with reason
+    timer_order_violation.
+- id: graded_roster_is_the_published_schedule_and_the_eight_oldest_at_the_last_attempt
+  dimension: configuration_schedule
+  weight: 5
+  knockout: false
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    The attempt was graded on the configurations the published schedule selects, and the scored
+    attempt on the eight whose last scheduled visit is oldest.
+  judgment: >-
+    The graded roster is recomputed here from the published rule -- configurations (7t + o) mod 32
+    for o in 0, 11, 19 at attempt t, three per attempt for attempts one through forty-nine -- and
+    at attempt fifty from the eight configurations whose last scheduled visit is oldest, ties
+    broken by ascending config_id. It is compared against the roster the harness recorded, never
+    taken from it. The rule is published in full and its consequence is not: under it the final
+    eight were last visited at attempts 29 through 36, so at attempt fifty every one of them is at
+    least fourteen attempts stale against an eight-attempt time to live. An agent that refreshes
+    the configurations it has just seen arrives at the scored attempt with exactly the wrong half
+    of the table live.
+- id: gate_outcomes_recompute_from_the_shard_accuracies
+  dimension: shard_agreement
+  weight: 3
+  knockout: false
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Each configuration's recorded gate outcome is the one its own accuracies imply, on both the
+    published bar and the sibling gap.
+  judgment: >-
+    For every graded configuration the recorded balanced accuracies on private_A(c) and
+    private_B(c) are in the unit interval, their absolute difference is at most 0.015, and the
+    recorded gate agrees with the recomputation: a gap above 0.015 must be recorded as
+    sibling_gap_violation and nothing else, an accuracy below that configuration's published bar
+    b_c must be recorded as below_bar unless a harder gate fired first, and a configuration
+    recorded as cleared must clear both. The two private shards are image-disjoint draws of the
+    same configuration, so a gap between them is a model fitted to one draw rather than to the
+    configuration; and a gate outcome that its own numbers contradict is the one way a fast run
+    that missed its bar could still be timed on the ramp.
+- id: exported_parameters_move_with_the_verifier_supplied_seed
+  dimension: seed_dependence
+  weight: 3
+  knockout: false
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    Re-running one graded configuration under the verifier's second init seed produces different
+    parameters that still clear the bar.
+  judgment: >-
+    At the scored attempt the harness re-runs one of the graded configurations with a distinct
+    verifier-supplied init seed; the two exports must differ in digest, their parameter tensors
+    must differ in mean absolute value beyond the published epsilon, and both runs must clear that
+    configuration's bar. Attempts before the scored one record no re-run and the check reports
+    that rather than inventing a failure. Identical parameters across two distinct seeds mean the
+    program did not train -- it emitted something it was carrying -- and that scores the attempt
+    exactly 0 with reason seed_independent_parameters. This is the bind that makes a smuggled
+    checkpoint a wrong deliverable rather than a fast one.
+- id: reward_log_agrees_with_the_harness_within_the_published_tolerances
+  dimension: reporting_integrity
+  weight: 3
+  knockout: false
+  evaluation_target: agent_reward_log
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: >-
+    What the run wrote to its own reward log matches what the harness measured, inside the
+    published tolerances.
+  judgment: >-
+    reward_log.jsonl carries one line for each configuration this attempt graded, and each line's
+    claimed balanced accuracy is within 0.05 of the harness measurement and its claimed elapsed
+    seconds within 10 percent of the harness elapsed. The log is the agent's own record and the
+    harness's is the graded one, so this check exists to make the two agree rather than to grade
+    the log: a run whose self-reported elapsed drifts from the host clock is either mis-measuring
+    its own timed region, which will cost it the ramp, or reporting a number it did not measure,
+    which scores the attempt exactly 0 with reason log_fabrication.
+- id: heldout_shards_and_canonical_carry_state_unwritten
+  dimension: isolation
+  weight: 5
+  knockout: true
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: >-
+    The graded run wrote nothing into the grading tree, the private shards or the harness-private
+    canonical carry state, opened no socket and saw one GPU.
+  judgment: >-
+    No path under tests/, tests/heldout/, the private data root or the harness-private canonical
+    carry state was created or modified during the graded run -- read from the harness's own
+    record of touched paths and corroborated by the run's own declaration, never from a post-hoc
+    scan -- the digests of the held-out shards and of the canonical carry state are unchanged
+    across the run, no socket syscall was observed inside the network-isolated verifier
+    environment, and exactly one GPU was visible. The canonical carry state is named here
+    explicitly because it is the one guarded object that is not a corpus: an agent that could
+    write it could stamp its own table. Violation scores the attempt exactly 0 with reason
+    grading_tree_mutated or isolation_violation.
+- id: refresh_and_exploit_budget_declared_per_configuration
+  dimension: budget_accounting
+  weight: 3
+  knockout: false
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: >-
+    The agent declares its budget in this task's own terms: configurations graded, seconds each,
+    and how many attempts went to refreshing rather than exploiting.
+  judgment: >-
+    The run record carries an agent-authored declaration naming graded_configurations,
+    seconds_per_configuration, attempts_spent_refreshing and attempts_spent_exploiting, each a
+    non-negative number, with graded_configurations equal to the number of configurations this
+    attempt actually graded and the two attempt counts summing to at most the current attempt
+    index. The declaration is what is graded, not the harness's own measurement, so it cannot be
+    satisfied by a field the harness writes. The refresh-versus-exploit split is asked for
+    because it is the choice this slot is actually about: an attempt spent re-observing a
+    configuration whose entry is about to expire buys nothing this attempt and is the only thing
+    that keeps the scored one from being graded on re-derivation.
+- id: bar_gated_wallclock_ramp_over_the_scored_attempt
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: harness_attempt_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: >-
+    The mean bar-gated wall clock over the attempt's graded configurations, mapped through the
+    published descending ramp.
+  judgment: >-
+    Per graded configuration c, the wall-clock seconds T_c the harness measured from that run's
+    first read of the private data directory to the completion of its export write, taken as the
+    mean over the attempt's graded configurations -- three for attempts one through forty-nine,
+    the eight oldest-visited at the scored attempt fifty, which is the scored one because final
+    selection is last. A configuration whose gate did not clear contributes the ramp's slow anchor
+    rather than its own elapsed, so speed bought by missing the bar, exceeding the ceiling,
+    breaking the sibling gap or exporting something inadmissible cannot move the axis; the reward
+    map's informative sub-band below the bar is a property of r_c and is not this axis. Fewer
+    seconds is better, so the ramp descends: S_outcome = clamp((floor - T) / (floor - knee), 0, 1),
+    and the item passes when T is at or below the dichotomizing threshold, which is a time on this
+    axis and not a score. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises
+    ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the
+    measurement wave writes them on the grading host.
+corpus_layout:
+  corpus_status: not-landed
+  corpus_status_reason: >-
+    seed/build/land_corpora.py has not run for this slot. STL-10 is staged and sha256-pinned at
+    seed/build/substrates/stl10.tar.gz, but the thirty-two private configurations have not been
+    cut, so environment/data/ and tests/heldout/ do not exist in seed/stage/c8s2 and no check here
+    was written against bytes anyone has inspected. Stated rather than hidden: the paths, the
+    configuration roster, the carry schema, the attempt schedule and the tolerances below are the
+    layout the corpus must land against, and a disagreement when it lands is a corpus-landing
+    failure to repair at Phase 1, not a licence to re-pin the graded family after seeing it.
+  proposed_carry_store: carry/notes.json
+  delivered_carry_store: carry/delivered_notes.json
+  delivered_carry_store_basis: >-
+    Two paths, because the check that the channel is honest needs both ends of it. carry/notes.json
+    is what this attempt proposes and the agent writes; carry/delivered_notes.json is the
+    read-only byte-identical copy of what the previous attempt's verifier persisted, which the
+    harness drops into the sandbox at the start of the attempt. The canonical state itself is
+    harness-private and is never in the agent's writable workspace.
+  canonical_carry_state: /var/lib/aello/c8s2/canonical_carry.json
+  run_record: run_record.json
+  run_record_basis: >-
+    Written beside the bundle root and read by the verifier. The harness fills the per-configuration
+    block and the isolation, lifecycle and replay fields from its own measurement; the agent fills
+    the budget declaration. instruction.md publishes every key the compiled checks read, so no
+    check grades an obligation the agent was never told to carry.
+  reward_log: reward_log.jsonl
+  private_data_root: environment/data/private
+  heldout_root: tests/heldout
+  published_bars: environment/data/config_bars.json
+  decoy_logs: environment/logs
+  decoy_recipe: environment/notes/recipes.md
+  split_discipline: >-
+    private_train(c) is mounted per graded configuration at the path --data names and is not in
+    the agent tree between runs; private_A(c) and private_B(c) live only under tests/heldout/,
+    which red line 1 forbids the graded run from touching and which only the separate verifier
+    environment mounts. The thirty-two published bars b_c ship agent-visible, because a bar the
+    agent cannot see cannot be aimed at; the six per-configuration constants behind them never do,
+    because they are the discovery cost the whole ramp is made of. environment/logs/ ships 6,400
+    lines of per-attempt records from a retired parameterization whose config_id names collide
+    with the live family, and environment/notes/recipes.md ships a confident 32px fast-training
+    recipe; both are decoys and both are agent-visible on purpose.
+  configuration_count: 32
+  config_roster:
+  - stl32-00
+  - stl32-01
+  - stl32-02
+  - stl32-03
+  - stl32-04
+  - stl32-05
+  - stl32-06
+  - stl32-07
+  - stl32-08
+  - stl32-09
+  - stl32-10
+  - stl32-11
+  - stl32-12
+  - stl32-13
+  - stl32-14
+  - stl32-15
+  - stl32-16
+  - stl32-17
+  - stl32-18
+  - stl32-19
+  - stl32-20
+  - stl32-21
+  - stl32-22
+  - stl32-23
+  - stl32-24
+  - stl32-25
+  - stl32-26
+  - stl32-27
+  - stl32-28
+  - stl32-29
+  - stl32-30
+  - stl32-31
+  config_roster_basis: >-
+    Thirty-two configurations over STL-10's ten classes at 96x96, each a class subset with its own
+    label orientation, class-prior skew, crop offset, crop scale, per-channel statistics and
+    boundary-ambiguity level. The identifiers are authored and pinned here before any measurement,
+    and the shipped decoy corpus reuses the same names for a retired parameterization so that
+    mining it is a live confusion rather than an obviously foreign table.
+  launch_flags:
+  - --data
+  - --out
+  - --init-seed
+  - --config-id
+  - --carry
+  attempt_schedule:
+    attempts_total: 50
+    graded_per_attempt: 3
+    final_attempt: 50
+    final_attempt_configurations: 8
+    stride: 7
+    offsets:
+    - 0
+    - 11
+    - 19
+    modulus: 32
+    tie_break: ascending config_id
+    rule: >-
+      attempt t in 1..49 grades the three configurations with indices (7t + o) mod 32 for o in
+      0, 11, 19; attempt 50 grades the eight configurations whose last scheduled visit over
+      attempts 1..49 is oldest, ties broken by ascending config_id.
+    rule_basis: >-
+      7 is invertible modulo 32, so the stride visits all thirty-two configurations and every one
+      is graded at least three times across the run; the three offsets are distinct modulo 32, so
+      no attempt grades the same configuration twice. Recomputed rather than tabulated so the
+      check reads the rule the instruction publishes rather than an answer authored beside it.
+      The consequence is deliberate and is not published as an answer: the eight oldest-visited
+      were last seen at attempts 29 through 36, so at attempt 50 each of them is at least fourteen
+      attempts stale against the eight-attempt time to live.
+  carry_schema:
+    max_bytes: 2048
+    scalar_fields:
+    - flip
+    - rho
+    - ofs
+    - scale
+    - chan
+    - amb
+    scalar_field_meanings: >-
+      flip is the configuration's label orientation, a bit; rho is its class-prior skew, the ratio
+      of the largest class prior to the smallest, at least 1; ofs is its crop offset packed as one
+      integer dy*16 + dx over the published 16x16 offset lattice, 0 to 255; scale is its crop
+      scale in the published band; chan is its channel gain, the mean over the three channels of
+      that configuration's channel standard deviation over the STL-10 corpus channel standard
+      deviation; amb is its boundary-ambiguity level in the unit interval. Six constants, six
+      scalars, and a crop offset that has to be packed into one number rather than stored as a
+      pair, which is where the encoding pressure starts.
+    src_field: src
+    src_observed: 0
+    src_predicted: 1
+    optional_tag_field: tag
+    tag_max_bytes: 32
+    forbidden_fields:
+    - last_confirmed
+    stamp_field: last_confirmed
+    flip_values:
+    - 0
+    - 1
+    off_min: 0
+    off_max: 255
+    scale_min: 0.62
+    scale_max: 0.88
+    rho_min: 1.0
+    amb_min: 0.0
+    amb_max: 1.0
+  carry_field_tolerances:
+    flip: 0.0
+    rho: 0.05
+    ofs: 0.0
+    scale: 0.01
+    chan: 0.02
+    amb: 0.05
+  carry_field_tolerances_basis: >-
+    The per-field tolerance C10-CARRYDIV compares an src=observed entry against the verifier's own
+    measurement with. flip and ofs are exact because they are discrete: a label orientation is
+    right or inverted and a lattice index is one cell or another. The four continuous fields carry
+    a tolerance wide enough that an honest estimate from a graded run passes and narrow enough
+    that a value lifted from the retired parameterization does not.
+  carry_ttl_attempts: 8
+  lifecycle_order:
+  - validate
+  - stamp
+  - expire
+  - persist
+  - report
+  block_keys:
+  - config_id
+  - argv
+  - init_seed
+  - elapsed_s
+  - timer_open_s
+  - timer_close_s
+  - first_private_read_s
+  - export_write_s
+  - export_sha256
+  - balanced_accuracy_a
+  - balanced_accuracy_b
+  - bar
+  - gate
+  gate_outcomes:
+  - cleared
+  - below_bar
+  - time_ceiling_exceeded
+  - sibling_gap_violation
+  - export_invalid
+  cleared_gate: cleared
+  below_bar_gate: below_bar
+  sibling_gap_gate: sibling_gap_violation
+  sibling_gap_max: 0.015
+  timer_epsilon_s: 0.25
+  timer_epsilon_basis: >-
+    seed/contract.yaml records the measured in-timer harness overhead on this host as 0.2355 s,
+    replacing an earlier asserted 2 s. The epsilon is that measurement rounded up to 0.25 s: it is
+    the width of the instrument, not a grace period, and at the reference's 30 to 40 s per
+    configuration it is under one percent of the graded quantity.
+  log_tolerances:
+    accuracy: 0.05
+    elapsed_fraction: 0.1
+  source_limits:
+    max_bytes: 131072
+    max_numeric_literal_array: 1024
+    max_base64_literal_bytes: 4096
+  seed_divergence_epsilon: 1.0e-06
+  budget_keys:
+  - graded_configurations
+  - seconds_per_configuration
+  - attempts_spent_refreshing
+  - attempts_spent_exploiting
+  guarded_writes:
+  - tests/
+  - /heldout/
+  - environment/data/private
+  - canonical_carry
+measurement_tier: gpu
+measurement_tier_basis: trains an image classifier once per graded configuration on one H100
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  ramp_units: >-
+    seconds. The axis is the mean bar-gated wall clock over the attempt's graded configurations
+    and it is descending: floor is the slow anchor, the per-configuration ceiling, and knee is the
+    fast anchor at which reward saturates. dichotomizing_threshold is a time on the same axis, not
+    a score. The ramp between them is logarithmic, matching the reward map:
+    S_outcome = clamp((ln floor - ln T) / (ln floor - ln knee), 0, 1).
+  measured_values_reason: >-
+    Null by seed/contract.yaml's own convention: every quantity recorded null is measured at Phase
+    1 build time on the grading host and never authored at Phase 0. The 2026-08-18 repoint from
+    PatchCamelyon to STL-10 additionally nulled the anchors this slot's previous design carried --
+    the per-configuration bars b_c, the slow and fast time anchors and the reference completion
+    time -- because they were measured on a substrate this slot no longer uses. Authoring a floor,
+    a knee or an ablation worth here would invent a measurement the bytes have not earned.
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: >-
+    a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0 asserts
+    the agent failed and null asserts the slot is not yet measurable
+  becomes_gradeable_when: >-
+    the Phase 2 measurement wave writes the four constants above on the grading host, over an
+    STL-10 configuration family that has landed
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: >-
+  No source was attempted for this slot's knee anchor at Phase 0. The anchor rule binds the knee
+  to a value not derived from this slot's own measurement, and the previous design's 60 s knee was
+  anchored to a PatchCamelyon reference this slot no longer runs.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.25
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+  composition_basis: >-
+    The ceiling is 0.25 rather than 0.05 because seed/contract.yaml's judged_reduction binds it
+    there: strictly below the dichotomizing threshold, below the NC-AMNESIC control's score so
+    that a rubric failure scores no better than the memory-less control, and above the 0.08
+    sub-band ceiling so that a rubric failure stays distinguishable from a hard-gate zero.
+reward_map:
+  full_reward: 1.0
+  shape: >-
+    r_det is zero on any red line and on any knockout failure. Otherwise, per graded configuration
+    c: zero on a per-configuration gate failure; 0.08 * clip((a_c - 0.50) / (b_c - 0.50), 0, 1)
+    when balanced accuracy is below that configuration's published bar, an informative sub-band
+    strictly below 0.08; and 0.08 + 0.92 * clip((ln floor - ln T_c) / (ln floor - ln knee), 0, 1)
+    once the bar is cleared. r_det is the mean of r_c over the attempt's graded configurations,
+    three for attempts one through forty-nine and the eight oldest-visited at attempt fifty, which
+    is the scored attempt because final selection is last. The compiled outcome check grades the
+    same axis one level up: the mean bar-gated wall clock over those configurations through the
+    same logarithmic ramp, with a configuration whose gate did not clear contributing the slow
+    anchor rather than its own elapsed.
+  unmeasured: >-
+    floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and the
+    slot is authored but not gradeable.
+truth_narrative:
+  opening: >-
+    Your deliverable each attempt is train.py at the top of the work directory plus an optional
+    carry store at carry/notes.json. The verifier launches your program once per graded
+    configuration as `python train.py --data <private data dir> --out <export path> --init-seed
+    <integer> --config-id <id> --carry carry/notes.json` in a network-isolated container on one
+    H100, times each run host-side from the first read of the private data directory to the write
+    of that run's export, and evaluates each export on a private image-disjoint STL-10 shard it
+    never gives you. There are thirty-two private configurations. Each carries its own label
+    orientation, class-prior skew, crop offset, crop scale, channel statistics and
+    boundary-ambiguity level, and instruction.md publishes the per-configuration balanced-accuracy
+    bar b_c for all thirty-two but publishes none of the six constants. Attempts one through
+    forty-nine are graded on three configurations each, drawn by a deterministic schedule that
+    instruction.md publishes in full; attempt fifty, which is the scored attempt because final
+    selection is last, is graded on the eight configurations whose last scheduled visit is oldest
+    at that point. Clear b_c on a configuration and your score for it rises as that run gets
+    faster, saturating at the published knee and falling to the gate value at the published
+    per-configuration ceiling; the attempt score is the mean over its graded configurations.
+    Between attempts the harness carries forward exactly one artifact: carry/notes.json, at most
+    2,048 bytes, validating against the closed schema instruction.md prints, one entry per
+    configuration with six named scalar fields and a one-bit src field marking the entry observed
+    or predicted. The harness never truncates it: an oversize or schema-invalid store fails the
+    attempt loudly with reason carry_store_invalid and the previous valid store is what carries
+    forward. The verifier alone writes each entry's last_confirmed stamp, and only when that
+    attempt actually graded that configuration and cleared its bar; any entry whose stamp is more
+    than eight attempts old is dropped before the store is delivered to the next attempt, and the
+    identifiers dropped are reported back to you in that attempt's record. A bounded number of
+    configurations are re-parameterized once during the run; how many, which, and when are not
+    published. Everything about how you train, what you store, how you encode it and when you
+    spend an attempt refreshing rather than exploiting is yours to choose, and the shipped
+    starter/train.py is a working, deliberately unoptimized program that ignores the carry store
+    entirely and that you may replace outright. The four requirements are jointly binding rather
+    than a checklist: a fast trainer without the calibration misses the bars, the calibration
+    without an encoding that fits 2,048 bytes fails loudly, the encoding without a refresh policy
+    arrives at attempt fifty with the wrong half of the table live, and the refresh policy without
+    a fast trainer caps every configuration at the slow end of the same ramp.
+  insight: >-
+    The time that separates a full-reward run from a floor run is not training time, it is
+    discovery time, and discovery time can only be paid inside the timed region. A program handed
+    a configuration it knows nothing about has to find that configuration's label orientation,
+    prior skew, crop offset, crop scale, channel gain and ambiguity level by probing the private
+    shard it was just given, and that probe costs about as much wall clock as the training it
+    precedes. So the only way to be fast is to already know, and the only channel that carries
+    knowing from one attempt to the next is 2,048 bytes wide, closed-schema, and expires eight
+    attempts after the verifier last confirmed an entry. Read the schedule before you read
+    anything else: attempt fifty is graded on the eight configurations whose last scheduled visit
+    is oldest, which under the published rule were last visited at attempts 29 through 36, so
+    every one of them is at least fourteen attempts past its time to live when it is graded. No
+    scheduled visit can keep those eight live as observations. What survives expiry is what you
+    marked predicted, and marking an entry predicted is honest exactly when you did not observe
+    it, so the route the design rewards is to observe what the schedule gives you, generalize
+    across the latent family to the configurations it does not, and carry the generalization
+    forward under its own provenance. The route it punishes is to relabel a guess as an
+    observation, which is a zero rather than a lower score.
+  steps:
+  - heading: Read the schedule and work out which eight are graded
+    paragraph: >-
+      instruction.md publishes the attempt schedule in full: attempt t grades configurations
+      (7t + o) mod 32 for o in 0, 11, 19, and attempt fifty grades the eight whose last scheduled
+      visit is oldest. Compute that set on attempt one, not attempt forty. Everything downstream
+      -- what to observe, what to encode, when to refresh -- is a scheduling decision against
+      those eight, and an agent that never runs the arithmetic optimises the half of the table it
+      is not graded on.
+  - heading: Make the discovery probe cheap enough to be worth repeating
+    paragraph: >-
+      Before memory can help you, you need something worth remembering. Recover a configuration's
+      six constants from private_train(c) itself -- a label-orientation probe on a small balanced
+      subsample, a channel-statistics pass, an offset search over the published lattice -- and
+      measure what that probe costs inside the timed region. It is the quantity NC-AMNESIC turns
+      into a score, and it is the reason a memory-less run lands near the bottom of the ramp
+      instead of somewhere in the middle.
+  - heading: Get the trainer under the knee with the constants known
+    paragraph: >-
+      With the six constants in hand the run is an ordinary short training job on 96px images, and
+      the levers are the ordinary ones: a single staged uint8 host-to-device transfer, bf16
+      channels-last, one-cycle scheduling, progressive resolution, and a residual net small enough
+      to converge inside the budget. Profile the data pipeline before touching the architecture --
+      the shipped starter loses more time to per-batch host decoding than to arithmetic.
+  - heading: Encode the table so thirty-two entries fit in 2,048 bytes
+    paragraph: >-
+      Thirty-two entries against a 2,048-byte cap is 64 bytes an entry including the JSON
+      punctuation. Six full-precision floats do not fit; six quantized scalars at the published
+      tolerances do. Quantize to the tolerance each field is actually compared at -- flip and ofs
+      are discrete, scale needs 0.01, chan 0.02, rho and amb 0.05 -- and check the encoded size
+      before you submit, because an oversize store does not truncate, it fails the attempt.
+  - heading: Mark provenance honestly and let prediction do the carrying
+    paragraph: >-
+      An entry you measured on a configuration this run graded is observed; an entry you inferred
+      from the latent structure is predicted. The verifier recomputes the first kind and exempts
+      the second, so predicted entries are the ones that can survive expiry, and calling a guess
+      an observation is a zero rather than a risk. Fit the latent map across the configurations
+      you have observed and use it to populate the ones you have not.
+  - heading: Spend attempts refreshing on a schedule you chose
+    paragraph: >-
+      Stamps are verifier-written and expire eight attempts after the last confirmation, and the
+      final eight are graded fourteen or more attempts after their last scheduled visit. Decide
+      early how many of the fifty attempts are refresh attempts, declare the split in the run
+      record, and treat an attempt whose graded configurations you already know cold as an
+      opportunity to re-observe rather than a chance to shave another second.
+  - heading: Carry a consistency check for the re-parameterization
+    paragraph: >-
+      A bounded number of configurations are re-drawn once during the run, and the feedback
+      carries no per-constant diagnostic to tell you which. A stored constant that has gone
+      quietly wrong costs both bars on that configuration and diagnoses as nothing. Validate each
+      recovered constant against the shard you were just handed at a cost you can afford -- under
+      a second -- and fall back to the latent-map prediction when the check fails.
+  - heading: Keep the timer boundary and the log honest
+    paragraph: >-
+      Decode the carry store, import your libraries and create the CUDA context before the first
+      read of the private data directory; all of that is legitimately outside the timed region and
+      it is stated as such. What is not legitimate is reading the private data before the clock
+      that times that read, or writing an elapsed to reward_log.jsonl that the host did not
+      measure. Both are zeros with one reason code each, not a slower ramp.
+  traps:
+  - >-
+    Establishes the correct six constants for a configuration at an early attempt, leaves them in
+    the trajectory summary rather than encoding them into the carry store, and by attempt fifty
+    has to re-derive them inside the timed region on most of the eight graded configurations,
+    landing at the slow end of the ramp everywhere.
+  - >-
+    Rewrites carry/notes.json fresh each attempt from that attempt's three observations,
+    overwriting the accumulated table, so at most three entries are ever live and the
+    eight-configuration final attempt is graded almost entirely on re-derivation.
+  - >-
+    Dumps the full thirty-two-entry table as raw JSON floats, exceeds 2,048 bytes, and the attempt
+    fails loudly with carry_store_invalid while the previous, smaller store is what carries
+    forward, costing the attempt and teaching the wrong lesson if the reason code is not read.
+  - >-
+    Never works out that the final attempt is graded on the eight oldest-visited configurations,
+    refreshes the recently-visited entries instead, and arrives at the scored attempt with exactly
+    the wrong half of the table live.
+  - >-
+    Marks everything observed because observed sounds stronger, and watches the whole table expire
+    on the eight-attempt clock while a predicted entry it never wrote would have survived.
+  - >-
+    Trusts stored constants past the bound re-parameterization and trains two configurations
+    against stale geometry and a stale prior, clearing neither bar and never diagnosing why,
+    because the feedback carries no per-constant diagnostic.
+  - >-
+    Mines the shipped decoy log corpus, resolves conflicting per-configuration records by majority
+    vote, and stores constants from the retired parameterization, so its memory is confidently
+    wrong rather than merely empty.
+  - >-
+    Fabricates entries marked observed for configurations the run never graded and zeroes on
+    carry_fabricated, when marking them predicted would have been admissible.
+  - >-
+    Ports a published fast-CIFAR speedrun recipe whose schedule, batch size and augmentation are
+    tuned for 32px inputs and never clears the bars at 96px on an image-disjoint STL-10 split.
+  - >-
+    Downloads a pretrained ImageNet backbone or a self-supervised STL-10 encoder, fine-tunes it
+    locally, and embeds or re-downloads it, then zeroes at grade time on source_payload_violation,
+    seed_independent_parameters or isolation_violation.
+  - >-
+    Hardcodes per-configuration constants into train.py that no graded run of this attempt's
+    history observed, and zeroes on constants_unprovenanced rather than bypassing the 2,048-byte
+    channel.
+  - >-
+    Spends the fifty-attempt budget on architecture search when the reachable gains live in the
+    calibration table, its encoding under the cap, and the refresh schedule.
+  - >-
+    Clears every bar but only near the ceiling on every configuration, saturating the slow end of
+    the ramp because the probe cost was never removed and the data pipeline was never profiled.
+  - >-
+    Reorders work to move cost outside the timed region in a way that reads the private data
+    before the declared point and trips the timer-order check.
+truth_annex: |-
+  Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+  1. `train_program_lands_and_compiles` (compiled, weight 5, knockout) -- the program the verifier
+  executes lands at /submission/train.py, decodes as text and parses.
+
+  2. `program_consumes_every_flag_the_verifier_passes` (compiled, weight 5, knockout) -- the five
+  launch flags are accepted, and every graded configuration was launched with all five and its own
+  identifier.
+
+  3. `source_tree_carries_no_smuggled_weights` (compiled, weight 5, knockout) -- 128 KB, text only,
+  no numeric literal array above 1,024 elements, no base64 literal above 4 KB, recomputed from the
+  delivered bytes. Contract checker C5-SRC.
+
+  4. `hardcoded_per_configuration_constants_are_provenanced` (compiled, weight 3) -- a config_id
+  written into the source is backed by an src=observed carry entry. Contract checker C17-CONST.
+
+  5. `carry_store_fits_the_two_kilobyte_channel` (compiled, weight 5, knockout) -- 2,048 bytes,
+  UTF-8, JSON object, at most one entry per configuration. Contract checker C6-CARRY.
+
+  6. `carry_entries_carry_the_six_named_scalars_and_nothing_else` (compiled, weight 5, knockout) --
+  the closed schema: six named scalars, a one-bit src, an optional 32-byte tag, no array and no
+  base64. Contract checker C6-CARRY.
+
+  7. `agent_store_writes_no_last_confirmed_stamp` (compiled, weight 5, knockout) -- the submitted
+  store carries no freshness stamp at any depth. Contract checker C7-STAMP.
+
+  8. `observed_entries_name_configurations_this_run_graded` (compiled, weight 3) -- observed
+  entries name graded configurations and match the verifier's own measurement inside the published
+  per-field tolerances; predicted entries are exempt. Contract checker C10-CARRYDIV.
+
+  9. `stamps_are_verifier_written_and_expire_after_eight_attempts` (compiled, weight 3) -- every
+  delivered stamp names an attempt at which that configuration cleared its bar and is at most
+  eight attempts old; observed implies stamped. Contract checkers C7-STAMP and C8-EXPIRE.
+
+  10. `carry_lifecycle_validates_stamps_expires_persists_then_reports` (compiled, weight 3) -- the
+  bound lifecycle order holds and the reported expired set equals the recomputation. Contract
+  checker C8-EXPIRE.
+
+  11. `delivered_store_is_byte_identical_to_the_persisted_one` (compiled, weight 3) -- what was
+  persisted is what was delivered, by digest. Contract checker C16-PERSIST.
+
+  12. `timer_opens_at_the_first_private_data_read` (compiled, weight 5, knockout) -- the clock
+  opens at the first private-data read and closes at the export write, and the recorded elapsed is
+  the difference. Contract checker C14-ORDER.
+
+  13. `graded_roster_is_the_published_schedule_and_the_eight_oldest_at_the_last_attempt`
+  (compiled, weight 5) -- the graded roster is recomputed from the published rule rather than read
+  from the record.
+
+  14. `gate_outcomes_recompute_from_the_shard_accuracies` (compiled, weight 3) -- each gate outcome
+  is the one its own accuracies imply, on the bar and on the 0.015 sibling gap. Contract checkers
+  C1-ACC and C3-SIB.
+
+  15. `exported_parameters_move_with_the_verifier_supplied_seed` (compiled, weight 3) -- two
+  distinct verifier seeds produce distinct parameters that both clear the bar. Contract checker
+  C4-SEED.
+
+  16. `reward_log_agrees_with_the_harness_within_the_published_tolerances` (compiled, weight 3) --
+  0.05 on accuracy, 10 percent on elapsed. Contract checker C13-LOG.
+
+  17. `heldout_shards_and_canonical_carry_state_unwritten` (compiled, weight 5, knockout) -- no
+  write into the grading tree, the private shards or the canonical carry state; no socket; one
+  GPU. Contract checker C11-ISO.
+
+  18. `refresh_and_exploit_budget_declared_per_configuration` (compiled, weight 3) -- the agent's
+  own budget declaration, in configurations, seconds and refresh-versus-exploit attempts.
+
+  19. `bar_gated_wallclock_ramp_over_the_scored_attempt` (compiled, weight 10, knockout) -- the
+  mean bar-gated wall clock over the attempt's graded configurations through the published
+  descending logarithmic ramp. Contract checkers C2-TIME and C12-EXPORT enter it as gate outcomes.
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+  - Lookup shortcut on the corpus: STL-10 is a public benchmark with public repositories and
+  published accuracies, and public fast-training speedrun code exists for other vision corpora.
+  -- controlled by: no published work optimizes wall-clock to a per-configuration bar on a private
+  thirty-two-configuration STL-10 re-derivation under a cross-attempt calibration protocol, so no
+  repository is a near-optimal solution to the stated objective. Each b_c is anchored above the
+  shipped starter's converged accuracy on that configuration and proven unreachable by that
+  starter at any budget inside the ceiling. Published STL-10 numbers use the public split,
+  unlimited time and often self-supervised pretraining on the 100,000-image unlabeled pool, none
+  of which survive the graded route, and none of them know any configuration's label orientation,
+  prior skew or crop geometry.
+
+  - Public benchmark collision: 1GC-7RC (arXiv 2605.17046) publishes an open GitHub harness whose
+  T2 is 200-class TinyImageNet from scratch, no pretrained weights, no internet, 40-120 minutes on
+  one GPU, which is also the OPT4 anchor's setup. -- controlled by: this slot deliberately avoids
+  TinyImageNet, the 200-class setup and the 40-120 minute band. The corpus is STL-10 at 96px, the
+  budget band is seconds rather than tens of minutes per configuration, and the graded object is a
+  program plus a byte-capped expiring calibration store re-executed from a verifier-supplied seed
+  across a rotating private configuration family, none of which the 1GC-7RC harness covers.
+
+  - Weight smuggling inside the source tree: a small network's parameters can be serialized as
+  literals in a Python file. -- controlled by: three independent binds. C5-SRC caps the source tree
+  at 128 KB, text only, with no numeric literal array above 1,024 elements and no base64 blob
+  above 4 KB, recomputed from the delivered bytes rather than declared; C4-SEED requires the graded
+  parameters to actually depend on the verifier-supplied init seed; and the per-configuration
+  label orientation, prior skew and crop geometry make constants fitted against the shipped public
+  split meaningless. instruction.md states all three rules plainly, so the agent is told rather
+  than only defeated.
+
+  - Turning the carry store into a weight store or an unbounded scratchpad, which would dissolve
+  the memory pressure by making the channel lossless. -- controlled by: C6-CARRY enforces a closed
+  schema of one entry per configuration with six named scalar fields plus a one-bit src field and
+  an optional 32-byte encoder tag, admits no array field and no base64, and caps the whole file at
+  2,048 bytes. Violation fails loudly with carry_store_invalid rather than being truncated or
+  silently graded down, so the cap is an interface the agent can see binding rather than a trap.
+
+  - Fabricating the calibration table by guessing or by lifting it from the shipped decoy corpus,
+  so that memory appears to compound without any observation having been made. -- controlled by:
+  C7-STAMP makes last_confirmed verifier-written and rejects any agent-supplied stamp field with
+  carry_stamp_forged; C10-CARRYDIV recomputes every entry marked observed against the verifier's
+  own measurement for configurations the run actually graded and zeroes on carry_fabricated.
+  Entries marked predicted are deliberately exempt, so honest generalization from the latent
+  structure is a legitimate and rewarded route while fabricated provenance is not.
+
+  - Using train.py's own source as an unbounded memory channel, hardcoding all thirty-two entries
+  each attempt and bypassing the 2,048-byte cap. -- controlled by: the sandbox is fresh from the
+  pinned image every attempt, so train.py is regenerated each attempt from the model's own
+  context, and that context is the lossy trajectory summary; control CTL-SUMMARY-ONLY measures
+  that route directly. C17-CONST additionally rejects a source carrying per-config_id constants
+  with no src=observed carry entry behind them, with reason constants_unprovenanced, so the route
+  is bounded by provenance rather than blocked by an interface trap.
+
+  - Timer gaming: performing setup work before the timer opens, or patching the clock. --
+  controlled by: the timer is host-side per configuration, opened at the first read of the private
+  data directory observed through a passthrough mount and closed at that run's export completion,
+  so the submission never reports it; C14-ORDER asserts the ordering of the observed syscall trace
+  and any inversion scores zero with reason timer_order_violation. Reading and parsing the carry
+  store, creating the CUDA context and importing libraries before the first private-data read is
+  legitimate and is stated as such in instruction.md.
+
+  Deliverable manifest: /submission/train.py (python_source), executed once per graded
+  configuration with --data, --out, --init-seed, --config-id and --carry, delivered together with
+  the optional carry store at carry/notes.json.
+
+  Control obligations recorded in seed/contract.yaml:
+
+  - `CTRL-NOOP` targets no train.py present / unchanged environment; recorded score 0.
+
+  - `NC-AMNESIC` targets THE archetype-dominance control: the reference with its carry store
+  forcibly emptied at the final attempt, so it pays the full discovery probe inside the timed
+  region on every configuration. If this control passes, memory is not load-bearing and the slot
+  is re-scoped rather than shipped; recorded score 0.3118, re-measured on STL-10 at Phase 1.
+
+  - `CTL-SUMMARY-ONLY` targets carry writes disabled, findings passed across attempts only through
+  the bound trajectory summarizer; recovering six scalars per configuration from prose is lossy;
+  recorded score 0.3563.
+
+  - `CTL-NAIVE-DUMP` targets writing the full 32-entry table as raw JSON floats, which exceeds
+  2,048 bytes and fails loudly with carry_store_invalid rather than being truncated; recorded
+  score 0.
+
+  - `CTL-STALE-CONST` targets the reference with its in-run consistency check removed, using
+  pre-drift stored constants blindly on the six re-parameterized configurations, all six of which
+  fall inside the final attempt's eight; recorded score 0.2725.
+
+  - `CTRL-STALE-PUBLIC` targets a program carrying weights, normalization constants or label
+  orientation fitted against the shipped public split; wrong on all eight graded configurations,
+  and additionally trips C4-SEED to exactly 0 if it skips training; recorded score 0.03.
+
+  - `CTL-HAYSTACK` targets seeding from the 6,400-line environment/logs/ decoy corpus of a retired
+  parameterization whose config_id names collide with the live family, rather than from the
+  agent's own graded observations; recorded score 0.03.
+
+  - `CTL-MAJORITY` targets resolving each configuration's constants by majority vote over the
+  decoy records, where five of every six records for a configuration agree on a wrong constant;
+  recorded score 0.03.
+
+  - `DECOY-RECIPE` targets adopting environment/notes/recipes.md, a plausible published-style 32px
+  fast-training recipe, verbatim; it trains fast but at the wrong geometry and misses the bars;
+  recorded score 0.05.
+
+  - `NC-GEOM` targets using the wrong per-configuration crop offset, whether hardcoded, mis-keyed
+  by config_id, or carried from the public split; misses bars on all eight; recorded score 0.03.
+
+  - `CTRL-LIST-ALL` targets re-deriving all six constants from scratch on every configuration on
+  every graded run, or training an ensemble of every candidate architecture; exceeds the
+  per-configuration ceiling and zeroes every configuration; recorded score 0.
+
+  - `CTRL-OBVIOUS-MAJORITY` targets a majority-class predictor, whose balanced accuracy is at
+  chance so the sub-band numerator is 0 on every configuration; recorded score 0.
+
+  - `CTRL-OBVIOUS-COPY` targets copying public split labels into the export; balanced accuracy
+  about chance on every private image-disjoint shard; recorded score 0.
+
+  - `CTRL-PCAM-JOIN` targets the egress shortcut of recovering the label orientation and crop
+  geometry by hash-joining served crops against the public archive in the egress-enabled sandbox
+  and hardcoding them. Private configurations are re-cropped at a scale in [0.62, 0.88] with
+  subpixel resampling and per-configuration photometric renormalization, destroying byte and
+  perceptual-hash identity with the public archive, and C17-CONST rejects any train.py carrying
+  per-config_id constants without a corresponding src=observed carry entry, with reason
+  constants_unprovenanced; recorded score 0.
+
+  - `FEAS-JDG-FLIP` targets buying r_det by a route the rubrics forbid: the reference at
+  r_det = 1.0 with exactly one rubric flipped reports min(1.0, 0.25) = 0.250; recorded score 0.25.
+
+  Recorded divergences between this bundle and its seed/contract.yaml record, none of them
+  resolved by authoring:
+
+  - Gap F67 stands. capacity_campaign repointed this slot from PatchCamelyon to STL-10 on
+  2026-08-18 and the slot record still binds PatchCamelyon in its shortcut register, its
+  contamination note and its feasibility sketch. This bundle is authored against STL-10 throughout,
+  per the record's own dataset and rescope_delta fields; the register entries above are restated
+  for STL-10 and the divergence is reported rather than silently reconciled.
+
+  - The record names checker C17-CONST in control CTRL-PCAM-JOIN and then omits it from its
+  sixteen-entry checker_obligations roster. Item 4 compiles it here, because a control that cites
+  a checker no roster carries is a control nothing enforces.
+
+  - The record's objective prose says full reward is reached at forty-five seconds while its
+  reward and oracle_proof blocks record the full-reward floor moving from 45 s to 60 s. Both
+  numbers were measured on PatchCamelyon and both are nulled by the repoint, so this bundle
+  publishes the ramp shape and leaves the two anchors to the Phase 1 measurement rather than
+  choosing between two stale numbers.
+provenance:
+  corpus: 'STL-10 (Coates, Lee, Ng; AISTATS 2011), 10 object classes at 96x96 RGB, distributed for research
+    from cs.stanford.edu/~acoates/stl10, staged and sha256-pinned at seed/build/substrates/stl10.tar.gz
+    (2.64 GB). 5000 labeled train images, 8000 labeled test images, and 100000 unlabeled images that
+    supply the semi-supervised structure the configuration family is grounded on. The thirty-two private
+    configurations are our own derivation over class subsets, crop offsets, class-prior skews and label
+    orientations, stratified so per-configuration accuracy bars carry resolution; row and configuration
+    assignment is never shipped and appears in no public corpus. The task-generating event is this repoint''s
+    derivation date 2026-08-18, not STL-10''s release, per the freeze-table inheritance rule. Acquisition:
+    the pinned local archive at image build; no runtime fetch, model-hub and dataset-host egress denied
+    by name in the graded container.'
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: 'STL-10 (Coates, Lee, Ng; AISTATS 2011), 10 object classes at 96x96 RGB, distributed
+      for research from cs.stanford.edu/~acoates/stl10, staged and sha256-pinned at seed/build/substrates/stl10.tar.gz
+      (2.64 GB). 5000 labeled train images, 8000 labeled test images, and 100000 unlabeled images that
+      supply the semi-supervised structure the configuration family is grounded on. The thirty-two private
+      configurations are our own derivation over class subsets, crop offsets, class-prior skews and
+      label orientations, stratified so per-configuration accuracy bars carry resolution; row and configuration
+      assignment is never shipped and appears in no public corpus. The task-generating event is this
+      repoint''s derivation date 2026-08-18, not STL-10''s release, per the freeze-table inheritance
+      rule. Acquisition: the pinned local archive at image build; no runtime fetch, model-hub and dataset-host
+      egress denied by name in the graded container.'
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-f52bbbe19703ede56d5674eb4c5d7dc3
+  - AELLO-CANARY-23a009b98bd344917e87ef548b584156
+  - AELLO-CANARY-3c8086a68a27b36b1f2ae16874efe9da
+  - AELLO-CANARY-90b0dc8de7fd77d4eb5b7482318e3440

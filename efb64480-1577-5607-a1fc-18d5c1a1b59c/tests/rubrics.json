@@ -1,0 +1,124 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The graded run modifies nothing under tests/ and no byte of the private dense masks.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "checker_tree_and_graded_masks_untouched",
+   "judgment": "EFFECT: The harness's guarded-path record is empty for tests/, for environment/data/dense_labels/ and for the verifier's output directory. This is red line 2 and it stands beside dense_private_labels_unread rather than replacing it; a run may satisfy either guard while breaking the other.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "No dense label raster of the private split was opened during the graded run.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "dense_private_labels_unread",
+   "judgment": "EFFECT: The run record's own read log names no path under tests/heldout/ or environment/data/dense_labels/. This is red line 1 and it forbids a READ, not a write, so it is not implied by the write guard -- a run that creates and modifies nothing and still opens graded_masks.npz has broken this slot while passing every write check. Checked against the log the run itself produced, never a post-hoc scan, which cannot separate a read made during the graded run from one made before it.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every predicted pixel names one of the 150 stuff and object classes, or concedes.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "label_domain_is_the_150_classes",
+   "judgment": "EFFECT: Every value in every member lies in 0..149 or is exactly the ignore index 255. A negative value, or any other value at or above 150, names no class the private split can score, so no per-class intersection-over-union is defined for it and the archive is out of domain.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The prediction distinguishes classes rather than painting the split one colour.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "long_tail_not_collapsed_to_modal_class",
+   "judgment": "EFFECT: The union of predicted class ids across the whole archive, with the ignore index removed, contains more than one of the 150 classes. CTL-MODAL predicts the modal class for every pixel and its signature is a single-valued archive; the shipped starter's constant mask has the same signature. No authored threshold is involved and none could be, since floor and knee are null -- the bound is structural and counts distinct classes, not quality.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "A per-scene integer mask archive is written to the declared submission path.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "mask_archive_lands",
+   "judgment": "EFFECT: /submission/masks.npz exists, opens with pickling disabled, carries at least one member, and every member is a two-dimensional array of an integer kind. A pickled archive, a float or boolean mask, a one-dimensional member or a zero-member archive scores zero with reason submission_malformed; a probability volume is not a mask and is not silently argmaxed here.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The prediction classifies every pixel, though supervision covered only a bound fraction.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "prediction_dense_despite_sparse_supervision",
+   "judgment": "EFFECT: No member retains the ignore index 255. Carrying the sparse annotation's own support into the answer concedes every pixel that was never labelled, and mean IoU is taken over all pixels of the private split rather than over the labelled ones, so a submission shaped like its supervision has already given away the majority of the grid. Not a knockout, because such an archive is a real if degenerate prediction rather than a malformed one.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Each graded ADE20K scene carries exactly one mask, on that scene's own pixel grid.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "scene_grid_per_image_id",
+   "judgment": "EFFECT: The archive's member keys equal the graded image ids the private split holds, and each member's height and width equal that scene's own. ADE20K scenes vary in size from image to image, so this cannot be satisfied by one array shape for the split; a missing id, an id the split does not contain, or a mask on a resized or padded grid is a missing prediction and is not interpolated into place at grading time.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Mean intersection-over-union over the private split clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "sparse_supervised_miou_ramp",
+   "judgment": "EFFECT: Mean intersection-over-union over the private split, accumulated per class across every graded scene and averaged over the classes the split actually contains, then mapped through the floor-to-knee ramp published in tests/constants.json. UNMEASURED AT PHASE 0: the ramp constants are null, so this check calls require_measured before it reads the submission and raises ConstantUnmeasured rather than returning a score. Reading the artifact first would let a missing-file error mask the unmeasured signal and report gradeable true with r_det 0.0, which asserts the agent failed when the truth is that the slot is not yet measurable.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "Training reached its declared step count at the decoder resolution the agent chose.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "step_budget_not_truncated_by_decoder_resolution",
+   "judgment": "EFFECT: The run record declares planned_steps, completed_steps and decoder_output_stride, and the completed count is not below the planned one. Raising decoder resolution until the step budget truncates training is the second recorded trap; without this check a truncated run is visible only as a low mean IoU, which reads as a weak model rather than as a run that stopped early.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The agent declares the labelled pixels it trained on, and the count does not exceed what ships.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "supervision_fraction_declared_and_bounded",
+   "judgment": "EFFECT: The run record carries an agent-authored supervision declaration naming labelled_pixels_consumed and pixels_total, and the consumed count is at most the labelled support of environment/data/sparse_labels.npz, counted as the pixels that carry a class id rather than the ignore index. Training on more labelled pixels than the sparse annotation ships is a dense-label read arriving by another route, so the bound is checked against the delivered shard rather than against the declaration alone. The declaration is what is graded; the check cannot be satisfied by a field the harness writes.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The declared partial-label loss policy masks unlabelled pixels instead of teaching them.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "unlabelled_pixels_masked_not_backpropagated",
+   "judgment": "EFFECT: The run record's declared loss policy names an ignore index or an explicit mask over the unlabelled pixels, and does not name background, void, zero-class or an all-pixels-supervised target for them. This is the first recorded trap and CTL-STALE embodies it -- a recipe tuned for the dense setting, where every pixel carries a target, collapses the long tail here. It is rejected as a wrong route rather than scored as a weak lever.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  }
+ ]
+}

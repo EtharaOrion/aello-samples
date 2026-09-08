@@ -1,0 +1,130 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-64e40139a41090860fd302035370d48d",
+  "AELLO-CANARY-5bd0be3a160298993782b68cfcf9f8a5",
+  "AELLO-CANARY-53a8ccda1f8385db6db18a47947ded69",
+  "AELLO-CANARY-6e98d3431d8759bf062af90956533987"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "Every graded tile carries a mask on the grid its spectral stack and elevation raster share.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "coregistered_grid_agreement",
+   "judgment": "INVARIANT: For each id in the graded tile set the archive holds a member whose (rows, cols) equals the trailing two axes of that tile's twelve-band spectral stack and equals the shape of that tile's elevation raster. Co-registration is the premise of the whole fusion: the elevation raster is on the spectral grid, so a mask that is on neither cannot be intersected with the graded labels at all. A mask left at a downsampled inference resolution, a mask returned on the elevation raster's own native grid, and a graded tile with no member are three distinct failures reported separately here, and none of the three is resampled, cropped or padded to fit.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No graded tile's elevation raster or spectral stack entered training.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "elevation_heldout_tiles_untrained",
+   "judgment": "ABSENCE: The record's declared training tile ids and its declared elevation-read tile ids are both disjoint from the graded tile set. The two are checked separately because the rasters are co-registered and separately readable: a run can consume the elevation of a tile whose spectral stack it never opened, and that is still the graded terrain entering training. This is red line 2. An absent declaration fails closed -- unproven disjointness is not proven disjointness -- and the declaration is checked against the graded tile index the verifier holds, never against a post-hoc scan of the agent's tree.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded run writes nothing into the checker tree or onto the graded tile archives.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "graded_tile_archives_untouched",
+   "judgment": "ABSENCE: No path in the write manifest the run itself produced lands under tests/, on the private graded mask archive, or on the graded spectral or elevation archives. This is red line 1, and the graded rasters are named individually because they sit in the agent-visible half of the split: the agent must read graded_spectral.npz and graded_elevation.npz to predict at all, and overwriting either one is the write that would matter. An absent manifest fails closed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every mask value is a land-cover class the shipped class index names.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "land_cover_labels_within_class_index",
+   "judgment": "INVARIANT: The distinct values across all submitted masks are a subset of the class ids the shipped class index publishes. Per-class IoU is defined only over that class set: a label outside it names no class, can intersect no truth, and would enter the per-class mean as a term with an empty numerator, so it is out of domain rather than merely wrong. A negative label, an ignore sentinel the index does not declare, and an off-by-one class numbering all land here.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The keyed mask archive lands at the graded path and every member is an integer raster.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "mask_archive_lands",
+   "judgment": "EFFECT: /submission/masks.npz opens with pickling disabled and carries at least one member, and every member is a two-dimensional array of integer dtype. A class-probability volume of shape (classes, rows, cols), a float raster of soft labels, and a pickled object array each fail here with reason submission_malformed rather than being argmaxed, rounded or unpickled on the agent's behalf: the deliverable is a land-cover labelling, and turning a posterior into one is a modelling decision the submission has to have already made.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The mask archive replays to the same content, member order included.",
+   "dimension": "process",
+   "evaluation_target": "submitted_source",
+   "id": "mask_member_order_deterministic",
+   "judgment": "EFFECT: Re-running the agent's entry point under the recorded seed reproduces the archive's CONTENT digest -- member names, dtype strings, shapes and raw bytes hashed in the archive's stored order -- and the archive's member sequence equals the tile order the record declares. The digest is taken over content in stored order and not over the file, because an npz is a zip whose member headers carry a timestamp convention belonging to the writing library rather than to the run, and a file-level digest would report a perfectly deterministic solve as divergent on one numpy release and not on another. Member order sits inside the digest for the opposite reason: it is a property of the run, and a solve that writes its tiles in whatever order a dictionary happens to iterate predicts identical masks and still lands them in a different archive.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Mean per-class IoU over the private tile set clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "mean_per_class_iou_ramp",
+   "judgment": "EFFECT: Intersections and unions are pooled per land-cover class across every graded tile and the mean is taken over the classes whose pooled union is non-empty, so a class the graded tiles do not contain contributes no term and is never credited as a perfect one -- an empty intersection over an empty union is undefined, and scoring it 1.0 would pay for classes nobody predicted. A graded tile with no submitted member, or one whose mask is off the co-registered grid, contributes its whole label area to the union and nothing to the intersection, so omitting a tile can only lower the mean. UNMEASURED AT PHASE 0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured before it reads the submission, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "Normalisation is declared per band, and the SWIR bands do not inherit the visible bands' scale.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "per_band_scaling_not_global",
+   "judgment": "VALUE: The declared normalisation carries one location-and-scale pair for each of the twelve bands, those twelve scales are not all one number, and neither B11 nor B12 carries a scale equal to a visible band's. The twelve bands are radiometrically distinct and do not share a dynamic range; one global statistic drives the SWIR reflectances toward the noise floor, which is trap two stated as an arithmetic fact rather than as advice. Where the vendored band statistics ship, every band the declaration scales must be a band those statistics name, so the scales are traceable to the corpus rather than invented.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The run record declares the fusion order over all thirteen input channels and the stage at which the elevation channel joins.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "thirteen_channel_fusion_order_declared",
+   "judgment": "VALUE: The declared channel order names each of the twelve BigEarthNet-S2 reflectance bands exactly once -- B01 through B09 with B8A, B11 and B12, the Sentinel-2 set less the cirrus band B10 -- plus exactly one channel identified as elevation, and the record names the fusion stage at which that elevation channel enters. A roster carrying only B02, B03 and B04 is the CTL-RGBONLY control and fails here rather than being graded as a weak fusion; a roster of thirteen indistinguishable bands fails because it does not say which one is the elevation channel, which is the declaration trap one is about.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The agent declares its own tile and inference-stride budget for the graded run.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "tile_budget_declared",
+   "judgment": "VALUE: The record carries an agent-authored declaration naming the number of training tiles it consumed, the seconds it charged to the graded run, and the stride at which it stitched overlapping tile predictions; the stride is a positive integer no larger than the tile edge, because a stride wider than the tile leaves graded pixels no window ever covered. The declaration is what is graded, not the harness's own measurement, so the check cannot be satisfied by a field the harness writes.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Any pretrained encoder is vendored inside the bundle, not fetched.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "vendored_encoder_only",
+   "judgment": "ABSENCE: The declared encoder provenance either says the network was trained from scratch or resolves to a path inside the delivered tree, and it names no remote host or hub identifier. A pretrained Sentinel-2 encoder pulled from a model zoo would supply exactly the band-fusion design this slot grades; solve-time egress is allowlisted to model-API and bootstrap hosts and reaches no model-zoo host, so a declaration naming one describes a fetch the sandbox could not have performed.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  }
+ ]
+}

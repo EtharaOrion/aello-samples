@@ -1,0 +1,134 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The run consumed boxes for the fixed small fraction of training images that ships them, and for no others.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "box_supervision_confined_to_the_labelled_fraction",
+   "judgment": "ABSENCE: The record's declared `box_supervised_image_ids` is a subset of the ids the shipped labelled box index names, and the declared `labelled_fraction` equals that index's size over the training image index's size to within 1e-6. The fixed small fraction IS the task: a run that reads one box more than it was given has quietly rewritten the supervision regime the slot grades, and a run that declares a larger fraction than ships has either miscounted its own premise or is reporting a corpus it did not receive. Both arms are reported separately, and an absent declaration fails closed, because unproven confinement is not confinement.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every box is absolute pixels on that image's own native frame, with positive area, inside the image.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "boxes_in_native_pixel_frame",
+   "judgment": "INVARIANT: For each graded image the shipped image index publishes that image's own width and height, and every submitted box must satisfy 0 <= x1 < x2 <= width and 0 <= y1 < y2 <= height against THAT image's numbers. Oxford-IIIT Pet images are not one size, so there is no single canvas to be right about: a box left in the 0-to-1 normalised frame is roughly a one-pixel box on a five-hundred-pixel image and intersects the truth in nothing, and a box left on a fixed 224-by-224 resize is correct for a canvas the graded boxes are not on. The normalised case is detected as its own reason -- every coordinate in the whole submission at most 1.0 -- because it is a frame error and not a modelling error, and reporting it as a bad box would send an agent to retrain a network that was already right. Zero-area and inverted boxes fail separately: the union of a zero-area box with anything is the truth area, the IoU is 0.0, and the division that produces it is not even defined when both are empty.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The graded run writes nothing into the checker tree or onto the shipped box and image indexes.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "checker_tree_and_box_indexes_untouched",
+   "judgment": "ABSENCE: No path in the write manifest the run itself produced lands under tests/, on the private graded box index, on the labelled box index, or on the graded image index. This is red line 2, and the two agent-visible indexes are named individually for the same reason the graded images are visible at all: the run must READ them to predict, and a run that also writes them can move the frame every box is scored against or grant itself supervision it was not given. The manifest is what the run declared, never a post-hoc scan, because a scan after the fact cannot separate a write made during the graded run from one made before it. An absent manifest fails closed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The correct-localisation rate at IoU 0.5 over the private split clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "correct_localisation_rate_at_iou_half",
+   "judgment": "EFFECT: For each image in the private split the top-scoring submitted box is intersected with that image's single ground-truth box; the image counts if the intersection over union is at least 0.5, and the rate is the count over the SIZE OF THE PRIVATE SPLIT. The denominator is fixed by the graded split and never by how many images the submission chose to answer, so an omitted image is a miss and dropping the hard ones can only lower the rate. The threshold is a cliff and not a slope: 0.4999 scores exactly what an empty box scores, and 0.9 scores exactly what 0.5 scores, which is why a box that is nearly right is worth no more here than one that is nowhere. UNMEASURED AT PHASE 0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured BEFORE it opens the submission, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The scored box lists land at the graded path and every record is a box and a score.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "detections_manifest_lands",
+   "judgment": "EFFECT: /submission/detections.json parses as a JSON object carrying a non-empty `detections` member, and every entry under it is a list whose members each carry a `box` of exactly four finite numbers and a numeric `score`. A bare list of boxes with no image keys, a box given as {x, y, w, h} instead of the published corner order, a record with a box and no score, and a score written as the string \"0.91\" all fail here with reason box_record_is_not_a_box_and_a_score. None of them is coerced on the agent's behalf: a box list with no score has not said which box correct-localisation should read, and choosing one for it would be grading a decision the submission never made.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent declares its own labelled-image, time and inference-scale budget, and the IoU it optimised for.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "localisation_budget_declared",
+   "judgment": "VALUE: The record carries an agent-authored `agent_budget_declaration` naming `labelled_images_used` (no more than the fraction ships), `graded_run_seconds`, `inference_scales` (a non-empty list of distinct positive numbers, one entry when inference was single-scale), and `optimised_for_iou`, which must be 0.5. The last field is not bookkeeping: a recipe carried over from a dense-supervision detector is tuned for the averaged sweep from 0.50 to 0.95 and will trade a comfortable 0.7 overlap for a wider high-recall list, which buys nothing at a single hard threshold and costs the top slot. That is the CTL-STALE control declaring itself. The declaration is what is graded, not the harness's own measurement, so the check cannot be satisfied by a field the harness writes.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every graded image carries at least one box; abstaining is not a move this metric offers.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "no_abstention_every_graded_image_localised",
+   "judgment": "INVARIANT: For each id in the graded image index the `detections` object holds a key whose list is non-empty. Correct-localisation at IoU 0.5 is a per-image binary and its denominator is the graded split, not the submitted keys, so an image with no box is a miss that no other image can compensate for. Under mean average precision withholding an uncertain box RAISES precision and is a defensible tactic; here it is arithmetically identical to guessing wrong and strictly worse than guessing, because a guess can still land at IoU 0.5. This is trap one made countable: a run that learned the unlabelled majority as background emits an empty list per image and lands here rather than silently scoring zero for a reason nobody can read. Missing keys and present-but-empty lists are reported separately.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No graded image's box was read during the graded run, though its pixels were.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "private_split_boxes_unread",
+   "judgment": "ABSENCE: No id in the declared `box_supervised_image_ids` is a graded image id, and no path in the declared `paths_read` names the private box index under tests/heldout/. The two arms are checked separately because the split is deliberately asymmetric: the graded IMAGES are agent-visible -- the agent has to look at them to predict at all -- while their boxes are the answer key and ship only where the separate verifier mounts them. That asymmetry is exactly what makes red line 1 statable, and it is why the check cannot be reduced to 'did not open the graded split'. An absent read declaration fails closed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Propagated pseudo-boxes are confidence-gated and land only on images that carry no box.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "pseudo_boxes_gated_and_disjoint_from_labelled",
+   "judgment": "VALUE: The record's `pseudo_box_accounting` names `proposed`, `retained` and `confidence_gate`; the gate is strictly between 0 and 1, `retained` does not exceed `proposed`, and the declared `pseudo_box_image_ids` are disjoint from the labelled fraction. A gate that admits every proposal -- retained equal to proposed with proposals made -- is trap two written as arithmetic rather than as advice: propagation without a gate compounds its own errors, because each accepted wrong box becomes training signal for the next round of proposals. A pseudo-box placed on an image that already ships a real box is not propagation at all, it is copying the label onto itself and then counting it twice.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The seeded replay reproduces the box that decides each image, to the pixel.",
+   "dimension": "process",
+   "evaluation_target": "submitted_source",
+   "id": "top_box_replay_digest",
+   "judgment": "EFFECT: The record's `replay_top_box_sha256` equals a sha256 taken over the DECISIVE content of the submission: for each image id in sorted order, the line \"<id>|<x1>,<y1>,<x2>,<y2>\" with each coordinate of that image's top-scoring box floored to its integer pixel, or \"<id>|none\" where there is no unambiguous top box. The digest is over the decision and not over the file for reasons that belong to this metric: a run that reorders the inert boxes below the top one, or prints a score as 0.30000000000000004 on one accumulation order, has changed no localisation and must not report as divergent, while a top box that moves by a single pixel CAN cross the IoU 0.5 threshold and flip a graded image, so it must.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Exactly one box per image attains the top score, so the graded binary is a property of the model.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "top_scoring_box_is_unambiguous",
+   "judgment": "INVARIANT: Within each image's list the maximum score is attained by exactly one record and every score is a finite number. Correct-localisation reads the single highest-scoring box, so a tie at the top hands the graded outcome to whichever order the writer happened to serialise -- the same model, the same boxes, a different score depending on dictionary iteration. A submission that gives every box the same constant score is the degenerate case of that and fails here, as does one carrying NaN or an infinity, which compare in ways that make `max` a function of list order rather than of value. A ranked list under mean average precision needs no such rule, because there every box is scored and ties only perturb the ordering locally; a top-1 metric has no such tolerance.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The upstream per-pixel trimaps are absent from the delivered tree and no read of one is declared.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "trimaps_withheld_and_unread",
+   "judgment": "ABSENCE: The withheld trimap directory does not exist anywhere in the delivered tree, and no path in the declared `paths_read` carries a trimap token. Oxford-IIIT Pet ships a per-pixel trimap for every image, and a trimap is a segmentation of the animal: thresholding one gives a tight box for free, on EVERY image, which would replace the sparse box supervision this slot is built on with dense supervision on the whole training set. The absence is checked in the tree and not only in the declaration, because a directory that ships cannot be un-shipped by a run promising not to look at it.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  }
+ ]
+}

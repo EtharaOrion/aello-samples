@@ -1,0 +1,170 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-34477cdc8d45a4268664ce6af225566f",
+  "AELLO-CANARY-be3116e30ccdfbd449346d06d270ee88",
+  "AELLO-CANARY-aa4237d8ef3a4e17d01dff3c00bf57f1",
+  "AELLO-CANARY-5994bef66a56e9cfd85895e8bafffa3f"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The agent declares its own budget in the terms this task spends it.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "budget_declared_in_training_seconds_and_timed_utterances",
+   "judgment": "EFFECT: The run record carries an agent-authored declaration naming train_seconds, inference_utterances_timed and attempts_used, each a non-negative number. The declaration is what is graded and the harness's own measurement is not, so the check cannot be satisfied by a field the harness writes. The second key is the one this slot adds: latency here is a property of the design and not of the run, and a front end tuned against a dozen utterances has not been measured against the gate it has to clear on 3500.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The run declares which keyword each class index means, and the declaration is the pinned roster in the pinned order.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "class_index_maps_to_the_pinned_keyword_roster",
+   "judgment": "INVARIANT: The run record's keyword_index is the 35-word roster in the order corpus_layout pins it. This is the one failure on this corpus that is invisible in the artifact: a model trained against a label ordering of its own produces a perfectly well-formed vector of integers in range whose accuracy is near chance, and neither the array nor the metric can tell a permuted mapping from a bad model. The check separates them, and reports permutation_only true when the declared words are the pinned set in the wrong order.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The harness holds one measured latency for every graded utterance and for nothing else.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "every_graded_utterance_timed_by_the_harness",
+   "judgment": "EFFECT: The harness's per-utterance latency series covers the graded roster exactly: every utterance timed, no timing for an utterance outside the roster, and every entry a finite number. A gate that applies to every inference needs a measurement of every inference; a series covering 3400 of 3500 utterances leaves 100 inferences ungated, and those are exactly the ones a slow configuration would hide in.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The declared front end is arithmetically possible for a one-second 16 kHz utterance.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "front_end_frame_count_follows_from_window_and_hop",
+   "judgment": "INVARIANT: Sample rate is the corpus's 16000 Hz, window and hop and mel bands sit inside the declared envelope, the hop does not exceed the window, the mel band count does not exceed the window's positive-frequency bin count, and frames_per_utterance equals 1 + (16000 - window) // hop recomputed here. A hop wider than the window leaves audio between frames that no frame ever reads, and a keyword onset can land entirely in that gap; more mel bands than spectrum bins produces empty filters that cost latency and carry no signal. Both are declarations that cannot describe a front end that ran.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded run writes into no guarded root and leaves the graded utterance archive byte-identical.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "graded_audio_and_checker_tree_unwritten",
+   "judgment": "ABSENCE: No path under tests/, under the graded utterance archive, or under the verifier's output directory is written during the graded run -- taken from the harness's own record of touched paths and corroborated by the run's declaration, never from a post-hoc scan, which cannot separate a write made during the graded run from one made before it -- and the archive digest recorded before the first inference equals the one recorded after the last. This is red line 1, and on an audio task it has a specific shape: re-mixing the graded utterances at a friendlier signal-to-noise ratio, or trimming them below a second, raises accuracy and lowers latency at the same time by changing the input rather than the model.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The keyword decision vector lands at the declared submission path and parses as a one-dimensional integer array.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "keyword_label_vector_lands",
+   "judgment": "EFFECT: /submission/preds_c8s7.npy exists, loads without pickle, and is a one-dimensional array of integer dtype. A two-dimensional array is a 35-wide score matrix that was never argmaxed, and taking the argmax verifier-side would grade a keyword decision the agent never made; a float dtype is a posterior row, not a decision. Both are reported by name rather than coerced.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every decision names a keyword the graded split actually contains.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "labels_inside_the_thirty_five_keyword_index",
+   "judgment": "EFFECT: Every entry lies in the closed range 0 to 34. Speech Commands v0.02 carries 35 keyword folders and this split uses all of them, so an index of 35 or of -1 names no keyword and an unknown or silence sentinel borrowed from the twelve-class formulation of this corpus is out of domain here. The offending values are listed rather than clipped into range.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The gate is recomputed as a maximum over utterances, and the run's own verdict agrees with it.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "latency_gate_is_a_per_utterance_maximum_not_a_mean",
+   "judgment": "INVARIANT: Both the maximum and the arithmetic mean are recomputed from the harness series. The gate is the maximum: one utterance above 20.0 ms fails it, however fast the other 3499 were. The run's declared latency_gate_passed is a claim the agent forms from its own development profiling, not a measurement it is allowed to submit, and it must agree with the recomputed maximum; the case where the mean is inside the bound while the maximum is outside is reported under its own name, gate_taken_on_the_mean, because that is the substitution this task exists to refuse -- a mean hides one slow inference behind three thousand fast ones, which is precisely the failure a per-utterance bound is written to catch.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Top-1 keyword accuracy over the private split clears the published bar through the ramp, with the per-utterance gate applied first.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "latency_gated_keyword_accuracy_ramp",
+   "judgment": "VALUE: Top-1 agreement between the submitted keyword decisions and the private 35-way labels, forced to exactly 0.0 when any graded utterance's harness-measured latency exceeds 20.0 ms, mapped through the floor-to-knee ramp published in tests/constants.json. The gate is read before the labels are compared, so accuracy bought by exceeding the bound is worth nothing rather than worth most of what it scored. UNMEASURED AT PHASE 0 -- the ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The graded latency comes from the harness's timer and no agent-held clock is offered in its place.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "latency_measured_by_the_harness_clock_not_the_agents",
+   "judgment": "ABSENCE: The run record names latency_source, it is harness_per_utterance_timer, the harness series is present, and no agent-timed latency field is written into the record. This is red line 2. A duration reported by the process being timed is not a measurement of that process: the batch mean is not the per-utterance cost, a timer started after the front end has already run charges nothing for the front end, and every one of those errors moves the number in the direction the agent needs. Nothing in the checker reads an agent-supplied millisecond.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No single keyword claims a share of the decisions that a 1.00:1 balanced split cannot support.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "no_keyword_claims_more_than_the_balanced_share_cap",
+   "judgment": "INVARIANT: The graded split is balanced at exactly 100 utterances per keyword, so the truth share of every keyword is 1/35, about 0.0286. A submission in which one keyword claims more than 0.25 of the 3500 rows -- eight and three quarter times its balanced share -- has collapsed onto a modal class rather than discriminated between keywords. The cap sits far enough above the balanced share that no honest model reaches it and low enough that the shipped all-zeros starter, which claims the whole vector for backward, is caught.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Background-noise mixing is declared, uses the vendored clips, and touches the training split only.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "noise_augmentation_confined_to_the_training_split",
+   "judgment": "ABSENCE: The augmentation declaration names applied_to as the training split, draws only from the six vendored background clips that ship with Speech Commands v0.02 -- doing_the_dishes, dude_miaowing, exercise_bike, pink_noise, running_tap, white_noise -- and mixes inside the published 0 to 20 dB signal-to-noise range. A run that uses no background mixing declares applied_to none with an empty clip list, which is a statement about a lever rather than a silence about one. Clips from outside the vendored six are unvendored audio on a task whose allowlist reaches no corpus host at solve time.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The vector carries exactly one keyword decision for every graded utterance, neither short nor long.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "one_label_per_graded_utterance",
+   "judgment": "EFFECT: The row count equals the graded roster exactly -- 3500 utterances, 100 per keyword. Length is checked and never repaired: a checker that ravels and truncates to the label length grades a prefix of the submission and silently rewards a run that predicted 900 utterances out of 3500, and a checker that pads grades rows the agent never wrote. Short and long are separate reasons because they are separate mistakes.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "A second run under the recorded seed reproduces the label vector, under the same front end.",
+   "dimension": "process",
+   "evaluation_target": "submitted_source",
+   "id": "replay_reproduces_the_label_vector_under_the_recorded_front_end",
+   "judgment": "INVARIANT: The replay's artifact digest equals the sha256 of the delivered .npy, and the replay's front-end digest equals the graded run's. Keyword decisions are deterministic under a fixed seed even though the latencies that gate them are not, so the labels are required to be bit-identical and the milliseconds are not. A replay that reproduces the labels under a different front end reproduces the answer without reproducing the run, and answers the wrong question.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "One front-end configuration served both the timed pass and the scored pass, and it is the configuration the record declares.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "timed_front_end_is_the_scoring_front_end",
+   "judgment": "INVARIANT: The digest recorded at timing equals the digest recorded at prediction, and both equal the checker's own sha256 over the canonical form of the declared front_end block. This slot binds a latency gate and an accuracy metric to the SAME inference, and the cheapest way to satisfy both dishonestly is to satisfy them separately -- time a 20-band, hop-320 front end and then score a 80-band, hop-64 one. Two digests and a recomputation close that: the record cannot claim a configuration it did not digest, and cannot digest two.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  }
+ ]
+}

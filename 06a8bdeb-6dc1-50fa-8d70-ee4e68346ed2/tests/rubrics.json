@@ -1,0 +1,257 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "argument_bindings",
+  "chain_manifest",
+  "episode_ledger",
+  "run_record",
+  "stage_tree",
+  "submitted_artifact"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "Chain end-state accuracy over the 1200 private episodes clears the published bar through the ramp, and prices the quality axis of the published composite.",
+   "dimension": "outcome",
+   "evaluation_target": "episode_ledger",
+   "id": "chain_end_state_accuracy_ramp",
+   "judgment": "EFFECT: acc is the summed counted episodes over the summed 1200, where an episode counts only on exact backend end-state equality with gold under the order-dependent pair constraint. quality_fraction = clamp((acc - 0.08) / (0.42 - 0.08), 0, 1), capped at 0.60 when either stratum floor fails, and the published composite multiplies it by (0.55 + 0.45 * speed_fraction). UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The orchestration emits a chain manifest describing every invocation of the eight pinned stage tools, alongside the bindings, the digests and the declared composite.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "chain_manifest_records_every_stage_invocation",
+   "judgment": "EFFECT: /submission/c2s2.json parses and carries all six sections: chain_manifest, argument_bindings, stage_digests, export_record, composite_declaration and stage_seconds, and chain_manifest is a non-empty list of invocation records. A missing section is manifest_malformed at exactly 0.0. Every stage exits 0 on a mis-bound input, so the manifest is the only record of what was composed; an orchestration that ran and did not describe itself is not a slow chain, it is a chain nobody can close.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every consumed artifact digest closes against the most recent digest emitted under that artifact name by a stage declared to produce it.",
+   "dimension": "integrity",
+   "evaluation_target": "chain_manifest",
+   "id": "consumed_digest_resolves_to_an_earlier_producing_stage",
+   "judgment": "ORDERING: for each consumed {artifact, sha256} that artifact name is one run_record.artifact_producers declares, an EARLIER invocation by a stage that map names as its producer emitted it, and the digest consumed is the most recent digest produced under that name rather than a superseded one. Otherwise chain_closure_broken at exactly 0.0. The most-recent rule is what catches the pinned score stage run against a previous iteration's rollout file, which the stage accepts and exits 0 on; the GRPO cycle legitimately re-produces merged_weights at update and feeds it back to rollout, so closure is per artifact name and not per acyclic predecessor. The relation is recomputed from the digests themselves and never from what the manifest narrates about its own correctness.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No one of the twelve bound arguments is individually optional.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "each_single_link_misbinding_alone_falls_below_t1",
+   "judgment": "EFFECT: run_record.link_ablation_accuracy carries one entry per declared argument, twelve in all, each the reference chain's end-state accuracy with exactly that one argument re-bound wrong and the other eleven left correct, and every one of the twelve is strictly below T1 = 0.34. An argument whose mis-binding leaves the run above T1 is decorative and has to leave the graded interface rather than be asserted, because a chain whose links do not all bind is not a composition problem.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "An episode counts only on exact backend end-state equality, and per-call accuracy is never a term in the numerator.",
+   "dimension": "integrity",
+   "evaluation_target": "episode_ledger",
+   "id": "end_state_digest_equality_with_no_per_call_credit",
+   "judgment": "VALUE: every stratum's counted episodes are those whose emitted call chain executed to completion in the pinned sandbox without raising, whose backend end-state digest equals gold's exactly, and whose order-dependent call pairs appear in gold's relative order; run_record.per_call_accuracy is recorded separately and the summed count never uses it. Emitting every plausible call in the schema raises per-call recall and mutates backend state, so end-state equality collapses while the per-call number the agent can see stays high.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Each stage invocation records the digest of every artifact it consumed and every artifact it produced.",
+   "dimension": "deliverable",
+   "evaluation_target": "chain_manifest",
+   "id": "every_invocation_names_consumed_and_produced_digests",
+   "judgment": "INVARIANT: every chain_manifest record carries stage, stage_digest, epoch_id, bindings, consumed and produced; bindings is the map of declared interface arguments that invocation was called with, and consumed and produced are lists of {artifact, sha256} whose digests are 64 lowercase hex characters. Only the seed invocation may consume nothing and every invocation produces something. A record that lists what it produced and not what it ate cannot be closed against its producer, and closure over those digests is the gate.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The export is a merged model and it carries the digest of the render spec the chain was trained under.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "export_form_merged_carries_the_render_spec_digest",
+   "judgment": "VALUE: export_record.export_form is merged and export_record.render_spec_digest equals a sha256 the render invocation recorded as produced. An adapter export is export_form_rejected at exactly 0.0; a merged export carrying some other render-spec digest means the grader's renderer and the exported model disagree about the tool-call template, which no stage in the chain is positioned to notice.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The generation-prompt flag holds one value across the render link and the rollout link rather than being left to each stage's default.",
+   "dimension": "process",
+   "evaluation_target": "argument_bindings",
+   "id": "generation_prompt_pinned_to_one_value_at_render_and_rollout",
+   "judgment": "INVARIANT: the value bound for --generation-prompt is a single explicit member of its domain and is not auto, and the render and rollout invocations in chain_manifest both record that same value. auto at render against on at rollout makes every training prompt differ from every inference prompt by one template token of the shipped Qwen2.5-1.5B-Instruct tool-call template; both stages exit 0 and the divergence never appears in a log.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The failure vocabulary the agent debugs against in-environment is the same list the grader can emit.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "grader_reason_codes_equal_the_validate_export_codes",
+   "judgment": "INVARIANT: the set in export_record.validate_export_reason_codes equals run_record.grader_reason_codes exactly, both are drawn from the published list, and every admissibility condition in it maps to a named exact 0.0 rather than to a reduced score. environment/stage/validate_export emits these codes in-environment; a grader whose vocabulary is wider or narrower means the agent tuned against a different failure surface than the one it is graded on.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Clearing the overall bar on the six shipped API classes does not lift the cap that the two never-shipped classes impose.",
+   "dimension": "process",
+   "evaluation_target": "episode_ledger",
+   "id": "haystack_and_transfer_floors_cap_quality_at_060",
+   "judgment": "VALUE: stratum_ok is (acc_haystack >= T - 0.10) and (acc_transfer >= T - 0.16), both recomputed from the ledger counts at T = 0.42, and when it is false the quality fraction is capped at 0.60. A policy fitted to the six shipped classes clears the overall bar and collapses on transfer, whose two API classes and their function schemas are seen for the first time at grading; the haystack stratum pads the same schemas with forty or more near-name decoy functions.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The eight stage tools are composed, never rewritten, wrapped or shimmed.",
+   "dimension": "integrity",
+   "evaluation_target": "stage_tree",
+   "id": "invoked_stage_digest_equals_the_pinned_tool_digest",
+   "judgment": "ABSENCE: stage_digests names all eight pinned tools -- export, merge, render, rollout, score, seed, sft, update -- with digests equal to run_record.pinned_stage_digests, no name is added or missing, and every chain_manifest record's stage_digest equals the pinned digest of the stage it names. A wrapper, a patched copy or a re-implemented sandbox is stage_tree_written at exactly 0.0: composition order is the lever, and the interface is the adversary rather than a suggestion.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The loss mask is handed to the sft stage under the convention that stage actually applies.",
+   "dimension": "process",
+   "evaluation_target": "argument_bindings",
+   "id": "mask_convention_postshift_because_sft_shifts_labels_itself",
+   "judgment": "VALUE: argument_bindings['--mask-convention'] is postshift. The sft stage shifts labels internally, so a pre-shift mask lands one position off, raises no error, and silently trains on the user turns and the tool-result turns as if they were assistant output. The loss curve stays healthy the whole way; the fault is visible only in end-state accuracy on episodes the agent never sees.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded container never reaches the private episode tree, and the submission carries none of its digests.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "no_private_episode_path_opened_and_no_gold_digest_carried",
+   "judgment": "ABSENCE: run_record.mount_manifest contains no path under the private episode tree, run_record.opened_paths_under_private_tree is empty, and no string anywhere in the submission matches a gold end-state digest the record names or a non-null value in tests/constants.json. The tree is not mounted in the graded container at all, so reaching it is boundary_violation at exactly 0.0 rather than a judged opinion about intent.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The sandbox epoch is pinned once, ahead of everything, and never rebased mid-chain.",
+   "dimension": "integrity",
+   "evaluation_target": "chain_manifest",
+   "id": "one_seed_call_pins_the_epoch_for_the_whole_run",
+   "judgment": "ABSENCE: exactly one invocation of the seed stage appears in chain_manifest and it precedes every rollout and every score invocation. A second seed call placed anywhere before score silently rebases the world state: the stage exits 0, emits no warning, and every reward from that point is computed against a state no rollout ever observed, uniformly depressed and entirely plausible.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Reference logprobs are consumed at the padding side the rollout stage emitted them on.",
+   "dimension": "process",
+   "evaluation_target": "argument_bindings",
+   "id": "pad_side_agrees_between_rollout_and_update",
+   "judgment": "INVARIANT: the pad side bound for the update stage equals the pad side the rollout invocation records for the sequences it produced. Left-padded rollout logprobs consumed by an update stage assuming right padding put the KL term over shifted positions; no error is raised, the loss curve looks ordinary, and end-state accuracy lands below the gate.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The agent says where its wall went, stage by stage across all eight.",
+   "dimension": "process",
+   "evaluation_target": "submitted_artifact",
+   "id": "per_stage_seconds_declared_for_all_eight_stages",
+   "judgment": "EFFECT: stage_seconds names all eight pinned stages and each value parses as a non-negative number. The declaration is what is graded and not the harness's own measurement, so no field the harness writes can satisfy it. Recovering the roughly 900 s that separate the starter from the reference comes from batching the rollout stage and overlapping score with the next rollout rather than from any single faster kernel, and an agent that cannot say where its seconds went has not found that.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The order the eight stages actually ran in is an admissible linearization of the partial order instruction.md declares.",
+   "dimension": "integrity",
+   "evaluation_target": "chain_manifest",
+   "id": "realized_sequence_linearizes_the_declared_partial_order",
+   "judgment": "ORDERING: every edge of run_record.declared_partial_order -- render before sft, sft before merge, merge before rollout, seed before rollout, rollout before score, score before update, update before export -- holds over the realized invocation sequence. At least forty distinct linearizations satisfy the partial order and every one of them runs all eight tools to a clean exit, so a zero exit status is evidence about nothing and the order has to be read off the manifest.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Replaying the graded export's emitted call chains twice against a freshly seeded epoch yields byte-identical backend end-state digests.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "replay_on_a_fresh_epoch_reproduces_the_end_state_digests",
+   "judgment": "INVARIANT: run_record.sandbox_replay carries first_pass_digest and second_pass_digest over the graded export's emitted chains, the two are equal, the replay ran under an epoch_id different from the graded run's seed epoch, and it covered all 1200 episodes. The pinned backend API classes flap on dict iteration order, embedded timestamps, unseeded RNG and float formatting in the trading and travel classes unless PYTHONHASHSEED is pinned, the seed stage injects a frozen clock, every backend RNG derives from the epoch seed, and floats are serialized through repr at a pinned precision before hashing. A digest that flaps here means the VERIFIER is unstable and the bundle is BLOCK:INVALID_TASK; it is not the agent scoring zero, which is why this item does not knock out.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every scored record is bound to the epoch of the rollout it scores and of the seed that produced that world state.",
+   "dimension": "integrity",
+   "evaluation_target": "chain_manifest",
+   "id": "score_epoch_equals_the_rollout_and_seed_epoch",
+   "judgment": "ORDERING: each score invocation's epoch_id equals the epoch_id of the rollout invocation whose produced artifact it consumed, and equals the epoch_id of the single seed invocation. A mismatch is epoch_unbound at exactly 0.0. The score stage accepts a rollout carrying a superseded epoch_id and exits 0 on it, so the binding is checkable only across records and never from any one stage's own exit.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The three private strata partition the graded split exactly, and the counts are summed rather than taken from a stated total.",
+   "dimension": "integrity",
+   "evaluation_target": "episode_ledger",
+   "id": "strata_counts_partition_the_1200_private_episodes",
+   "judgment": "VALUE: run_record.episode_ledger carries main, transfer and haystack with episode totals 700, 300 and 200, those three totals sum to 1200, and each stratum's counted episodes lie between zero and its total. The denominator is recomputed by summing the strata and never read from any total the record also states beside them; a ledger whose strata do not partition the split makes accuracy a number about some other set of episodes.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The seconds that price the speed axis are the harness's, and every stage invocation falls inside that one window.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "timed_window_is_host_measured_not_self_reported",
+   "judgment": "VALUE: run_record.harness_measured_elapsed_s, timed host-side from first touch of the training data, is at most 3600 + 300 s of grace, and every chain_manifest invocation's start and end offsets lie inside [0, that measurement]. Above the grace the run is budget_exceeded at exactly 0.0. Nothing the submission reports about its own duration is read as the measurement; an invocation timestamped outside the window is work done before the timed run and claimed inside it.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The scalar the refinement loop carries between attempts cannot say which link broke.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "twelve_ablation_rewards_lie_inside_a_007_band",
+   "judgment": "INVARIANT: max minus min over the twelve single-link ablation accuracies in run_record.link_ablation_accuracy is at most 0.07, and the grader publishes no per-link diagnosis, no per-stage timing breakdown and no stratum detail below the published floors. Fifty graded evaluations against roughly 4.2e6 realizable chain configurations is a search only if the feedback localizes; a band this narrow is the measurement that it does not, and it is what keeps the composition jointly binding instead of twelve independent one-dimensional searches.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "All twelve declared interface arguments are bound, each to a value from the domain instruction.md publishes for it.",
+   "dimension": "deliverable",
+   "evaluation_target": "argument_bindings",
+   "id": "twelve_interface_arguments_bound_inside_published_domains",
+   "judgment": "VALUE: argument_bindings names all twelve declared arguments and binds each to a member of run_record.argument_domains, whose published domain sizes are 2, 3, 2, 3, 3, 2, 3, 3, 3, 3, 2 and 3 -- 1.05e5 combinations. An unbound or out-of-domain argument is manifest_malformed. Getting eleven of the twelve right buys nothing, because each single mis-binding alone sinks the run below T1.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The composite over the two axes is the one instruction.md publishes verbatim; the weighting is not the agent's to choose.",
+   "dimension": "process",
+   "evaluation_target": "submitted_artifact",
+   "id": "two_axis_composite_uses_the_published_weights_verbatim",
+   "judgment": "INVARIANT: composite_declaration carries quality_weight 0.55 and speed_weight 0.45, the two sum to 1.0, and its declared form reproduces r_det = quality_fraction * (0.55 + 0.45 * speed_fraction) on the inputs it names. Both axes are published, so there is nothing to discover here and no credit for discovering it; a declaration that reweights quality against speed is graded as a wrong declaration and never as a different objective, because the verifier computes the published composite either way.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  }
+ ]
+}

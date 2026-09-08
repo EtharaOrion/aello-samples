@@ -1,0 +1,1720 @@
+"""Derivation for C4-S2: every canonical artifact descends from solution/grounding.yaml.
+
+WHAT THIS GENERATOR EMITS AND WHY IT LOOKS LIKE THIS. The checks below are written about a
+DECLARED six-stage retrieval serving chain and the replay that was driven against the service it
+produces. They read three things and nothing else: the chain manifest at the declared path, the
+per-query replay table the load generator wrote at the service boundary, and the harness record
+the pinned stage wrapper and the cold rebuild left behind. What they assert is particular to this
+task -- that a declared edge's consumer input digest equals its producer's output digest, that the
+resolved argv equals the declared binding so a manifest cannot describe one chain while the
+service runs another, that a response arriving after 150 ms is credited exactly zero however good
+its ranking was, that the deadline-free and credited nDCG reconcile over the late set, that the
+index metric agrees with the normalisation stage C declared, that stage D's id map is stage A's
+row order and not a local enumeration off by the dedup delta, and that both encode paths carry the
+asymmetric E5 prefix pair. Not one of those would mean anything on a classifier, a quantization
+recipe, a forecaster or a corpus-mixture slot.
+
+Every published bound, path, roster and contract lives in solution/grounding.yaml and is
+substituted into the emitted prelude, so the derivation source really is the source and this file
+carries no task fact of its own.
+
+Every compiled item carries a hand-written body. There is no generic fallback and an item without
+a body is a refusal here. The fallback that used to stand in this position looked up an obligation
+record keyed by the item id, which nothing in this bundle ever writes, so nine of this slot's
+items graded nothing at all and reported that they had passed.
+"""
+import json
+import os
+import sys
+
+import yaml
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+BUNDLE = os.path.dirname(HERE)
+# Nothing outside the bundle is imported. A staged tree could resolve seed/stage/<slug>/../../build
+# and a DELIVERED tree at dataset/<uuid>/ cannot, so reaching outside would make the bundle
+# non-self-contained: it would regenerate in the stage and fail everywhere it actually ships.
+
+SLOT_ID = "C4-S2"
+TITLE = "# C4-S2 -- what this task actually tests"
+ITEM_KEYS = ("id", "dimension", "weight", "evaluation_target", "criterion", "judgment",
+             "knockout", "mode")
+ITEM_SCHEMA = frozenset(ITEM_KEYS + ("outcome_class",))
+OUTCOME_CLASSES = frozenset(("EFFECT", "INVARIANT", "ABSENCE", "VALUE", "DIVERGENCE", "ORDERING"))
+RAMP_CONSTANTS = ("floor", "knee", "dichotomizing_threshold", "reward_gate_pass_threshold")
+OUTCOME_ITEM = "deadline_respecting_ndcg_through_the_ramp"
+OUTCOME_DIMENSION = "serving_outcome"
+REQUIRE_FIRST = 'c = require_measured("floor", "knee", "dichotomizing_threshold")'
+SERVE_STAGE = "serve"
+
+
+def load_grounding():
+    with open(os.path.join(HERE, "grounding.yaml")) as handle:
+        return yaml.safe_load(handle)
+
+
+def read_identity(here):
+    """Identity is an INPUT: the freeze computes it over the hashed tree and binds it into the
+    carrier, which is hash-excluded, so reading it back keeps generation acyclic."""
+    path = os.path.join(here, "provenance.yaml")
+    if os.path.exists(path):
+        doc = yaml.safe_load(open(path)) or {}
+        if isinstance(doc.get("identity"), dict):
+            return doc["identity"]
+    return {"canonical_content_hash": None, "uuid": None,
+            "normalization_domain": "aello.canary.norm/v1",
+            "derivation": "uuid5(FORGE_TASK_NAMESPACE, canonical_content_hash)"}
+
+
+def read_screening(here):
+    """The screening instant and result are MEASURED OVER the frozen tree, so they are read back
+    the way identity is; the carrier is hash-excluded, so binding them moves nothing."""
+    path = os.path.join(here, "provenance.yaml")
+    if os.path.exists(path):
+        doc = yaml.safe_load(open(path)) or {}
+        got = {k: doc[k] for k in ("screening_measured_at", "screening_expires_at",
+                                   "screening_result") if k in doc}
+        if got:
+            return got
+    return {"screening_measured_at": None, "screening_expires_at": None,
+            "screening_result": None}
+
+
+def render(template, bindings):
+    """Substitute {{NAME}} placeholders. Deliberately not printf formatting: the emitted module is
+    full of percent signs of its own and a second format pass over it raises TypeError."""
+    out = template
+    for name, value in bindings.items():
+        out = out.replace("{{%s}}" % name, value)
+    left = [line for line in out.split("\n") if "{{" in line]
+    if left:
+        raise SystemExit("%s: unresolved placeholder in the emitted prelude: %r"
+                         % (SLOT_ID, left[0].strip()[:70]))
+    return out
+
+
+PRELUDE = '''"""Compiled checks for {{SLOT}}. GENERATED by solution/recompute.py. DO NOT HAND-EDIT.
+
+The graded object is a DECLARED six-stage retrieval serving chain, not a file of predictions.
+Every check below runs against three artifacts the graded run leaves behind: the chain manifest at
+the declared path, the per-query replay table the load generator wrote at the service boundary,
+and the harness run record carrying the pinned stage wrapper's argv and digests, the cold-rebuild
+clocks, the cross-stage contracts and the absence ledger. Nothing here reads an unmeasured
+quantity except {{OUTCOME}}, which calls require_measured before it opens anything at all.
+"""
+import json
+import os
+
+import yaml
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+CHECKS = []
+
+# WHERE THE GRADED BYTES ARE. The manifest is the graded deliverable because it is the one file
+# that names every stage program, every artifact edge and every argument binding. The other two
+# are harness instruments and are read as measurements, never as the agent's self-report.
+PIPELINE = {{PIPELINE}}
+CHAIN_ROOT = {{CHAIN_ROOT}}
+RUN_RECORD = {{RUN_RECORD}}
+REPLAY_LOG = {{REPLAY_LOG}}
+
+# THE DECLARED TOPOLOGY. Six stages, closed, because the topology is graded alongside the ranking
+# it serves: A chunk/dedup/content-address, B ONNX export plus INT8 engine, C corpus embedding
+# pass, D OPQ+IVF-PQ index, E cross-encoder compile, F async service.
+STAGE_ROSTER = {{STAGE_ROSTER}}
+ORDER_RELATIONS = {{ORDER_RELATIONS}}
+RAW_SOURCES = {{RAW_SOURCES}}
+TERMINAL_ARTIFACT = {{TERMINAL_ARTIFACT}}
+SERVE_STAGE = {{SERVE_STAGE}}
+CORPUS_EMBED_STAGE = {{CORPUS_EMBED_STAGE}}
+INDEX_STAGE = {{INDEX_STAGE}}
+CHUNK_STAGE = {{CHUNK_STAGE}}
+RERANK_STAGE = {{RERANK_STAGE}}
+
+# THE REPLAY PROTOCOL, all of it disclosed in instruction.md and none of it measured here. Fixed
+# work at a fixed offered load: three cold replays of a frozen 6,000-arrival schedule spanning
+# 150 s, which is 40 queries per second, over three disjoint private query subsets.
+DEADLINE_MS = {{DEADLINE_MS}}
+HARD_TIMEOUT_MS = {{HARD_TIMEOUT_MS}}
+OFFERED_QPS = {{OFFERED_QPS}}
+QUERIES_PER_REPLAY = {{QUERIES_PER_REPLAY}}
+REPLAY_COUNT = {{REPLAY_COUNT}}
+UNIQUE_JUDGED_TOPICS = {{TOPICS}}
+REPLAY_SPAN_S = {{REPLAY_SPAN_S}}
+MAX_DISPATCH_LAG_MS = {{MAX_DISPATCH_LAG_MS}}
+RESPONSE_IDS = {{RESPONSE_IDS}}
+RESPONSE_VIOLATION_SHARE = {{RESPONSE_VIOLATION_SHARE}}
+
+# THE CROSS-STAGE CONTRACTS. Each one is an agreement between two stages that no single tool can
+# check, which is why every one of them is a silent failure in the field and a named check here.
+RERANK_DEPTH = {{RERANK_DEPTH}}
+DEGRADATION_LADDER = {{LADDER}}
+RERANK_AGGREGATION = {{RERANK_AGGREGATION}}
+INDEX_METRIC = {{INDEX_METRIC}}
+VECTOR_NORM_TOLERANCE = {{NORM_TOL}}
+PQ_TRAINING_SAMPLE = {{PQ_SAMPLE}}
+CORPUS_PREFIX = {{CORPUS_PREFIX}}
+QUERY_PREFIX = {{QUERY_PREFIX}}
+
+# BUDGETS AND BOUNDS.
+SIBLING_GAP_BOUND = {{SIBLING_GAP_BOUND}}
+BUILD_BUDGET_S = {{BUILD_BUDGET_S}}
+HEALTH_DEADLINE_S = {{HEALTH_DEADLINE_S}}
+MAX_LAUNCH_RETRIES = {{MAX_LAUNCH_RETRIES}}
+
+# WHAT THE GRADED RUN MAY NOT TOUCH OR REACH.
+GUARDED_PREFIXES = {{GUARDED}}
+PRIVATE_PREFIXES = {{PRIVATE}}
+EGRESS_ALLOWLIST = {{ALLOWLIST}}
+DENIED_HOSTS = {{DENIED}}
+PINNED_CHECKPOINTS = {{PINNED}}
+
+
+class ConstantUnmeasured(Exception):
+    """Raised when a check needs a ramp constant that Phase 0 deliberately left null."""
+
+
+def check(id, weight, knockout, kind):
+    def deco(fn):
+        CHECKS.append({"id": id, "weight": weight, "knockout": knockout, "kind": kind, "fn": fn})
+        return fn
+    return deco
+
+
+def constants():
+    with open(os.path.join(HERE, "constants.json")) as handle:
+        return json.load(handle)
+
+
+def require_measured(*names):
+    c = constants()
+    missing = [n for n in names if c.get(n) is None]
+    if missing:
+        raise ConstantUnmeasured(
+            "{{SLOT}}: " + ", ".join(missing) + " are null. Phase 0 authors no measurement; the "
+            "Phase 2 wave measures the deadline-respecting nDCG distribution on the grading host "
+            "at the fixed offered load, writes these, and this check becomes gradeable then.")
+    return c
+
+
+def evidence(**kw):
+    return {"evaluation_target": kw.pop("target", "pipeline_manifest"), "values": kw}
+'''
+
+
+TAIL = '''
+
+# ----------------------------------------------------------------------------------------------
+# Reading the declared chain. The manifest is read as a CLAIM about what the chain is; the stage
+# wrapper record and the replay table are read as MEASUREMENTS of what it did. Where the two
+# disagree the measurement wins, and the check names which side was believed.
+# ----------------------------------------------------------------------------------------------
+
+
+def manifest():
+    with open(PIPELINE) as handle:
+        doc = yaml.safe_load(handle)
+    if not isinstance(doc, dict):
+        raise ValueError("pipeline.yaml must be a mapping, not %s" % type(doc).__name__)
+    return doc
+
+
+def declared_stages():
+    """The stage records in declared order. A stage without an id is kept with id None so the
+    roster check can report it rather than silently dropping it from the count."""
+    rows = manifest().get("stages")
+    if not isinstance(rows, list):
+        raise ValueError("pipeline.yaml carries no stages list")
+    out = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("a stages entry is %s, not a mapping" % type(row).__name__)
+        out.append(row)
+    return out
+
+
+def declared_ids():
+    return [row.get("id") for row in declared_stages()]
+
+
+def stage_named(sid):
+    for row in declared_stages():
+        if row.get("id") == sid:
+            return row
+    return None
+
+
+def artifact_list(row, key):
+    value = row.get(key) or []
+    if isinstance(value, str):
+        return [value]
+    return [str(v) for v in value]
+
+
+def declared_edges():
+    """Every (producer, artifact, consumer) triple the manifest declares, derived from the
+    outputs of one stage meeting the inputs of another. The edge set is derived rather than
+    declared twice, so a manifest cannot list an edge it does not also imply."""
+    produced = {}
+    for row in declared_stages():
+        for art in artifact_list(row, "outputs"):
+            produced.setdefault(art, []).append(row.get("id"))
+    edges = []
+    for row in declared_stages():
+        for art in artifact_list(row, "inputs"):
+            for producer in produced.get(art, []):
+                edges.append((producer, art, row.get("id")))
+    return edges, produced
+
+
+def topological_order():
+    """Kahn over the declared edges. Returns (order, cycle_members); a chain with a cycle cannot
+    be re-executed at all, so it is separated from a chain whose order is merely wrong."""
+    edges, _ = declared_edges()
+    ids = [i for i in declared_ids() if i is not None]
+    indegree = dict.fromkeys(ids, 0)
+    successors = {i: [] for i in ids}
+    for producer, _art, consumer in edges:
+        if producer in indegree and consumer in indegree and producer != consumer:
+            successors[producer].append(consumer)
+            indegree[consumer] += 1
+    ready = sorted(i for i in ids if indegree[i] == 0)
+    order = []
+    while ready:
+        node = ready.pop(0)
+        order.append(node)
+        for nxt in sorted(successors[node]):
+            indegree[nxt] -= 1
+            if indegree[nxt] == 0:
+                ready.append(nxt)
+                ready.sort()
+    return order, sorted(set(ids) - set(order))
+
+
+def precedes(order, first, second):
+    if first not in order or second not in order:
+        return False
+    return order.index(first) < order.index(second)
+
+
+# ----------------------------------------------------------------------------------------------
+# Reading the harness instruments.
+# ----------------------------------------------------------------------------------------------
+
+
+def run_record():
+    path = os.path.join(HERE, "..", RUN_RECORD)
+    if not os.path.exists(path):
+        return {}
+    with open(path) as handle:
+        return json.load(handle)
+
+
+def replay_log():
+    path = os.path.join(HERE, "..", REPLAY_LOG)
+    if not os.path.exists(path):
+        return {}
+    with open(path) as handle:
+        return json.load(handle)
+
+
+def replays():
+    rows = replay_log().get("replays")
+    return rows if isinstance(rows, list) else []
+
+
+def queries_of(replay):
+    rows = replay.get("queries")
+    return rows if isinstance(rows, list) else []
+
+
+def every_query():
+    out = []
+    for replay in replays():
+        out.extend(queries_of(replay))
+    return out
+
+
+def wrapper_records():
+    """One record per stage, written by the pinned wrapper that every stage runs under."""
+    rows = run_record().get("stage_wrapper")
+    return rows if isinstance(rows, dict) else {}
+
+
+def stage_contract(name):
+    rows = run_record().get("stage_contracts")
+    if not isinstance(rows, dict):
+        return {}
+    row = rows.get(name)
+    return row if isinstance(row, dict) else {}
+
+
+def as_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def canonical(value):
+    """Canonicalise a declared binding for comparison: 48 and 48.0 are the same binding, the
+    string "48" is not, and a list of bindings compares element for element. Numeric equality
+    across int and float is what a YAML round trip legitimately changes; a type change from
+    number to string is what a manifest written to please a validator looks like."""
+    if isinstance(value, bool):
+        return ("bool", value)
+    if isinstance(value, (int, float)):
+        return ("num", float(value))
+    if isinstance(value, (list, tuple)):
+        return ("seq", tuple(canonical(v) for v in value))
+    if isinstance(value, dict):
+        return ("map", tuple(sorted((str(k), canonical(v)) for k, v in value.items())))
+    return ("str", str(value))
+
+
+def median(values):
+    ordered = sorted(values)
+    if not ordered:
+        return None
+    middle = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return (ordered[middle - 1] + ordered[middle]) / 2.0
+
+
+# ----------------------------------------------------------------------------------------------
+# The deadline term. Credit is recomputed here from latency and nDCG for every replayed query;
+# the credited value the log carries is compared against the recomputation and never substituted
+# for it, because a service that reports its own credit reports the thing the reward is made of.
+# ----------------------------------------------------------------------------------------------
+
+
+def is_late(row):
+    latency = as_float(row.get("latency_ms"))
+    return latency is None or latency > DEADLINE_MS
+
+
+def recomputed_credit(row):
+    """nDCG@10 inside the deadline, exactly 0.0 outside it. No decay and no grace: the boundary
+    is a step, and a response at 150.4 ms is worth what an empty one is worth."""
+    ndcg = as_float(row.get("ndcg_at_10"))
+    if ndcg is None:
+        return None
+    return 0.0 if is_late(row) else ndcg
+
+
+def replay_mean(replay):
+    rows = queries_of(replay)
+    credits = [recomputed_credit(r) for r in rows]
+    if not rows or any(c is None for c in credits):
+        return None
+    return sum(credits) / float(len(credits))
+
+
+def deadline_free_mean(replay):
+    rows = queries_of(replay)
+    values = [as_float(r.get("ndcg_at_10")) for r in rows]
+    if not rows or any(v is None for v in values):
+        return None
+    return sum(values) / float(len(rows))
+
+
+def recomputed_graded_q():
+    """Q as the reward map consumes it: the median over the three cold replays of each replay's
+    mean per-query credit."""
+    means = [replay_mean(r) for r in replays()]
+    if len(means) != REPLAY_COUNT or any(m is None for m in means):
+        return None
+    return median(means)
+
+
+def response_contract_violations():
+    """A query violates the response contract when it did not return exactly ten distinct ids
+    from the private shard's id space inside the hard timeout. Membership is resolved by the
+    harness, which holds the shard; distinctness and the arity are recomputed here."""
+    bad = []
+    for row in every_query():
+        ids = row.get("ids")
+        latency = as_float(row.get("latency_ms"))
+        why = None
+        if not isinstance(ids, list) or len(ids) != RESPONSE_IDS:
+            why = "not_ten_ids"
+        elif len(set(map(str, ids))) != RESPONSE_IDS:
+            why = "duplicate_ids"
+        elif as_float(row.get("ids_in_shard")) != float(RESPONSE_IDS):
+            why = "id_outside_the_shard"
+        elif latency is None or latency > HARD_TIMEOUT_MS:
+            why = "hard_timeout_exceeded"
+        if why:
+            bad.append({"query_id": row.get("query_id"), "reason": why})
+    return bad
+'''
+
+
+BODIES = {
+
+"chain_manifest_and_stage_programs_present": '''\
+    if not os.path.exists(PIPELINE):
+        return False, evidence(target="pipeline_manifest", reason="deliverable_absent",
+                               declared_path=PIPELINE)
+    try:
+        rows = declared_stages()
+    except Exception as exc:
+        return False, evidence(target="pipeline_manifest", reason="manifest_unparseable",
+                               error=str(exc))
+    missing = []
+    for row in rows:
+        command = row.get("command")
+        if not isinstance(command, list) or not command:
+            missing.append({"stage": row.get("id"), "program": "<no command declared>"})
+            continue
+        raw = str(command[0])
+        program = raw if os.path.isabs(raw) else os.path.join(CHAIN_ROOT, raw)
+        if not os.path.exists(program):
+            missing.append({"stage": row.get("id"), "program": raw, "resolved": program})
+    ok = bool(rows) and not missing
+    return ok, evidence(target="pipeline_manifest", chain_root=CHAIN_ROOT,
+                        declared_stages=len(rows), missing_programs=missing[:6],
+                        reason=None if ok else "deliverable_absent")''',
+
+"declared_stages_drawn_from_the_roster_without_repetition": '''\
+    try:
+        named = declared_ids()
+    except Exception as exc:
+        return False, evidence(target="pipeline_manifest", reason="manifest_unreadable",
+                               error=str(exc))
+    roster = list(STAGE_ROSTER)
+    duplicated = sorted({str(i) for i in named if named.count(i) > 1})
+    outside = sorted({str(i) for i in named if i not in roster})
+    undeclared = sorted(str(i) for i in roster if i not in named)
+    serves = SERVE_STAGE in named
+    # The roster is closed UPWARD and open DOWNWARD, and the asymmetry is the contract's rather
+    # than a convenience. A seventh stage has no re-execution contract, a repeated id makes an
+    # artifact's producer ambiguous to the edge-digest check, and a chain with no serving stage
+    # cannot answer a query at all. But a chain declaring FEWER stages is not refused here:
+    # dropping the cross-encoder is priced at Q = 0.118 by the near-duplicate clusters and the
+    # hard-negative haystack, and refusing it here as well would police what the metric already
+    # answers.
+    ok = not duplicated and not outside and serves
+    reason = None
+    if duplicated:
+        reason = "duplicate_stage_id"
+    elif outside:
+        reason = "stage_outside_the_published_roster"
+    elif not serves:
+        reason = "no_serving_stage_declared"
+    return ok, evidence(target="pipeline_manifest", declared=[str(i) for i in named],
+                        roster=roster, declared_count=len(named), duplicated=duplicated,
+                        not_in_roster=outside, roster_members_not_declared=undeclared,
+                        serving_stage_declared=serves, reason=reason)''',
+
+"every_consumed_artifact_has_a_declared_producer": '''\
+    try:
+        rows = declared_stages()
+        _edges, produced = declared_edges()
+    except Exception as exc:
+        return False, evidence(target="pipeline_manifest", reason="manifest_unreadable",
+                               error=str(exc))
+    orphans, ambiguous, unconsumed = [], [], []
+    consumed = set()
+    for row in rows:
+        for art in artifact_list(row, "inputs"):
+            consumed.add(art)
+            if art not in produced and art not in RAW_SOURCES:
+                orphans.append({"stage": row.get("id"), "artifact": art})
+    for art, producers in sorted(produced.items()):
+        if len(producers) > 1:
+            ambiguous.append({"artifact": art, "producers": [str(p) for p in producers]})
+        if art not in consumed and art != TERMINAL_ARTIFACT:
+            unconsumed.append(art)
+    # An input with no producer and no raw source is exactly what a pre-baked index, a
+    # hand-carried embedding matrix or a hardcoded id table looks like once it is declared
+    # honestly, and it is the whole content of the chain_binding_violation red line.
+    ok = not orphans and not ambiguous and not unconsumed
+    reason = None
+    if orphans:
+        reason = "chain_binding_violation"
+    elif ambiguous:
+        reason = "ambiguous_producer"
+    elif unconsumed:
+        reason = "declared_output_never_consumed"
+    return ok, evidence(target="pipeline_manifest", orphan_inputs=orphans[:6],
+                        ambiguous=ambiguous[:4], unconsumed=unconsumed[:6],
+                        raw_sources=sorted(RAW_SOURCES), terminal=TERMINAL_ARTIFACT,
+                        reason=reason)''',
+
+"stage_edge_digests_bind_consumer_to_producer": '''\
+    try:
+        edges, _produced = declared_edges()
+    except Exception as exc:
+        return False, evidence(target="stage_wrapper_record", reason="manifest_unreadable",
+                               error=str(exc))
+    recorded = run_record().get("stage_edges")
+    if not isinstance(recorded, list):
+        return False, evidence(target="stage_wrapper_record", reason="edge_record_absent")
+    seen = {}
+    for row in recorded:
+        if not isinstance(row, dict):
+            continue
+        seen[(str(row.get("producer")), str(row.get("artifact")),
+              str(row.get("consumer")))] = row
+    declared = {(str(p), str(a), str(c)) for p, a, c in edges}
+    unrecorded = sorted(declared - set(seen))
+    undeclared = sorted(set(seen) - declared)
+    broken = []
+    for key in sorted(declared & set(seen)):
+        row = seen[key]
+        out_digest = row.get("producer_output_digest")
+        in_digest = row.get("consumer_input_digest")
+        if out_digest is None or in_digest is None or str(out_digest) != str(in_digest):
+            broken.append({"edge": list(key), "producer_output": str(out_digest)[:16],
+                           "consumer_input": str(in_digest)[:16]})
+    ok = not unrecorded and not undeclared and not broken
+    reason = None
+    if broken or unrecorded:
+        reason = "chain_binding_violation"
+    elif undeclared:
+        reason = "undeclared_edge_executed"
+    return ok, evidence(target="stage_wrapper_record", declared_edges=len(declared),
+                        recorded_edges=len(seen), digest_mismatches=broken[:5],
+                        declared_but_not_executed=[list(k) for k in unrecorded[:4]],
+                        executed_but_not_declared=[list(k) for k in undeclared[:4]],
+                        reason=reason)''',
+
+"declared_order_quantizes_and_chunks_before_the_corpus_pass": '''\
+    try:
+        order, cycle = topological_order()
+    except Exception as exc:
+        return False, evidence(target="pipeline_manifest", reason="manifest_unreadable",
+                               error=str(exc))
+    if cycle:
+        return False, evidence(target="pipeline_manifest", reason="chain_cycle_declared",
+                               unordered=cycle)
+    violated, skipped = [], []
+    for first, second in ORDER_RELATIONS:
+        if first not in order or second not in order:
+            # A relation whose endpoints are not both declared is SKIPPED and reported as
+            # skipped. A chain shipping fewer stages is priced on quality, not failed on an
+            # ordering it never declared, and a silent skip would hide that from the evidence.
+            skipped.append({"relation": "%s before %s" % (first, second)})
+            continue
+        if not precedes(order, first, second):
+            violated.append({"required": "%s before %s" % (first, second)})
+    # Each relation is one a wrong chain satisfies syntactically and fails semantically.
+    # Embedding before chunking embeds passages the index never stores; quantizing the encoder
+    # after the corpus pass leaves the corpus vectors in a geometry the served encoder no longer
+    # produces; training the coarse quantizer before stage C has written anything trains it on
+    # something other than what it will index.
+    ok = not violated
+    return ok, evidence(target="pipeline_manifest", topological_order=order,
+                        violated_relations=violated, skipped_relations=skipped,
+                        reason=None if ok else "stage_order_violation")''',
+
+"resolved_argv_equals_the_declared_argument_bindings": '''\
+    try:
+        rows = declared_stages()
+    except Exception as exc:
+        return False, evidence(target="stage_wrapper_record", reason="manifest_unreadable",
+                               error=str(exc))
+    wrappers = wrapper_records()
+    if not wrappers:
+        return False, evidence(target="stage_wrapper_record", reason="wrapper_record_absent")
+    argv_diverged, kwarg_diverged, unrecorded = [], [], []
+    for row in rows:
+        sid = str(row.get("id"))
+        seen = wrappers.get(sid)
+        if not isinstance(seen, dict):
+            unrecorded.append(sid)
+            continue
+        declared_argv = [str(a) for a in (row.get("command") or [])]
+        resolved_argv = [str(a) for a in (seen.get("resolved_argv") or [])]
+        if declared_argv != resolved_argv:
+            argv_diverged.append({"stage": sid, "declared": declared_argv[:6],
+                                  "resolved": resolved_argv[:6]})
+        declared_kwargs = row.get("bindings") or {}
+        effective = seen.get("effective_kwargs") or {}
+        for key in sorted(set(declared_kwargs) | set(effective)):
+            left = canonical(declared_kwargs.get(key))
+            right = canonical(effective.get(key))
+            if key not in declared_kwargs or key not in effective or left != right:
+                kwarg_diverged.append({"stage": sid, "binding": key,
+                                       "declared": declared_kwargs.get(key),
+                                       "resolved": effective.get(key)})
+    # nprobe and rerank_depth are where this actually separates: a manifest declaring 64 and 48
+    # over a service resolving 8 and 12 describes the chain that would have earned the quality
+    # and runs the chain that earned the latency. Both answer ten ids inside the timeout, so no
+    # other instrument in this bundle can tell them apart.
+    ok = not argv_diverged and not kwarg_diverged and not unrecorded
+    reason = None
+    if unrecorded:
+        reason = "stage_never_ran_under_the_wrapper"
+    elif argv_diverged or kwarg_diverged:
+        reason = "declared_binding_divergence"
+    return ok, evidence(target="stage_wrapper_record", argv_divergences=argv_diverged[:4],
+                        binding_divergences=kwarg_diverged[:6], unrecorded_stages=unrecorded,
+                        reason=reason)''',
+
+"late_responses_earn_exactly_zero_ndcg_credit": '''\
+    rows = replays()
+    if not rows:
+        return False, evidence(target="replay_log", reason="replay_log_absent")
+    mismatched, missing, late_total, counted = [], 0, 0, 0
+    mean_disagreements = []
+    for replay in rows:
+        queries = queries_of(replay)
+        credits = []
+        for query in queries:
+            recomputed = recomputed_credit(query)
+            if recomputed is None:
+                missing += 1
+                continue
+            counted += 1
+            if is_late(query):
+                late_total += 1
+            credits.append(recomputed)
+            recorded = as_float(query.get("credited_ndcg"))
+            if recorded is None or abs(recorded - recomputed) > 1e-12:
+                mismatched.append({"query_id": query.get("query_id"),
+                                   "latency_ms": as_float(query.get("latency_ms")),
+                                   "ndcg_at_10": as_float(query.get("ndcg_at_10")),
+                                   "recorded_credit": recorded, "recomputed": recomputed})
+        if credits:
+            recorded_mean = as_float(replay.get("mean_credited_ndcg"))
+            recomputed_mean = sum(credits) / float(len(credits))
+            if recorded_mean is None or abs(recorded_mean - recomputed_mean) > 1e-12:
+                mean_disagreements.append({"replay": replay.get("replay_id"),
+                                           "recorded": recorded_mean,
+                                           "recomputed": recomputed_mean})
+    ok = not mismatched and not mean_disagreements and missing == 0 and counted > 0
+    reason = None
+    if missing or counted == 0:
+        reason = "query_record_incomplete"
+    elif mismatched:
+        reason = "late_query_credited"
+    elif mean_disagreements:
+        reason = "replay_mean_disagrees_with_its_own_queries"
+    return ok, evidence(target="replay_log", deadline_ms=DEADLINE_MS, queries=counted,
+                        late_queries=late_total,
+                        late_share=(late_total / float(counted)) if counted else None,
+                        credit_mismatches=mismatched[:5],
+                        mean_disagreements=mean_disagreements, incomplete=missing, reason=reason)''',
+
+"deadline_free_and_credited_ndcg_reconcile_over_the_late_set": '''\
+    rows = replays()
+    if not rows:
+        return False, evidence(target="replay_log", reason="replay_log_absent")
+    broken, ledger = [], []
+    for replay in rows:
+        queries = queries_of(replay)
+        credited = replay_mean(replay)
+        free = deadline_free_mean(replay)
+        if credited is None or free is None:
+            broken.append({"replay": replay.get("replay_id"), "why": "incomplete_query_records"})
+            continue
+        lost = sum(as_float(q.get("ndcg_at_10")) for q in queries if is_late(q))
+        thrown_away = lost / float(len(queries))
+        # Q_free - Q is exactly the ranking quality the late responses threw away. The identity
+        # breaks if the log reports a Q_free it did not compute from this table, and it breaks
+        # if late queries are dropped from the DENOMINATOR instead of credited zero -- which is
+        # the arithmetic that turns a chain answering a third of its queries on time into a
+        # chain with an excellent mean.
+        if free + 1e-12 < credited or abs((free - credited) - thrown_away) > 1e-9:
+            broken.append({"replay": replay.get("replay_id"), "q_free": free, "q": credited,
+                           "gap": free - credited, "late_mass": thrown_away})
+        recorded_free = as_float(replay.get("mean_deadline_free_ndcg"))
+        if recorded_free is None or abs(recorded_free - free) > 1e-9:
+            broken.append({"replay": replay.get("replay_id"), "recorded_q_free": recorded_free,
+                           "recomputed_q_free": free})
+        ledger.append({"replay": replay.get("replay_id"), "q": credited, "q_free": free,
+                       "late": sum(1 for q in queries if is_late(q))})
+    ok = not broken
+    return ok, evidence(target="replay_log", per_replay=ledger, broken=broken[:4],
+                        reason=None if ok else "deadline_accounting_inconsistent")''',
+
+"graded_q_is_the_median_of_three_disjoint_replays": '''\
+    rows = replays()
+    if len(rows) != REPLAY_COUNT:
+        return False, evidence(target="replay_log", reason="replay_count_wrong",
+                               replays=len(rows), required=REPLAY_COUNT)
+    sizes, id_sets, problems = [], [], []
+    for replay in rows:
+        queries = queries_of(replay)
+        ids = [str(q.get("query_id")) for q in queries]
+        sizes.append(len(ids))
+        id_sets.append(set(ids))
+        if len(ids) != QUERIES_PER_REPLAY:
+            problems.append({"replay": replay.get("replay_id"), "queries": len(ids),
+                             "required": QUERIES_PER_REPLAY})
+        if len(set(ids)) != len(ids):
+            problems.append({"replay": replay.get("replay_id"), "why": "repeated_query_id"})
+    overlaps = []
+    for i in range(len(id_sets)):
+        for j in range(i + 1, len(id_sets)):
+            shared = id_sets[i] & id_sets[j]
+            if shared:
+                overlaps.append({"replays": [i, j], "shared": len(shared)})
+    union = set().union(*id_sets) if id_sets else set()
+    means = [replay_mean(r) for r in rows]
+    recomputed = recomputed_graded_q()
+    recorded = as_float(replay_log().get("graded_q"))
+    agrees = (recomputed is not None and recorded is not None
+              and abs(recorded - recomputed) <= 1e-12)
+    # Disjoint subsets with no query repeated anywhere in a grading run are what leave a
+    # response cache with nothing to be warm for; the median is what stops one replay that lost
+    # its accelerator from dragging the graded value.
+    ok = (not problems and not overlaps and len(union) == UNIQUE_JUDGED_TOPICS and agrees)
+    reason = None
+    if problems or overlaps or len(union) != UNIQUE_JUDGED_TOPICS:
+        reason = "replay_subsets_not_disjoint_or_wrong_size"
+    elif not agrees:
+        reason = "graded_q_is_not_the_median_of_the_replays"
+    return ok, evidence(target="replay_log", replay_sizes=sizes, overlaps=overlaps,
+                        unique_topics=len(union), required_topics=UNIQUE_JUDGED_TOPICS,
+                        replay_means=means, recomputed_median=recomputed, recorded=recorded,
+                        problems=problems[:4], reason=reason)''',
+
+"offered_load_holds_at_forty_per_second_without_back_pressure": '''\
+    rows = replays()
+    if not rows:
+        return False, evidence(target="replay_log", reason="replay_log_absent")
+    faults, ledger = [], []
+    for replay in rows:
+        scheduled = replay.get("scheduled_arrivals")
+        dispatched = replay.get("dispatched")
+        span = as_float(replay.get("arrival_schedule_span_s"))
+        lag = as_float(replay.get("max_dispatch_lag_ms"))
+        throttled = replay.get("generator_throttled")
+        rid = replay.get("replay_id")
+        if scheduled != QUERIES_PER_REPLAY:
+            faults.append({"replay": rid, "why": "schedule_not_%d" % QUERIES_PER_REPLAY,
+                           "scheduled": scheduled})
+        if dispatched != scheduled:
+            faults.append({"replay": rid, "why": "schedule_not_delivered",
+                           "dispatched": dispatched, "scheduled": scheduled})
+        if span is None or abs(span - REPLAY_SPAN_S) > 1e-6:
+            faults.append({"replay": rid, "why": "span_not_%.1f_s" % REPLAY_SPAN_S, "span": span})
+        elif abs((scheduled or 0) / span - OFFERED_QPS) > 1e-6:
+            faults.append({"replay": rid, "why": "offered_load_not_%.1f_qps" % OFFERED_QPS,
+                           "measured_qps": (scheduled or 0) / span})
+        if throttled is not False:
+            faults.append({"replay": rid, "why": "generator_throttled", "flag": throttled})
+        if lag is None or lag > MAX_DISPATCH_LAG_MS:
+            faults.append({"replay": rid, "why": "dispatch_lag_over_bound", "lag_ms": lag})
+        ledger.append({"replay": rid, "scheduled": scheduled, "dispatched": dispatched,
+                       "span_s": span, "max_lag_ms": lag})
+    # Fixed WORK at a fixed offered load, never a fixed wall time. A generator that backs off
+    # when the service slows lets a slow chain reduce its own offered load and then answer
+    # fewer, easier queries inside the deadline, which is the one way to make the deadline term
+    # cheap without making the chain fast.
+    ok = not faults
+    return ok, evidence(target="replay_log", offered_qps=OFFERED_QPS, per_replay=ledger,
+                        faults=faults[:6], reason=None if ok else "slo_violation")''',
+
+"every_response_returns_ten_distinct_in_shard_ids": '''\
+    rows = every_query()
+    if not rows:
+        return False, evidence(target="replay_log", reason="replay_log_absent")
+    bad = response_contract_violations()
+    share = len(bad) / float(len(rows))
+    by_reason = {}
+    for row in bad:
+        by_reason[row["reason"]] = by_reason.get(row["reason"], 0) + 1
+    # Deliberately separate from the deadline. Missing 150 ms costs that one query its credit;
+    # failing to answer at all costs the whole run, so degrading rank quality under load is
+    # priced and dropping requests is forbidden.
+    ok = share <= RESPONSE_VIOLATION_SHARE
+    return ok, evidence(target="replay_log", queries=len(rows), violations=len(bad),
+                        violation_share=share, allowed_share=RESPONSE_VIOLATION_SHARE,
+                        required_ids=RESPONSE_IDS, hard_timeout_ms=HARD_TIMEOUT_MS,
+                        by_reason=by_reason, examples=bad[:5],
+                        reason=None if ok else "response_contract_violation")''',
+
+"served_lists_replay_identically_under_the_frozen_budget_schedule": '''\
+    record = run_record().get("replay_determinism")
+    if not isinstance(record, dict):
+        return False, evidence(target="run_record", reason="determinism_pass_not_run")
+    graded_digest = record.get("graded_served_list_sha256")
+    frozen_digest = record.get("frozen_schedule_served_list_sha256")
+    graded_free = as_float(record.get("graded_q_free"))
+    frozen_free = as_float(record.get("frozen_schedule_q_free"))
+    clock = str(record.get("admission_clock"))
+    covered = record.get("queries_covered")
+    digests_agree = (graded_digest is not None and frozen_digest is not None
+                     and str(graded_digest) == str(frozen_digest))
+    free_agree = (graded_free is not None and frozen_free is not None
+                  and graded_free == frozen_free)
+    clock_named = clock == "frozen_remaining_budget_schedule"
+    complete = covered == UNIQUE_JUDGED_TOPICS
+    # The second pass exists because the reference's rerank-depth degradation is clock-driven:
+    # under a LIVE clock the served list is not a pure function of the input bytes. Recording
+    # that is cheaper than a determinism claim the chain cannot keep, so exact equality is
+    # claimed on the served lists and on the deadline-free Q_free, and never on Q itself.
+    ok = digests_agree and free_agree and clock_named and complete
+    reason = None
+    if not clock_named:
+        reason = "determinism_pass_ran_under_a_live_clock"
+    elif not complete:
+        reason = "determinism_pass_covered_fewer_queries"
+    elif not digests_agree:
+        reason = "served_lists_diverged"
+    elif not free_agree:
+        reason = "deadline_free_ndcg_diverged"
+    return ok, evidence(target="run_record", admission_clock=clock, queries_covered=covered,
+                        graded_digest=str(graded_digest)[:16],
+                        replay_digest=str(frozen_digest)[:16], graded_q_free=graded_free,
+                        replay_q_free=frozen_free, reason=reason)''',
+
+"sibling_shard_quality_within_twenty_percent": '''\
+    record = run_record().get("shard_generalisation")
+    if not isinstance(record, dict):
+        return False, evidence(target="run_record", reason="sibling_shard_not_measured")
+    primary = as_float(record.get("q_primary"))
+    sibling = as_float(record.get("q_sibling"))
+    same_protocol = record.get("same_protocol") is True
+    if primary is None or sibling is None:
+        return False, evidence(target="run_record", reason="sibling_shard_not_measured",
+                               q_primary=primary, q_sibling=sibling)
+    if primary <= 0.0:
+        return False, evidence(target="run_record", reason="primary_quality_not_positive",
+                               q_primary=primary)
+    gap = abs(sibling - primary) / primary
+    # The sibling shard is drawn under a SECOND private seed from the same construction, so a
+    # chain whose nprobe, rerank depth and admission thresholds were fitted to the primary
+    # shard's particular near-duplicate clusters opens the gap, and a chain that derives them
+    # from whatever shard it is handed at build time does not.
+    ok = gap <= SIBLING_GAP_BOUND and same_protocol
+    reason = None
+    if not same_protocol:
+        reason = "sibling_measured_under_a_different_protocol"
+    elif not ok:
+        reason = "shard_overfit"
+    return ok, evidence(target="run_record", q_primary=primary, q_sibling=sibling,
+                        relative_gap=gap, bound=SIBLING_GAP_BOUND, reason=reason)''',
+
+"both_encode_paths_share_the_e5_tokenizer_contract": '''\
+    contract = stage_contract("tokenizer")
+    corpus = contract.get("corpus_path")
+    query = contract.get("query_path")
+    if not isinstance(corpus, dict) or not isinstance(query, dict):
+        return False, evidence(target="run_record", reason="tokenizer_contract_unrecorded")
+    faults = []
+    if corpus.get("prefix") != CORPUS_PREFIX:
+        faults.append({"side": "corpus", "field": "prefix", "declared": corpus.get("prefix"),
+                       "required": CORPUS_PREFIX})
+    if query.get("prefix") != QUERY_PREFIX:
+        faults.append({"side": "query", "field": "prefix", "declared": query.get("prefix"),
+                       "required": QUERY_PREFIX})
+    for field in ("max_tokens", "pooling", "normalise"):
+        if canonical(corpus.get(field)) != canonical(query.get(field)):
+            faults.append({"field": field, "corpus": corpus.get(field),
+                           "query": query.get(field)})
+    # multilingual-e5 is trained on the asymmetric pair. Drop the query prefix and every query
+    # vector sits in a slightly rotated space from every corpus vector: no tool reports an
+    # error anywhere, and the only visible symptom is that nDCG falls.
+    ok = not faults
+    reason = None
+    if any(f.get("side") == "query" and f.get("field") == "prefix" for f in faults):
+        reason = "query_prefix_missing"
+    elif faults:
+        reason = "encode_paths_disagree"
+    return ok, evidence(target="run_record", corpus_path=corpus, query_path=query,
+                        faults=faults[:5], reason=reason)''',
+
+"index_metric_agrees_with_the_normalisation_stage_c_declares": '''\
+    embed = stage_contract(CORPUS_EMBED_STAGE)
+    index = stage_contract(INDEX_STAGE)
+    declared_normalised = embed.get("normalised")
+    norms = embed.get("vector_norm_sample")
+    metric = index.get("metric")
+    if declared_normalised is None or metric is None:
+        return False, evidence(target="run_record", reason="metric_contract_unrecorded",
+                               normalised=declared_normalised, metric=metric)
+    if not isinstance(norms, list) or not norms:
+        return False, evidence(target="run_record", reason="vector_norms_not_sampled")
+    values = [as_float(n) for n in norms]
+    if any(v is None for v in values):
+        return False, evidence(target="run_record", reason="vector_norms_unreadable")
+    off = [v for v in values if abs(v - 1.0) > VECTOR_NORM_TOLERANCE]
+    normalised_in_fact = not off
+    metric_matches = str(metric) == INDEX_METRIC
+    # The failure is not symmetric, so the check names which half is wrong. Unnormalised vectors
+    # under inner product rank by MAGNITUDE, so long passages win and the neighbours are
+    # plausible and wrongly ordered; normalised vectors under L2 are merely a slower route to
+    # the same order. Neither reports an error anywhere in the build.
+    ok = bool(declared_normalised) and normalised_in_fact and metric_matches
+    reason = None
+    if not normalised_in_fact:
+        reason = "corpus_vectors_not_normalised"
+    elif not declared_normalised:
+        reason = "normalisation_not_declared"
+    elif not metric_matches:
+        reason = "index_metric_disagrees_with_normalisation"
+    return ok, evidence(target="run_record", declared_normalised=declared_normalised,
+                        sampled=len(values), off_tolerance=len(off),
+                        worst_norm=max(values, key=lambda v: abs(v - 1.0)),
+                        tolerance=VECTOR_NORM_TOLERANCE, metric=metric,
+                        required_metric=INDEX_METRIC, reason=reason)''',
+
+"index_id_map_is_stage_a_row_order": '''\
+    chunker = stage_contract(CHUNK_STAGE)
+    index = stage_contract(INDEX_STAGE)
+    before = chunker.get("chunks_before_dedup")
+    removed = chunker.get("duplicates_removed")
+    emitted = chunker.get("chunks_emitted")
+    emitted_digest = chunker.get("emitted_id_digest")
+    map_count = index.get("id_map_count")
+    map_digest = index.get("id_map_digest")
+    if emitted is None or emitted_digest is None or map_digest is None:
+        return False, evidence(target="run_record", reason="id_map_contract_unrecorded",
+                               chunks_emitted=emitted, id_map_count=map_count)
+    try:
+        dedup_closes = int(emitted) == int(before) - int(removed)
+    except (TypeError, ValueError):
+        dedup_closes = False
+    lengths_agree = map_count == emitted
+    digests_agree = str(map_digest) == str(emitted_digest)
+    # THE DEDUP DELTA IS THE TRAP. A stage D that re-enumerates 0..N-1 for itself agrees with
+    # stage A on length whenever nothing was deduplicated and is off by exactly the delta
+    # whenever something was, so every id the service returns dereferences to a neighbouring
+    # document. The responses stay ten distinct in-shard ids either way; only Q finds out.
+    ok = dedup_closes and lengths_agree and digests_agree
+    reason = None
+    if not dedup_closes:
+        reason = "dedup_arithmetic_does_not_close"
+    elif not lengths_agree:
+        reason = "id_map_off_by_the_dedup_delta"
+    elif not digests_agree:
+        reason = "id_map_not_row_order"
+    return ok, evidence(target="run_record", chunks_before_dedup=before,
+                        duplicates_removed=removed, chunks_emitted=emitted,
+                        id_map_count=map_count, stage_a_digest=str(emitted_digest)[:16],
+                        id_map_digest=str(map_digest)[:16],
+                        dedup_delta=(None if map_count is None or emitted is None
+                                     else map_count - emitted),
+                        reason=reason)''',
+
+"coarse_quantizer_trained_on_post_normalisation_chunk_vectors": '''\
+    index = stage_contract(INDEX_STAGE)
+    embed = stage_contract(CORPUS_EMBED_STAGE)
+    sample = index.get("training_sample")
+    if not isinstance(sample, dict):
+        return False, evidence(target="run_record", reason="training_sample_unrecorded")
+    source_digest = sample.get("source_digest")
+    stage_c_output = embed.get("output_digest")
+    size = sample.get("size")
+    index_list_digest = sample.get("index_list_digest")
+    drawn_live = sample.get("drawn_live")
+    from_normalised = (source_digest is not None and stage_c_output is not None
+                       and str(source_digest) == str(stage_c_output))
+    right_size = size == PQ_TRAINING_SAMPLE
+    fixed = index_list_digest is not None and drawn_live is not True
+    # An ordering constraint expressed as a DIGEST, because "after normalisation and after
+    # chunking" is only checkable against the bytes those two steps produced. A quantizer
+    # trained on raw passage text or on pre-normalisation vectors partitions a space the index
+    # does not live in: the centroids land off the data and recall collapses at every nprobe.
+    ok = from_normalised and right_size and fixed
+    reason = None
+    if not from_normalised:
+        reason = "quantizer_trained_before_normalisation"
+    elif not right_size:
+        reason = "training_sample_not_%d" % PQ_TRAINING_SAMPLE
+    elif not fixed:
+        reason = "training_sample_drawn_live"
+    return ok, evidence(target="run_record", source_digest=str(source_digest)[:16],
+                        stage_c_output_digest=str(stage_c_output)[:16], sample_size=size,
+                        required_size=PQ_TRAINING_SAMPLE,
+                        index_list_digest=str(index_list_digest)[:16], drawn_live=drawn_live,
+                        reason=reason)''',
+
+"rerank_stage_scores_the_declared_depth_and_aggregates_to_documents": '''\
+    try:
+        declares_rerank = RERANK_STAGE in [str(i) for i in declared_ids()]
+    except Exception as exc:
+        return False, evidence(target="run_record", reason="manifest_unreadable", error=str(exc))
+    if not declares_rerank:
+        # OUT OF SCOPE, deliberately. A chain declaring no cross-encoder stage is answered by Q,
+        # where the near-duplicate clusters and the hard-negative haystack put it at 0.118.
+        # Declaring one and not running it is a different thing and is what the rest of this
+        # check is about.
+        return True, evidence(target="run_record", rerank_stage_declared=False,
+                              priced_not_policed=True)
+    rerank = stage_contract(RERANK_STAGE)
+    rows = every_query()
+    if not rows:
+        return False, evidence(target="run_record", reason="replay_log_absent")
+    scored = rerank.get("candidates_scored")
+    invocations = rerank.get("invocations")
+    aggregation = rerank.get("aggregation")
+    depths = [as_float(q.get("admitted_rerank_depth")) for q in rows]
+    if any(d is None for d in depths):
+        return False, evidence(target="run_record", reason="admitted_depth_unrecorded")
+    admitted_sum = int(sum(depths))
+    admitted_nonzero = sum(1 for d in depths if d > 0)
+    scored_matches = as_float(scored) == float(admitted_sum)
+    invocations_match = as_float(invocations) == float(admitted_nonzero)
+    aggregates = str(aggregation) == RERANK_AGGREGATION
+    # A stage E the manifest DECLARES and the service never invokes scores zero candidates while
+    # the admission record sums to hundreds of thousands: that is the no-reranker chain exactly.
+    # Aggregation is as load-bearing as depth, because the shard carries real near-duplicate
+    # passage clusters and a chain that ranks chunks without folding them back to documents
+    # spends several of its ten slots on copies of one page.
+    ok = scored_matches and invocations_match and aggregates
+    reason = None
+    if not scored_matches and not admitted_sum:
+        reason = "no_candidate_was_ever_admitted"
+    elif not scored_matches or not invocations_match:
+        reason = "rerank_stage_declared_but_not_invoked"
+    elif not aggregates:
+        reason = "chunk_scores_not_aggregated_to_documents"
+    return ok, evidence(target="run_record", candidates_scored=scored,
+                        admitted_depth_sum=admitted_sum, invocations=invocations,
+                        queries_admitted_above_zero=admitted_nonzero, aggregation=aggregation,
+                        required_aggregation=RERANK_AGGREGATION, declared_depth=RERANK_DEPTH,
+                        reason=reason)''',
+
+"admission_computes_a_remaining_budget_and_degrades_depth_monotonically": '''\
+    rows = every_query()
+    if not rows:
+        return False, evidence(target="replay_log", reason="replay_log_absent")
+    ladder = set(DEGRADATION_LADDER)
+    if all(q.get("admitted_rerank_depth") is None and q.get("remaining_budget_ms") is None
+           for q in rows):
+        # No admission controller at all: nothing computes a budget and nothing chooses a depth.
+        # Named rather than passed over, and non-knockout, because the deadline-blind chain is
+        # priced at 0.155 in Q rather than refused.
+        return False, evidence(target="replay_log", reason="admission_policy_not_declared",
+                               queries=len(rows))
+    off_ladder, formula_breaks, pairs = [], [], []
+    for query in rows:
+        depth = query.get("admitted_rerank_depth")
+        if depth not in ladder:
+            off_ladder.append({"query_id": query.get("query_id"), "depth": depth})
+        budget = as_float(query.get("remaining_budget_ms"))
+        wait = as_float(query.get("queue_wait_ms"))
+        elapsed = as_float(query.get("admission_elapsed_ms"))
+        if budget is None or wait is None or elapsed is None:
+            formula_breaks.append({"query_id": query.get("query_id"), "why": "field_absent"})
+            continue
+        if abs(budget - (DEADLINE_MS - wait - elapsed)) > 1e-6:
+            formula_breaks.append({"query_id": query.get("query_id"), "recorded": budget,
+                                   "formula": DEADLINE_MS - wait - elapsed})
+        pairs.append((budget, as_float(depth)))
+    monotone_breaks = []
+    # Sorted by (budget, depth) rather than by budget alone. Two queries that record the SAME
+    # remaining budget may legitimately land on two rungs, and sorting ties by depth keeps that
+    # from reading as an inversion; a genuine inversion is a query with a strictly smaller budget
+    # admitted at a strictly deeper rerank than one with a larger budget, which still fires.
+    pairs.sort(key=lambda pair: (pair[0], pair[1]))
+    for i in range(1, len(pairs)):
+        if pairs[i][1] < pairs[i - 1][1]:
+            monotone_breaks.append({"budget_ms": pairs[i][0], "depth": pairs[i][1],
+                                    "previous_budget_ms": pairs[i - 1][0],
+                                    "previous_depth": pairs[i - 1][1]})
+    # A controller recording an IDENTICAL budget for every query is not reading a clock at all,
+    # and degradation has to be a policy over the budget rather than a coincidence of load, which
+    # is what monotonicity states.
+    late = [q for q in rows if is_late(q)]
+    stepped_down = any(as_float(q.get("admitted_rerank_depth")) < DEGRADATION_LADDER[0]
+                       for q in rows)
+    # THE DEADLINE-BLIND CLAUSE. A controller that watched responses arrive late and never once
+    # stepped down the ladder is not degrading depth INSTEAD OF missing the deadline; it is the
+    # chain that answers correctly and answers late. It is conditioned on a late query existing,
+    # because a chain fast enough that nothing was ever late is free to stay at full depth for
+    # the whole run and this check must not price that as a defect.
+    blind = bool(late) and not stepped_down
+    ok = not off_ladder and not formula_breaks and not monotone_breaks and not blind
+    reason = None
+    if off_ladder:
+        reason = "admitted_depth_outside_the_declared_ladder"
+    elif formula_breaks:
+        reason = "remaining_budget_not_from_the_disclosed_formula"
+    elif monotone_breaks:
+        reason = "degradation_not_monotone_in_the_remaining_budget"
+    elif blind:
+        reason = "full_depth_admitted_while_responses_arrived_late"
+    return ok, evidence(target="replay_log", ladder=list(DEGRADATION_LADDER),
+                        distinct_budgets=len({p[0] for p in pairs}),
+                        distinct_depths=sorted({p[1] for p in pairs}),
+                        late_queries=len(late), ever_stepped_down=stepped_down,
+                        off_ladder=off_ladder[:4], formula_breaks=formula_breaks[:4],
+                        monotone_breaks=monotone_breaks[:4], reason=reason)''',
+
+"served_engines_derive_only_from_the_two_pinned_checkpoints": '''\
+    record = run_record().get("model_identity")
+    if not isinstance(record, dict):
+        return False, evidence(target="run_record", reason="model_identity_unrecorded")
+    on_disk = record.get("checkpoints_on_disk")
+    if not isinstance(on_disk, dict):
+        return False, evidence(target="run_record", reason="checkpoint_roster_unrecorded")
+    roster = sorted(str(name) for name in on_disk)
+    foreign = sorted(set(roster) - set(PINNED_CHECKPOINTS))
+    absent = sorted(set(PINNED_CHECKPOINTS) - set(roster))
+    moved = []
+    for name in sorted(set(roster) & set(PINNED_CHECKPOINTS)):
+        row = on_disk.get(name) or {}
+        before = row.get("weight_digest_before")
+        after = row.get("weight_digest_after")
+        if before is None or after is None or str(before) != str(after):
+            moved.append({"checkpoint": name, "before": str(before)[:16],
+                          "after": str(after)[:16]})
+    try:
+        declared = {str(i) for i in declared_ids()}
+    except Exception:
+        declared = set()
+    stray = []
+    engines = record.get("served_engines")
+    engines = engines if isinstance(engines, list) else []
+    for engine in engines:
+        if not isinstance(engine, dict):
+            continue
+        if str(engine.get("derived_from")) not in PINNED_CHECKPOINTS:
+            stray.append({"engine": engine.get("name"),
+                          "derived_from": engine.get("derived_from")})
+        elif str(engine.get("producer_stage")) not in declared:
+            stray.append({"engine": engine.get("name"),
+                          "producer_stage": engine.get("producer_stage")})
+    # A stronger public multilingual encoder would win this task on model quality instead of on
+    # chain engineering, which is why two pins plus a model hub denied by name are the entire
+    # model surface, and why deriving the served engine THROUGH a declared stage is the only
+    # route from a pin to a serving weight.
+    ok = not foreign and not absent and not moved and not stray and bool(engines)
+    reason = None
+    if foreign:
+        reason = "model_identity_violation"
+    elif absent or not engines:
+        reason = "pinned_checkpoint_absent"
+    elif moved:
+        reason = "pinned_checkpoint_replaced_not_converted"
+    elif stray:
+        reason = "served_engine_has_no_pinned_lineage"
+    return ok, evidence(target="run_record", roster=roster, pinned=list(PINNED_CHECKPOINTS),
+                        foreign=foreign, absent=absent, digest_moved=moved,
+                        engines=len(engines), stray_lineage=stray[:4], reason=reason)''',
+
+"no_private_input_read_and_no_denied_host_contacted": '''\
+    record = run_record()
+    egress = record.get("egress_hosts")
+    reads = record.get("private_input_reads")
+    writes = record.get("guarded_paths_touched")
+    if egress is None or reads is None or writes is None:
+        return False, evidence(target="run_record", reason="absence_ledger_incomplete",
+                               egress_recorded=egress is not None,
+                               reads_recorded=reads is not None,
+                               writes_recorded=writes is not None)
+    contacted = sorted(str(h) for h in egress)
+    outside = sorted(h for h in contacted if h not in EGRESS_ALLOWLIST)
+    denied = sorted(h for h in contacted if h in DENIED_HOSTS)
+    private = sorted(str(p) for p in reads)
+    flagged = sorted(p for p in private
+                     if any(p.startswith(prefix) for prefix in PRIVATE_PREFIXES))
+    touched = sorted(str(p) for p in writes)
+    guarded = sorted(p for p in touched
+                     if any(p.startswith(prefix) for prefix in GUARDED_PREFIXES))
+    # Three absences, each a red line. The allowlist excludes model hubs, dataset hosts and
+    # inference endpoints BY NAME rather than by intent, because answering from an external
+    # reranker is the one shortcut here that would look like good engineering; and the read
+    # ledger is what closes answering from relevance judgements instead of from retrieval.
+    ok = not outside and not private and not touched
+    reason = None
+    if denied or outside:
+        reason = "egress_violation"
+    elif private or flagged:
+        reason = "private_input_read"
+    elif touched or guarded:
+        reason = "verifier_tree_written"
+    return ok, evidence(target="run_record", contacted=contacted,
+                        allowlist=sorted(EGRESS_ALLOWLIST), outside_allowlist=outside,
+                        denied_by_name=denied, private_reads=private[:6],
+                        private_prefix_hits=flagged[:6], guarded_writes=touched[:6],
+                        reason=reason)''',
+
+"cold_rebuild_and_smoke_query_inside_the_published_budgets": '''\
+    record = run_record().get("cold_rebuild")
+    if not isinstance(record, dict):
+        return False, evidence(target="run_record", reason="cold_rebuild_unrecorded")
+    clock = str(record.get("clock_source"))
+    wall = as_float(record.get("wall_clock_s"))
+    per_stage = record.get("per_stage_seconds")
+    health = as_float(record.get("seconds_to_health"))
+    smoke = record.get("smoke_query_answered")
+    retries = record.get("launch_retries")
+    failing = record.get("failing_stage")
+    if wall is None or not isinstance(per_stage, dict):
+        return False, evidence(target="run_record", reason="cold_rebuild_unrecorded",
+                               wall_clock_s=wall)
+    measured = [as_float(v) for v in per_stage.values()]
+    if any(v is None for v in measured):
+        return False, evidence(target="run_record", reason="per_stage_seconds_unreadable")
+    summed = sum(measured)
+    faults = []
+    if clock != "harness":
+        faults.append({"why": "self_reported_clock", "clock_source": clock})
+    if abs(summed - wall) > 1.0:
+        faults.append({"why": "work_hides_between_stages", "summed": summed, "total": wall})
+    if wall > BUILD_BUDGET_S:
+        faults.append({"why": "build_budget_exceeded", "wall_clock_s": wall,
+                       "budget_s": BUILD_BUDGET_S})
+    if health is None or health > HEALTH_DEADLINE_S or smoke is not True:
+        faults.append({"why": "pipeline_build_failed", "seconds_to_health": health,
+                       "smoke_query_answered": smoke, "failing_stage": failing})
+    if retries is None or retries > MAX_LAUNCH_RETRIES:
+        faults.append({"why": "too_many_launch_retries", "retries": retries})
+    # One retry is permitted because a cold relaunch can lose a port or a driver race once
+    # without the chain being wrong. An underspecified objective carried across six
+    # heterogeneous stages still has to arrive at a RUNNING system rather than at a description
+    # of one, and that is what the smoke query decides.
+    ok = not faults
+    reason = None
+    if faults:
+        reason = faults[0]["why"]
+    return ok, evidence(target="run_record", clock_source=clock, wall_clock_s=wall,
+                        summed_per_stage=summed, budget_s=BUILD_BUDGET_S,
+                        seconds_to_health=health, health_deadline_s=HEALTH_DEADLINE_S,
+                        smoke_query_answered=smoke, launch_retries=retries, faults=faults,
+                        reason=reason)''',
+
+"per_stage_build_seconds_declared_and_add_up": '''\
+    try:
+        doc = manifest()
+        declared = {str(i) for i in declared_ids()}
+    except Exception as exc:
+        return False, evidence(target="pipeline_manifest", reason="manifest_unreadable",
+                               error=str(exc))
+    accounting = doc.get("build_seconds")
+    if not isinstance(accounting, dict):
+        return False, evidence(target="pipeline_manifest", reason="no_agent_declaration")
+    total = as_float(accounting.get("total"))
+    per_stage, bad = {}, []
+    for key, value in accounting.items():
+        if key == "total":
+            continue
+        seconds = as_float(value)
+        if seconds is None or seconds < 0:
+            bad.append({"stage": key, "declared": value})
+        else:
+            per_stage[str(key)] = seconds
+    missing = sorted(declared - set(per_stage))
+    stray = sorted(set(per_stage) - declared)
+    if total is None:
+        return False, evidence(target="pipeline_manifest", reason="no_declared_total",
+                               per_stage=per_stage)
+    summed = sum(per_stage.values())
+    # What is graded here is the DECLARATION, not the harness's measurement of the same rebuild.
+    # A field the harness writes cannot satisfy this check and the two figures are compared
+    # nowhere: the question is whether the agent knows where its hour went across six stages.
+    reason = None
+    if bad:
+        reason = "declared_seconds_not_a_non_negative_number"
+    elif missing or stray:
+        reason = "declaration_does_not_cover_the_declared_stages"
+    elif abs(summed - total) > 0.5:
+        reason = "declared_stages_do_not_sum_to_the_declared_total"
+    elif total > BUILD_BUDGET_S:
+        reason = "declared_budget_over_the_build_cap"
+    return reason is None, evidence(target="pipeline_manifest", per_stage=per_stage,
+                                    declared_total=total, summed=summed,
+                                    budget_s=BUILD_BUDGET_S, missing=missing, stray=stray,
+                                    malformed=bad[:4], reason=reason)''',
+
+"deadline_respecting_ndcg_through_the_ramp": '''\
+    c = require_measured("floor", "knee", "dichotomizing_threshold")
+    # require_measured FIRST, before the replay log is opened. Opening it first lets a missing
+    # or malformed file raise an ordinary error, the verifier records a FAILED check rather than
+    # an UNMEASURED one, and the report then reads gradeable=true with r_det=0.0 -- which
+    # asserts that the agent scored zero. "Not yet measurable" and "scored zero" are two
+    # different claims and the null-constant convention exists to keep them apart.
+    q = recomputed_graded_q()
+    if q is None:
+        return False, evidence(target="replay_log", reason="graded_quantity_not_measurable",
+                               replays=len(replays()), required=REPLAY_COUNT)
+    span = c["knee"] - c["floor"]
+    ramp = 0.0 if span <= 0 else max(0.0, min(1.0, (q - c["floor"]) / span))
+    # The bar is cleared on the RAMPED value, not on Q. floor and knee live on the nDCG axis and
+    # the dichotomizing threshold lives on the reward axis: the contract puts the judged gate's
+    # 0.50 ceiling exactly 0.10 below the 0.60 threshold, and that subtraction only means
+    # anything if both are reward. Comparing Q against a reward threshold would be comparing two
+    # different scales and would silently move the bar every time the ramp is re-anchored.
+    return ramp >= c["dichotomizing_threshold"], evidence(
+        target="replay_log", deadline_respecting_ndcg=q, s_outcome=ramp, floor=c["floor"],
+        knee=c["knee"], deadline_ms=DEADLINE_MS, offered_qps=OFFERED_QPS,
+        replays=REPLAY_COUNT, queries_per_replay=QUERIES_PER_REPLAY)''',
+
+}
+
+
+def build_tests(grounding, prelude, bodies):
+    """Assemble the compiled-check module. `kind` is the item's own dimension, so a failing check
+    names the contract it belongs to rather than the word 'process'."""
+    chunks = [prelude]
+    for item in sorted(grounding["items"], key=lambda i: i["id"]):
+        if item["mode"] != "compiled":
+            continue
+        chunks.append('\n\n@check(id="%s", weight=%d, knockout=%s, kind="%s")\ndef test_%s():\n%s\n'
+                      % (item["id"], item["weight"], item["knockout"], item["dimension"],
+                         item["id"], bodies[item["id"]]))
+    return "".join(chunks)
+
+
+def build_annex(grounding):
+    """The contract annex, rendered from the derivation source rather than authored beside it.
+
+    It used to be a hand-written string in grounding.yaml that listed the contract's checker
+    obligations alphabetically, which is not a path through anything. Here the ordered path is
+    the narrative's own steps, each carrying the compiled checks it discharges, so the annex
+    cannot drift away from the items."""
+    lines = ["Retained under FORGE.md item 10e and Phase 2 item 7, which require this file to "
+             "carry the ordered path through instruction.md with each satisfied checker "
+             "identifier, and each rejected route bound to a measured known-wrong control. "
+             "standards/truth-md-authoring-v1.md section 3 admits no fifth section, so this "
+             "annex is a recorded deviation rather than an omission.", ""]
+
+    lines += ["### Ordered path, with the compiled check each step discharges", ""]
+    for n, step in enumerate(grounding["truth_narrative"]["steps"], 1):
+        discharged = ", ".join("`%s`" % i for i in step["satisfies"])
+        lines += ["%d. **%s** -- %s" % (n, step["heading"], discharged), ""]
+
+    lines += ["### Rejected routes, each bound to the control that measures it wrong", ""]
+    for route in grounding["rejected_routes"]:
+        lines += ["- %s" % route["route"], "  Controlled by: %s" % route["controlled_by"], ""]
+
+    lines += ["### Control ladder recorded in seed/contract.yaml", ""]
+    for control in grounding["control_ladder"]:
+        lines += ["- `%s` (recorded score %s) -- %s"
+                  % (control["id"], control["recorded_score"], control["targets"]), ""]
+
+    lines += ["### The compiled surface", ""]
+    total = sum(i["weight"] for i in grounding["items"])
+    knockouts = [i["id"] for i in grounding["items"] if i["knockout"]]
+    bounds = grounding["published_bounds"]
+    lines += ["%d compiled checks carrying %d weight, of which %d are knockouts. Every one runs "
+              "against the chain manifest at %s, the per-query replay table, or the harness run "
+              "record. The declared topology is %d stages: %s."
+              % (len(grounding["items"]), total, len(knockouts),
+                 grounding["deliverable"]["path"], len(bounds["stage_roster"]),
+                 ", ".join(bounds["stage_roster"])), ""]
+    for item in sorted(grounding["items"], key=lambda i: (-i["weight"], i["id"])):
+        lines += ["- `%s` (%s, weight %d%s) -- %s"
+                  % (item["id"], item["dimension"], item["weight"],
+                     ", knockout" if item["knockout"] else "", item["criterion"].strip())]
+    lines += [""]
+
+    lines += ["### Behavioural rubrics, judged after r_det and never inside it", ""]
+    for rubric in grounding["council_rubrics"]:
+        lines += ["- `%s` -- %s" % (rubric["id"], rubric["asks"].strip()),
+                  "  Deterministic counterpart: `%s`" % rubric["deterministic_counterpart"], ""]
+
+    deliverable = grounding["deliverable"]
+    lines += ["### Deliverable manifest", "",
+              "%s (%s): %s. Companions the checks also read: %s."
+              % (deliverable["path"], deliverable["kind"], deliverable["shape"].strip(),
+                 ", ".join(deliverable["companion_paths"])), "",
+              "Corpus layout: %s" % grounding["corpus_layout"]["status"], ""]
+    return "\n".join(lines)
+
+
+def build_truth(grounding, title):
+    """Render solution/TRUTH.md from the frozen literals of solution/grounding.yaml."""
+    narrative = grounding["truth_narrative"]
+    lines = [title, "", "GENERATED SECTION. DO NOT HAND-EDIT.", "", narrative["opening"], "",
+             "## The single most important insight", "", narrative["insight"], "",
+             "## The ideal solve, step by step", ""]
+    for n, step in enumerate(narrative["steps"], 1):
+        lines += ["%d. **%s** %s" % (n, step["heading"], step["paragraph"]), ""]
+    lines += ["## Traps that catch agents that are not thinking carefully", ""]
+    lines += ["- " + trap for trap in narrative["traps"]]
+    lines += ["", "---", "", "## Contract record (annex; not part of the narrative body)", "",
+              build_annex(grounding), ""]
+    return "\n".join(lines) + "\n"
+
+
+def build_rubrics(grounding, item_keys):
+    """The 9g rubric carrier. The item schema is CLOSED at eight keys, so item 10f's outcome
+    classification rides as a greppable prefix of the judgment rather than as a ninth key."""
+    items = []
+    for raw in grounding["items"]:
+        item = {key: raw[key] for key in item_keys}
+        item["criterion"] = " ".join(raw["criterion"].split())
+        item["judgment"] = "%s: %s" % (raw["outcome_class"], " ".join(raw["judgment"].split()))
+        items.append(item)
+    compiled = sum(i["weight"] for i in items if i["mode"] == "compiled")
+    total = sum(i["weight"] for i in items)
+    return {"$schema": "forge.rubric/v1",
+            "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+            "generator": "solution/recompute.py",
+            "compilation_floor": grounding["compilation_floor"],
+            "compiled_weight_share": round(compiled / total, 6) if total else 0.0,
+            "evaluation_target_vocabulary": sorted(grounding["evaluation_target_vocabulary"]),
+            "items": sorted(items, key=lambda i: i["id"])}
+
+
+def build_provenance(grounding, identity):
+    record = grounding["provenance"]
+    out = {
+        "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+        "generator": "solution/recompute.py from solution/grounding.yaml",
+        "schema_version": "1.0",
+        "slot_id": grounding["slot_id"],
+        "identity": identity,
+        "corpus": record["corpus"],
+        "anchors": record["anchors"],
+        "shards": record["shards"],
+        "narrative": record["narrative"],
+        "supersedes": record["supersedes"],
+        "upstream_provenance": record["upstream_record"],
+        "reward_composition": record["reward_composition"],
+        "screening_interval_days": record["screening_interval_days"],
+        "screening_detector_version": record["screening_detector_version"],
+        "derivation_instant": record["derivation_instant"],
+        "screening_roots": record["screening_roots"],
+        "empty_submission_result": record["empty_submission_result"],
+        "resolved_closure": record["resolved_closure"],
+        "applicability": record["applicability"],
+        "measurement_tier": grounding["measurement_tier"],
+        "gradeable": grounding["gradeable"],
+        "knee_anchor_status": grounding["knee_anchor_status"],
+    }
+    out.update(read_screening(HERE))
+    return out
+
+
+def validate(grounding):
+    """Refuse to emit from a derivation source this slot cannot honestly compile.
+
+    Every rule below is a defect that has actually shipped in this batch:
+
+      1. An item without a body used to fall through to a generic obligation lookup keyed by the
+         item id, reading a run-record key nothing in the bundle ever writes. Nine of this slot's
+         items fell through it, so nine checks consulted nothing and reported that they passed.
+      2. The outcome item must call require_measured as its FIRST statement. Reading the replay
+         log first lets a missing-file error mask the unmeasured signal, and the verifier then
+         reports gradeable=true with r_det=0.0, collapsing "not yet measurable" into "the agent
+         scored zero".
+      3. The four measured constants stay null at Phase 0. A generator that emitted an authored
+         floor would be inventing the measurement the whole convention exists to withhold.
+      4. The order relations have to name stages the roster actually carries, or the ordering
+         check would pass by vacuity on a chain that declares none of them.
+      5. The arrival schedule has to reproduce the offered load: queries_per_replay divided by
+         replay_span_s must equal offered_qps, or the load the checks assert is not the load the
+         instruction publishes.
+      6. Three replays of 6,000 disjoint queries have to account for every judged topic, or the
+         disjointness check is asserting a total no protocol produces.
+      7. Every narrative step's `satisfies` list, and every rejected route's `controlled_by`,
+         has to name something that exists. Renaming an item once left the annex pointing at an
+         id no item carried, and the annex renders happily either way: a broken cross-reference
+         in a generated document is invisible unless a generator refuses over it.
+    """
+    problems = []
+    items = grounding.get("items") or []
+    if not items:
+        problems.append("no items to compile")
+
+    seen = set()
+    for item in items:
+        iid = item.get("id", "<unnamed>")
+        if iid in seen:
+            problems.append("duplicate item id %r" % iid)
+        seen.add(iid)
+        if set(item) != ITEM_SCHEMA:
+            problems.append("item %r does not carry the closed schema: %s"
+                            % (iid, sorted(set(item) ^ ITEM_SCHEMA)))
+            continue
+        if item["outcome_class"] not in OUTCOME_CLASSES:
+            problems.append("item %r carries outcome_class %r" % (iid, item["outcome_class"]))
+        if item["evaluation_target"] not in grounding["evaluation_target_vocabulary"]:
+            problems.append("item %r evaluates %r, which the vocabulary does not admit"
+                            % (iid, item["evaluation_target"]))
+        if not isinstance(item["weight"], int) or item["weight"] <= 0:
+            problems.append("item %r carries weight %r" % (iid, item["weight"]))
+
+    compiled = {i["id"] for i in items if i["mode"] == "compiled"}
+    for iid in sorted(compiled - set(BODIES)):
+        problems.append("compiled item %r carries no body; this generator refuses rather than "
+                        "emitting a check that consults nothing" % iid)
+    for iid in sorted(set(BODIES) - compiled):
+        problems.append("body %r belongs to no compiled item" % iid)
+
+    outcome = [i for i in items if i["dimension"] == OUTCOME_DIMENSION]
+    if [i["id"] for i in outcome] != [OUTCOME_ITEM]:
+        problems.append("expected exactly one %r item named %r, found %r"
+                        % (OUTCOME_DIMENSION, OUTCOME_ITEM, [i["id"] for i in outcome]))
+    elif OUTCOME_ITEM in BODIES:
+        statements = [line.strip() for line in BODIES[OUTCOME_ITEM].split("\n")
+                      if line.strip() and not line.strip().startswith("#")]
+        head = statements[0] if statements else ""
+        if head != REQUIRE_FIRST:
+            problems.append("%s must call require_measured on floor, knee and "
+                            "dichotomizing_threshold as its first statement, before it reads the "
+                            "replay log; its first statement is %r" % (OUTCOME_ITEM, head[:70]))
+
+    for name in RAMP_CONSTANTS:
+        if grounding["constants"].get(name) is not None:
+            problems.append("measured constant %r was authored at Phase 0; it is measured on the "
+                            "grading host, not written here" % name)
+
+    bounds = grounding["published_bounds"]
+    roster = set(bounds["stage_roster"])
+    if len(bounds["stage_roster"]) != len(roster):
+        problems.append("the stage roster repeats an id: %r" % (bounds["stage_roster"],))
+    if SERVE_STAGE not in roster:
+        problems.append("the stage roster carries no %r stage, so nothing serves" % SERVE_STAGE)
+    for first, second in bounds["required_order_relations"]:
+        for side in (first, second):
+            if side not in roster:
+                problems.append("order relation %r -> %r names %r, which the roster does not "
+                                "carry" % (first, second, side))
+
+    per_replay = float(bounds["queries_per_replay"])
+    span = float(bounds["replay_span_s"])
+    if abs(per_replay / span - float(bounds["offered_qps"])) > 1e-9:
+        problems.append("the arrival schedule does not reproduce the offered load: %g queries "
+                        "over %g s is %g q/s, not the declared %g"
+                        % (per_replay, span, per_replay / span, bounds["offered_qps"]))
+    if bounds["queries_per_replay"] * bounds["replay_count"] != bounds["unique_judged_topics"]:
+        problems.append("%d disjoint replays of %d queries is %d topics, not the declared %d"
+                        % (bounds["replay_count"], bounds["queries_per_replay"],
+                           bounds["replay_count"] * bounds["queries_per_replay"],
+                           bounds["unique_judged_topics"]))
+    known = {i.get("id") for i in items}
+    for step in grounding["truth_narrative"]["steps"]:
+        for ref in step["satisfies"]:
+            if ref not in known:
+                problems.append("narrative step %r says it discharges %r, which is not an item"
+                                % (step["heading"][:44], ref))
+    controls = {c["id"] for c in grounding["control_ladder"]}
+    for route in grounding["rejected_routes"]:
+        if route["controlled_by"] not in controls:
+            problems.append("rejected route is controlled by %r, which the control ladder does "
+                            "not carry" % route["controlled_by"])
+    counterparts = {r["deterministic_counterpart"] for r in grounding["council_rubrics"]}
+    for name in sorted(counterparts - known):
+        problems.append("a council rubric names deterministic counterpart %r, which is not an "
+                        "item" % name)
+
+    ladder = list(bounds["degradation_ladder"])
+    if not ladder or ladder[0] != bounds["rerank_depth"]:
+        problems.append("the degradation ladder %r does not start at the declared rerank depth %r"
+                        % (ladder, bounds["rerank_depth"]))
+    if ladder != sorted(ladder, reverse=True) or ladder[-1] != 0:
+        problems.append("the degradation ladder %r must descend to zero" % (ladder,))
+    return problems
+
+
+def main():
+    grounding = load_grounding()
+    # The validator runs FIRST and refuses rather than emitting: a generator that writes a
+    # carrier it knows is malformed hands the drift check a moving target.
+    problems = validate(grounding)
+    if problems:
+        raise SystemExit("%s grounding is not well-formed: %s" % (SLOT_ID, "; ".join(problems)))
+
+    layout = grounding["corpus_layout"]
+    bounds = grounding["published_bounds"]
+    roster = list(bounds["stage_roster"])
+
+    prelude = render(PRELUDE, {
+        "SLOT": SLOT_ID,
+        "OUTCOME": OUTCOME_ITEM,
+        "PIPELINE": repr(layout["pipeline_manifest"]),
+        "CHAIN_ROOT": repr(layout["chain_root"]),
+        "RUN_RECORD": repr(layout["run_record"]),
+        "REPLAY_LOG": repr(layout["replay_log"]),
+        "STAGE_ROSTER": repr(tuple(roster)),
+        "ORDER_RELATIONS": repr(tuple(tuple(p) for p in bounds["required_order_relations"])),
+        # SORTED TUPLES, not repr(frozenset(...)). A frozenset's repr orders by hash, which moves
+        # with PYTHONHASHSEED, so a set literal made the generator emit a different byte sequence
+        # on every run and the freeze's canary-preservation refusal fired on nothing at all.
+        "RAW_SOURCES": "frozenset(%r)" % (tuple(sorted(layout["raw_source_roster"])),),
+        "TERMINAL_ARTIFACT": repr(layout["terminal_artifact"]),
+        "SERVE_STAGE": repr(roster[5]),
+        "CORPUS_EMBED_STAGE": repr(roster[2]),
+        "INDEX_STAGE": repr(roster[3]),
+        "CHUNK_STAGE": repr(roster[0]),
+        "RERANK_STAGE": repr(roster[4]),
+        "DEADLINE_MS": repr(float(bounds["deadline_ms"])),
+        "HARD_TIMEOUT_MS": repr(float(bounds["hard_timeout_ms"])),
+        "OFFERED_QPS": repr(float(bounds["offered_qps"])),
+        "QUERIES_PER_REPLAY": repr(int(bounds["queries_per_replay"])),
+        "REPLAY_COUNT": repr(int(bounds["replay_count"])),
+        "TOPICS": repr(int(bounds["unique_judged_topics"])),
+        "REPLAY_SPAN_S": repr(float(bounds["replay_span_s"])),
+        "MAX_DISPATCH_LAG_MS": repr(float(bounds["max_dispatch_lag_ms"])),
+        "RESPONSE_IDS": repr(int(bounds["response_ids"])),
+        "RESPONSE_VIOLATION_SHARE": repr(float(bounds["response_violation_share"])),
+        "RERANK_DEPTH": repr(int(bounds["rerank_depth"])),
+        "LADDER": repr(tuple(bounds["degradation_ladder"])),
+        "RERANK_AGGREGATION": repr(bounds["rerank_aggregation"]),
+        "INDEX_METRIC": repr(bounds["index_metric"]),
+        "NORM_TOL": repr(float(bounds["vector_norm_tolerance"])),
+        "PQ_SAMPLE": repr(int(bounds["pq_training_sample"])),
+        "CORPUS_PREFIX": repr(bounds["corpus_prefix"]),
+        "QUERY_PREFIX": repr(bounds["query_prefix"]),
+        "SIBLING_GAP_BOUND": repr(float(bounds["sibling_shard_gap_bound"])),
+        "BUILD_BUDGET_S": repr(float(bounds["build_budget_s"])),
+        "HEALTH_DEADLINE_S": repr(float(bounds["health_deadline_s"])),
+        "MAX_LAUNCH_RETRIES": repr(int(bounds["max_launch_retries"])),
+        "GUARDED": repr(tuple(sorted(layout["guarded_prefixes"]))),
+        "PRIVATE": repr(tuple(sorted(layout["private_input_prefixes"]))),
+        "ALLOWLIST": "frozenset(%r)" % (tuple(sorted(layout["declared_egress_allowlist"])),),
+        "DENIED": "frozenset(%r)" % (tuple(sorted(layout["denied_hosts_by_name"])),),
+        "PINNED": "frozenset(%r)" % (tuple(sorted(layout["pinned_checkpoints"])),),
+    })
+
+    tests_dir = os.path.join(BUNDLE, "tests")
+    os.makedirs(tests_dir, exist_ok=True)
+
+    # EVERYTHING IS COMPUTED BEFORE ANY OUTPUT FILE IS OPENED. `with open(path, "w")` truncates
+    # before its body's arguments are evaluated, so a read inside the with-statement reads the
+    # file that line just emptied. That shipped once here, over the frozen identity block.
+    truth = build_truth(grounding, TITLE).rstrip("\n") + "\n"
+    rubrics = build_rubrics(grounding, ITEM_KEYS)
+    module = build_tests(grounding, prelude, BODIES) + TAIL
+    provenance = build_provenance(grounding, read_identity(HERE))
+
+    # solution/TRUTH.md and solution/rubrics.json are PRIVATE_CARRIERS: seed/identity.py plants a
+    # canary block into them at freeze, and canary normalisation is what keeps planting from
+    # moving identity. A generator that rewrote them plainly would DROP the planted tripwire and
+    # the next content hash would differ from the frozen one, so the planted block is carried
+    # across the regeneration rather than recreated.
+    truth_path = os.path.join(HERE, "TRUTH.md")
+    planted = None
+    if os.path.exists(truth_path):
+        import re as _re
+        found = _re.search(r"<!-- AELLO-CANARY-BLOCK.*?-->\n?", open(truth_path).read(), _re.S)
+        planted = found.group(0) if found else None
+
+    rubrics_path = os.path.join(HERE, "rubrics.json")
+    if os.path.exists(rubrics_path):
+        try:
+            previous = json.load(open(rubrics_path))
+            if "canary" in previous:
+                rubrics["canary"] = previous["canary"]
+        except Exception:
+            pass
+
+    with open(truth_path, "w") as handle:
+        handle.write(truth + ("\n" + planted if planted else ""))
+    with open(rubrics_path, "w") as handle:
+        json.dump(rubrics, handle, indent=1, sort_keys=True)
+        handle.write("\n")
+    # tests/rubrics.json is NOT a private carrier: it ships to the grader, so it is emitted
+    # clean, without the planted block the solution-side copy carries.
+    with open(os.path.join(tests_dir, "rubrics.json"), "w") as handle:
+        json.dump(build_rubrics(grounding, ITEM_KEYS), handle, indent=1, sort_keys=True)
+        handle.write("\n")
+    with open(os.path.join(tests_dir, "test_output.py"), "w") as handle:
+        handle.write(module)
+    with open(os.path.join(tests_dir, "constants.json"), "w") as handle:
+        json.dump(grounding["constants"], handle, indent=1, sort_keys=True)
+        handle.write("\n")
+    with open(os.path.join(HERE, "provenance.yaml"), "w") as handle:
+        # MATCH seed/build/screen_bind.py and the frozen generators exactly: sort_keys=True,
+        # default_flow_style=False, width=100. The screen writes this carrier after the freeze,
+        # so a generator using a different dump convention reorders the keys on the next
+        # regeneration and reports as drift even though no value changed.
+        yaml.safe_dump(provenance, handle, sort_keys=True, default_flow_style=False, width=100,
+                       allow_unicode=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

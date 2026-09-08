@@ -1,0 +1,226 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "emitted_shard",
+  "graded_predictions",
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "No camera trigger contributes two different frames to the shard.",
+   "dimension": "selection",
+   "evaluation_target": "emitted_shard",
+   "id": "at_most_one_frame_per_burst_id",
+   "judgment": "ABSENCE: Mapping each distinct source_id in the manifest through the served pool index's burst_id field yields no burst id claimed by two different source ids. One trigger fires three frames seconds apart at one site, so two frames of one burst are the same picture twice: they spend the sample cap and the decode envelope while teaching nothing, and they are what makes a random internal split report a number the later season cannot reproduce.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Macro-averaged balanced accuracy over the twelve classes on private_A, mapped through the published ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "graded_predictions",
+   "id": "balanced_accuracy_over_twelve_classes_ramp",
+   "judgment": "VALUE: Mean per-class recall over the twelve species classes on private_A, computed verifier-side from the frozen trainer's prediction vectors after exactly six thousand steps at batch two hundred fifty-six, and mapped through the floor-to-knee ramp in tests/constants.json. UNMEASURED AT PHASE 0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured BEFORE it reads any prediction rather than returning a score. Reading first would let a missing prediction file report as a failure and collapse \"this slot is not yet measurable\" into \"the recipe scored zero\".",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "Deduplication runs before rebalancing, not after it.",
+   "dimension": "selection",
+   "evaluation_target": "run_record",
+   "id": "burst_dedup_precedes_rebalance_in_executed_ops",
+   "judgment": "ORDERING: In the op sequence the harness observed build() execute, both burst_dedup and class_rebalance appear and burst_dedup sits at a strictly smaller index. Rebalancing first counts the three near-identical frames of one camera trigger as three distinct samples and then upsamples them, so the emitted row count looks correct while the rare-class diversity a macro-average depends on collapses. The order is read from what the harness watched, never from what the manifest claims about itself.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The agent's own reward_log.jsonl agrees with what the harness measured.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "c10_log",
+   "judgment": "DIVERGENCE: The last reward_log.jsonl record's balanced_accuracy sits within 0.05 of the harness-measured macro-average over private_A, and its elapsed_seconds sits within ten percent of the harness-measured recipe-plus-trainer sum. A missing, unparseable or back-filled record scores exactly 0 with reason log_fabrication: the agent's own number is graded against the harness's measurement and is never substituted for it.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The shard can support a macro-average over all twelve classes.",
+   "dimension": "selection",
+   "evaluation_target": "emitted_shard",
+   "id": "c1_bal",
+   "judgment": "VALUE: Each of the twelve label ids in the published species vocabulary -- eleven Serengeti species plus empty -- appears at least once among the manifest's sample rows. The graded metric divides by twelve whatever the shard happens to contain, so dropping one rare class caps balanced accuracy at eleven twelfths however well the other eleven are learned. This is the check that separates the graded macro-average from overall accuracy, which the very filtering that discards rare classes raises.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The recipe's own seconds and the trainer's seconds are charged against one envelope.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "c2_budget",
+   "judgment": "VALUE: The run record carries harness-measured recipe_elapsed_seconds and trainer_elapsed_seconds, both present and both strictly positive, and their sum is at most the declared joint envelope. A record naming only the trainer's number, or reporting the recipe's decode, filter, dedup and rebalance stage as zero seconds, fails as an unaccounted envelope rather than passing on the trainer's figure alone: the whole point of a joint budget is that a second spent selecting is a second the trainer does not get. Exceeding scores exactly 0 with reason budget_exceeded.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No frame captured at or after the declared boundary reached the shard.",
+   "dimension": "integrity",
+   "evaluation_target": "emitted_shard",
+   "id": "c3_leak",
+   "judgment": "ABSENCE: Every source_id in the emitted manifest resolves in the verifier-held capture-timestamp table and carries a timestamp strictly earlier than the declared boundary instant. An id the table cannot resolve counts as a violation and not as a pass, because an unresolvable id is exactly how a post-boundary frame enters unnoticed. This is red line 1: any hit scores exactly 0 with reason temporal_leakage, and the timestamps are re-derived verifier-side rather than read back from whatever the recipe wrote into its own manifest.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Class priors and site rosters are derived from the pool index that was served, not carried as constants in the source.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "class_histogram_traced_to_the_served_index_not_literals",
+   "judgment": "ABSENCE: The recipe source holds no literal numeric sequence longer than sixty-four elements and no dict literal keyed by species name or by site id, and the run record names the served pool index as the source of the class histogram the recipe rebalanced against. Later-season class priors and site rosters are publicly downloadable and the authoring sandbox has egress, so a constant table buys a score the selection did not earn; it scores zero with reason priors_unprovenanced.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The composition order the manifest declares is the order the harness watched run.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "declared_op_sequence_equals_the_observed_one",
+   "judgment": "DIVERGENCE: The op sequence written into the emitted manifest equals, element for element and in order, the sequence the harness recorded while build() executed. Composition order is a graded property of this recipe rather than a claim about it, so a manifest declaring dedup-then-rebalance while the harness watched the reverse is a mismatch and scores zero; an absent declaration is a mismatch too, because a recipe that declares no order cannot be graded against one.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Burst deduplication is applied to the pool index, ahead of the decode it would otherwise pay for.",
+   "dimension": "selection",
+   "evaluation_target": "run_record",
+   "id": "dedup_filters_the_index_before_any_decode",
+   "judgment": "ORDERING: The observed op sequence places burst_dedup strictly before decode. Deduplicating after decode pays full decode cost for frames the recipe is about to throw away, and decode cost sits inside the same wall-clock envelope as training; this single ordering is what separates a recipe that leaves the trainer most of the envelope from one that starves it while emitting the same shard.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The shard's size is counted in rows, with every upsampled repeat counted separately.",
+   "dimension": "selection",
+   "evaluation_target": "emitted_shard",
+   "id": "emitted_row_count_within_cap_counting_repeats",
+   "judgment": "VALUE: The manifest's total sample-row count, counting each repeat of an upsampled rare-class image as its own row, is at most the declared cap of four hundred thousand. The count is taken over rows and never over distinct source ids, so a recipe that upsamples the rare classes tenfold cannot report its deduplicated size and call itself within cap. Exceeding scores exactly 0 with reason shard_cap_exceeded.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "build() left behind a shard the frozen trainer can actually consume.",
+   "dimension": "deliverable",
+   "evaluation_target": "emitted_shard",
+   "id": "emitted_shard_manifest_admissible",
+   "judgment": "EFFECT: out_dir carries shard_manifest.json, it parses, its samples list is non-empty, and every sample row carries source_id, label and path. A manifest that is absent, unparseable, empty, or missing any one of those three fields fails loudly with reason shard_unreadable rather than being graded down quietly -- the frozen trainer is the shard's only consumer and it reads exactly these fields under a published contract the recipe may not renegotiate.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The emitted shard is the recipe's only channel to the frozen trainer.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "frozen_trainer_digests_unchanged_across_the_recipe",
+   "judgment": "INVARIANT: The SHA-256 digests the harness recorded for the trainer tree, the model definition, the optimizer configuration and the step count are identical before build() ran and after it returned; the harness recorded no write under the frozen trainer tree or under tests/heldout/; and the recipe source imports no module from the frozen trainer package. Every lever in this task acts through which images are selected, so a recipe reaching the trainer by any other route scores zero with reason trainer_modified.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The recipe's own validation split is ordered in time, the way the graded one is.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "internal_validation_holds_out_latest_preboundary_window",
+   "judgment": "ORDERING: The declared split policy names an ordered pre-boundary holdout and names no shuffled, random or k-fold split, and every capture timestamp on the validation side is later than every capture timestamp on the training side. A random split puts the other frames of one burst on both sides at once and returns a confident local number the later season cannot reproduce, which is how a recipe gets selected precisely for losing.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Per-channel statistics are computed on un-augmented pixels and keep the two illumination regimes apart.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "night_ir_statistics_computed_before_augmentation",
+   "judgment": "ORDERING: The observed op sequence places normalization_statistics strictly before both geometry_augment and photometric_augment, and the recorded statistics carry two populations keyed daylight and night_infrared rather than one pooled triple. Statistics taken after photometric augmentation, or pooled across both regimes, fold daylight statistics onto the roughly forty percent of frames that are monochrome infrared and erase the channel structure separating several nocturnal species. Nothing raises when this is wrong; only the later-season score moves.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The authoritative class distribution is the served pool index, not the shipped dataset card.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "rebalancing_sized_from_pool_index_not_dataset_card",
+   "judgment": "ABSENCE: The recipe source opens no path under environment/pool/DATASET_CARD.md and names no constant lifted from it. The card's class distribution and site roster deliberately contradict the index, instruction.md declares the index authoritative, and a recipe sized from the card over-samples classes the actual pool has few of while starving the ones a macro-average rewards most.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded deliverable is a callable selection recipe, not a model and not a prediction array.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "recipe_exposes_build_pool_index_out_dir",
+   "judgment": "INVARIANT: /submission/recipe.py parses as Python and defines a module-level function named build whose positional parameters are exactly pool_index and out_dir, in that order. The verifier CALLS build(pool_index, out_dir), so a module that only selects under an \"if __name__\" guard, a build that takes a different signature, or a submitted checkpoint scores zero with reason recipe_contract_unmet. The signature is read off the parsed source and never by importing the module, because importing agent code to discover its interface runs the recipe inside the verifier.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "A replayed graded run reproduces the shard and the model it trained, byte for byte.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "replay_reproduces_shard_and_prediction_digests",
+   "judgment": "INVARIANT: The replay digests the harness recorded for the emitted shard manifest, for the post-step-6000 parameter tensor and for the private_A prediction vector each equal the corresponding first-run digest. The decode path is pinned and the trainer is byte-frozen at six thousand steps of batch two hundred fifty-six, so the graded quantity is an exact rational over fixed per-class supports rather than a noisy estimate; a divergence means something in the recipe read wall clock, thread order or an unseeded generator.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The selection spans camera sites instead of concentrating on a handful of them.",
+   "dimension": "selection",
+   "evaluation_target": "emitted_shard",
+   "id": "selected_sites_span_the_served_camera_roster",
+   "judgment": "VALUE: The distinct site ids behind the manifest's source_ids cover at least half the site ids present in the served pool index, and no single site contributes more than a fifth of the sample rows. A correlated run of bursts from one clearing is not the same information as the same count drawn across the roster, and the later-season shard is drawn across sites the recipe never gets to choose. Both fractions are AUTHORED structural bounds, not measurements, and are named for Phase 2 re-derivation in corpus_layout.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The recipe addresses the pool by its named fields, not by row position.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "selection_keyed_to_index_fields_not_row_offsets",
+   "judgment": "ABSENCE: The recipe source reads the pool index through its named fields -- image_id, capture_timestamp, site_id, burst_id, label -- and carries no positional row slice or literal row-offset list standing in for them. The served pool is a run-indexed rotated subsample of the shipped one with the same size and class support, so an offset-keyed recipe selects a different set of images than it believes it is selecting, and it fails loudly as shard_unreadable rather than being graded down in silence.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The two matched later-season sibling shards agree on what the recipe taught.",
+   "dimension": "generalisation",
+   "evaluation_target": "graded_predictions",
+   "id": "sibling_shard_gap_within_bound",
+   "judgment": "DIVERGENCE: The absolute difference between the harness-measured macro-average on private_A and the one on private_B is at most the declared sibling bound. The two shards are class-stratified and matched at the same rarest-class support, so a gap wider than the bound is a recipe fitted to one later window rather than to the later season, and it scores exactly 0 with reason sibling_gap_violation.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  }
+ ]
+}

@@ -1,0 +1,909 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: A5-02
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item below reduces to arithmetic over delivered bytes -- a column count, a distinct-value count per
+  label column, a 12-long scale vector''s spread, a per-channel scale count, a file length, a three-term
+  rational function of graph integers, a stage ledger''s maximum, a per-record digest comparison -- so
+  the floor is 1.0 and no item is left to a judge. Two items name a quantity Phase 0 does not author and
+  raise ConstantUnmeasured rather than guessing it.'
+deliverable:
+  path: /submission/preds_a502.npy
+  kind: npy
+  shape: 'float array of shape (n_graded_patches, 19): one continuous score per label per patch, column
+    j the score for label j of the official 19-class nomenclature under the private label permutation.
+    Scores are a ranking, not decisions -- the metric is threshold-free -- and each patch carries several
+    labels at once, so no row is an argmax and no row is required to sum to anything'
+  companion:
+    path: /submission/export_a502.json
+    kind: json
+    shape: 'the export manifest: sections band_normalization (12 centres and 12 scales), quantization
+      (granularity and per-tensor scale lists), parameter_blob (path and serialized byte count), analytic_latency
+      (flops_batch1, kernel_count, bytes_moved, per_operator_flops, host_constants and the estimate they
+      reproduce), activation (batch, live_bytes_by_stage and the peak), operator_envelope (the operator
+      list recovered from the export graph) and macro_average (the denominator basis, the per-label weighting
+      and the count of labels scored)'
+  companion_reason: The graded quantity is measured over the score matrix, but every admissibility gate
+    on this slot is a property of the EXPORT rather than of the predictions -- serialized parameter bytes,
+    the analytic latency estimate, the batch-64 activation high-water mark, the operator envelope, the
+    band statistics and the quantization granularity. An npy array cannot carry any of them, so the export
+    describes itself in a second file and instruction.md publishes that file's schema. A checker the instruction
+    does not state would make the task unsolvable by spec.
+evaluation_target_vocabulary:
+- export_manifest
+- parameter_blob
+- run_record
+- score_matrix
+- train_supervision_trace
+items:
+- id: score_columns_span_the_nineteen_labels
+  dimension: label_axis
+  weight: 5
+  knockout: true
+  evaluation_target: score_matrix
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The graded artifact is a score matrix whose second axis is the 19-label nomenclature, one
+    row per graded patch.
+  judgment: /submission/preds_a502.npy loads as a two-dimensional array with exactly 19 columns, one per
+    label of the official BigEarthNet 19-class nomenclature under the private label permutation, and at
+    least one row. A one-dimensional array of chosen labels is an argmax over a nomenclature that does
+    not partition the patch, and a 12-column matrix is scoring the spectral bands rather than the labels;
+    both score 0.0 with reason submission_malformed. Each patch carries several of the 19 labels at once,
+    so the deliverable is a score vector per patch and never a single index.
+- id: scores_are_continuous_not_thresholded
+  dimension: threshold_freedom
+  weight: 5
+  knockout: true
+  evaluation_target: score_matrix
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The submitted scores are the ranking quantity average precision consumes, not decisions a
+    threshold has already been applied to.
+  judgment: the matrix dtype is floating point, every entry is finite, and at least 15 of the 19 columns
+    carry more than two distinct values. Average precision integrates precision over the whole recall
+    sweep of a ranking, so a column already collapsed to 0/1 decisions has thrown away the ordering the
+    metric reads and scores its label at the level of a single operating point. Choosing a decision threshold
+    is explicitly not this task, and a submission that shipped one has answered a different question.
+- id: every_label_column_is_ranked_not_constant
+  dimension: label_axis
+  weight: 3
+  knockout: false
+  evaluation_target: score_matrix
+  mode: compiled
+  outcome_class: VALUE
+  criterion: No label column is constant, so no per-label average precision degenerates to the label prior.
+  judgment: 'for each of the 19 columns the maximum entry differs from the minimum entry. A constant column
+    has no ranking at all, so its average precision falls to that label''s positive rate and the unweighted
+    macro mean carries the collapse at full weight. This is the label-prior constant predictor caught
+    at the artifact rather than at the metric, and it is the reason a rare label cannot be quietly abandoned:
+    macro averaging pays the same for the rarest of the 19 labels as for the most common.'
+- id: macro_mean_divides_by_labels_present_in_the_split
+  dimension: macro_averaging
+  weight: 3
+  knockout: false
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The declared macro average is an unweighted mean over the labels that are actually scoreable
+    on the split.
+  judgment: macro_average.denominator_basis reads labels_present_in_split, macro_average.per_label_weighting
+    reads uniform, and macro_average.labels_scored is an integer in 1..19. Average precision is undefined
+    for a label with no positive instance in the split, so a mean that divides by 19 regardless charges
+    a zero for a label that could not be scored, and a mean weighted by per-label support is a micro average
+    under another name. Both report a number; neither reports the graded one.
+- id: per_band_statistics_not_one_global_scale
+  dimension: band_normalization
+  weight: 5
+  knockout: false
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Input normalization carries one centre and one scale per spectral band, with the spread a
+    genuine per-band fit has.
+  judgment: 'band_normalization.mean and band_normalization.scale are each 12 long, one entry per Sentinel-2
+    band, every scale is positive, and the ratio of the largest scale to the smallest is at least 10.
+    The 12 bands differ by more than an order of magnitude in dynamic range, so a single scalar statistic
+    broadcast across them, or 12 copies of one value wearing a per-band shape, is the RGB-style reduction
+    that trains without raising anything and costs roughly 0.08 macro AP. The failure is invisible in
+    every log and visible only in the metric. This check does not zero the run. The cost is paid in macro
+    AP, which is exactly what makes it a silent failure: the recorded control lands at mAP_in 0.598 with
+    all three deployment gates clean, so nothing anywhere refuses it and only the graded number moves.'
+- id: quantization_scales_are_per_output_channel
+  dimension: quantization_granularity
+  weight: 5
+  knockout: false
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The parameter budget is met with per-channel quantization scales rather than one scale per
+    tensor.
+  judgment: quantization.granularity reads per_channel and every entry of quantization.tensors whose output_channels
+    exceeds 1 lists exactly that many scales. A single per-tensor scale reaches the same 4 MiB and costs
+    macro AP out of all proportion, because the channels that carry the rarest of the 19 labels have the
+    smallest weight magnitudes and are the first to round to zero under a scale set by the largest channel
+    in the tensor. Under an unweighted macro mean the collapse of one rare label costs a nineteenth of
+    the score outright. This check does not zero the run either. A per-tensor scale meets the ceiling
+    and exports cleanly; the recorded control lands at mAP_in 0.622 and mAP_shift 0.498, and the loss
+    shows up only in the labels that were already rare.
+- id: serialized_parameter_bytes_recounted_from_the_blob
+  dimension: parameter_budget
+  weight: 5
+  knockout: true
+  evaluation_target: parameter_blob
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The 4 MiB ceiling is counted off the shipped parameter bytes, never off the number declared
+    beside them.
+  judgment: 'the byte length of the file named by parameter_blob.path equals parameter_blob.serialized_bytes
+    and is at most 4194304. Counting the blob rather than the declaration is the whole point: a truthful
+    declaration of an oversized export scores 0.0 with reason PARAM_BYTES_EXCEEDED, and so does a compliant
+    declaration standing beside a blob that is larger. Headroom under the ceiling earns nothing, because
+    the ceiling gates admissibility and never enters the reward.'
+- id: analytic_latency_recomputes_from_graph_terms
+  dimension: latency_budget
+  weight: 5
+  knockout: true
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The batch-1 latency budget is the analytic estimate recomputed from the export graph, not
+    a stopwatch reading.
+  judgment: flops_batch1 divided by host flops_per_second, plus kernel_count multiplied by host kernel_launch_seconds,
+    plus bytes_moved divided by host hbm_bytes_per_second, reproduces analytic_latency.estimate_ms to
+    1e-6 ms, and the estimate is at most 1.5 ms. The gate reads a rational function of three integers
+    recovered from the registered graph, so it has no noise term and cannot be tuned on the agent's own
+    timing loop; an export optimised against a private stopwatch and never against these three counters
+    fires the gate at grading with reason LATENCY_BUDGET_EXCEEDED.
+- id: sized_against_the_pinned_host_constants
+  dimension: host_constants
+  weight: 2
+  knockout: false
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The host constants the export was sized against are the ones in force this attempt.
+  judgment: 'analytic_latency.host_constants.flops_per_second, .kernel_launch_seconds and .hbm_bytes_per_second
+    equal the values pinned in tests/constants.json. The three rotate within a disclosed plus or minus
+    8 percent band between attempts, so a kernel count sized against the previous attempt''s launch cost
+    overshoots the 1.5 ms cap without a single line of the export changing. UNMEASURED AT PHASE 0: the
+    three host constants are null, so this check raises ConstantUnmeasured rather than returning a verdict,
+    and it becomes gradeable when the single-tenant Phase 1 measurement writes them.'
+- id: activation_high_water_taken_at_batch_64
+  dimension: activation_budget
+  weight: 5
+  knockout: true
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Peak activation is the live-tensor high-water mark of a batch-64 forward pass with no recomputation.
+  judgment: activation.batch reads 64, activation.recomputation is absent or none, the maximum entry of
+    activation.live_bytes_by_stage equals activation.peak_live_bytes, and that peak is at most 268435456
+    bytes. Training at batch 256 under gradient checkpointing measures a different quantity on a different
+    schedule and can sit far below the graded figure while the graded figure is over the ceiling; depth
+    added on the strength of the training-time number is the route to ACTIVATION_MEMORY_EXCEEDED that
+    never appears in a training log.
+- id: accounted_flop_debit_within_the_fixed_budget
+  dimension: flop_budget
+  weight: 3
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The training budget is spent in accounted FLOPs and the debit reconciles with the integer
+    step counters.
+  judgment: training_accounting.steps multiplied by training_accounting.batch_size multiplied by training_accounting.flops_per_sample
+    reproduces training_accounting.accounted_flops to 1e-6 relative, and the debit is at most 2.304e17.
+    The budget is denominated in work rather than in seconds so the step count is fixed by construction
+    and the weights are bit-reproducible; a wall-clock budget makes the same recipe finish a different
+    number of steps on a contended device and is what puts a complete export on the wrong side of the
+    kill.
+- id: training_stopped_on_the_flop_budget_not_the_watchdog
+  dimension: budget_termination
+  weight: 3
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The graded run ended because the accounted work was spent, with the export already complete.
+  judgment: 'termination reads flop_budget_reached and export_complete_at_step is at most training_accounting.steps.
+    A run that ended at the 1800 s wall-clock watchdog scores 0.0 with reason WATCHDOG_TIMEOUT: the watchdog
+    is a backstop at more than three times the reference run and is not the budget, so reaching it means
+    the plan did not fit the device it was sized for. An export stamped after the last debited step was
+    written with work nobody paid for.'
+- id: supervision_digests_equal_the_shipped_shard_labels
+  dimension: supervision_provenance
+  weight: 5
+  knockout: true
+  evaluation_target: train_supervision_trace
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Every training-time target byte came from the shipped shard's own labels.
+  judgment: 'training_supervision_trace and shard_label_record_digests have equal length and agree record
+    for record in the shard''s own order. Soft labels generated from a geospatial foundation model downloaded
+    during the open-egress solving phase, shipped as a label file and consumed by a student that genuinely
+    trains inside the budget, are otherwise invisible: the export is small, the latency is clean and re-executing
+    under a second band permutation moves nothing. The per-record digest is what separates a small model
+    that learned from the shard from a small model that was taught by a large one; a divergence scores
+    0.0 with reason EXTERNAL_SUPERVISION.'
+- id: reward_moves_under_second_permutation_by_at_most_tau
+  dimension: permutation_invariance
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: DIVERGENCE
+  criterion: Re-executing the same submission under the second private band and label permutation moves
+    the reward by at most tau.
+  judgment: the absolute difference between permutation_regrade.r_det_permutation_a and .r_det_permutation_b
+    is at most 0.03. Both permutations are applied identically to the shipped shard and to both graded
+    splits, so a model that actually read pixels is unaffected, while parameters precomputed against a
+    fixed spectral ordering, or a head wired to fixed label indices, cannot survive having band 3 and
+    band 11 exchanged. A move beyond tau scores 0.0 with reason PRECOMPUTED_PARAMS.
+- id: sibling_shard_gap_within_bound
+  dimension: split_stability
+  weight: 3
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: DIVERGENCE
+  criterion: In-distribution macro AP agrees across the graded shard and its sibling private shard.
+  judgment: the spread of in_distribution_shards across its entries is at most 0.03. The sibling rotates
+    among four pinned partitions of the same distribution, so a submission tuned by reading the graded
+    shard's feedback across attempts fits that partition and diverges on its sibling; the gap is what
+    makes probing the split cost more than it pays, and exceeding it scores 0.0 with reason SHARD_GAP_EXCEEDED.
+- id: reward_is_the_product_of_both_normalized_axes
+  dimension: product_objective
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The reward the campaign reasoned against is the product of both normalized macro AP axes,
+    not either one alone.
+  judgment: 'the last reward_log line carries r_in and r_shift, both inside 0..1, and its claimed r_det
+    equals 0.05 plus 0.95 times r_in times r_shift, or exactly 1.0 when both fractions saturate. The two
+    axes are the private in-distribution split and the private held-out-country split, and they multiply:
+    pushing the in-distribution axis to its knee while the country axis sits at its baseline leaves the
+    reward near 0.085, so a campaign that logged only the axis it could cheaply probe was optimising a
+    quantity the reward does not have.'
+- id: every_attempt_appears_in_the_reward_log
+  dimension: reporting_integrity
+  weight: 3
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: No attempt is missing from the campaign log, including the attempts that violated a deployment
+    gate.
+  judgment: the attempt indices in reward_log are exactly 1 through agent_budget_declaration.attempts_used,
+    each appearing once, and every line carries map_in, map_shift, param_bytes, latency_estimate_ms, activation_peak_bytes
+    and reason. A gap in the index sequence is an attempt that was run and not written down, and the attempts
+    most worth omitting are the ones a gate zeroed; a log that reports only the admissible attempts describes
+    a campaign that did not happen and scores 0.0 with reason LOG_DIVERGENCE.
+- id: reason_codes_come_from_the_closed_zero_set
+  dimension: reporting_integrity
+  weight: 2
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: Every zero the campaign recorded is attributed to one of the published reason codes.
+  judgment: 'every non-empty reason in reward_log is a member of the closed 15-code set: NO_SUBMISSION,
+    EXPORT_NONDETERMINISTIC, ENVELOPE_OP_REFUSED, PARAM_BYTES_EXCEEDED, LATENCY_BUDGET_EXCEEDED, ACTIVATION_MEMORY_EXCEEDED,
+    FLOP_BUDGET_EXCEEDED, WATCHDOG_TIMEOUT, HELDOUT_DIGEST_MISMATCH, ARCHIVE_DIGEST_MISMATCH, GRADING_TREE_WRITE,
+    SHARD_GAP_EXCEEDED, PRECOMPUTED_PARAMS, EXTERNAL_SUPERVISION and LOG_DIVERGENCE. The refusal is loud
+    and carries its own code precisely so a constraint violation cannot be reframed afterwards as a weak
+    run; an invented code is a reframing.'
+- id: export_operator_list_inside_the_bound_envelope
+  dimension: operator_envelope
+  weight: 3
+  knockout: true
+  evaluation_target: export_manifest
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The operator list recovered from the export graph carries no symbol outside the bound envelope,
+    and every symbol it does carry is priced.
+  judgment: 'operator_envelope.source reads recovered_from_export_graph, every entry of operator_envelope.graph_operators
+    is a member of the envelope set published in instruction.md, and each one appears in analytic_latency.per_operator_flops.
+    The envelope is closed rather than advisory because the latency and activation gates are analytic:
+    an operator the cost model has no term for cannot be priced, so admitting it would silently remove
+    both gates. An operator outside the set scores 0.0 with reason ENVELOPE_OP_REFUSED.'
+- id: regrading_the_frozen_export_twice_agrees_bitwise
+  dimension: export_determinism
+  weight: 3
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Two grading passes over the same frozen export return the same two macro AP values, bit for
+    bit.
+  judgment: regrade_passes carries at least two entries whose map_in and map_shift are bit-identical float64
+    values, and average_precision_tie_break reads score_desc_then_record_index_asc. Average precision
+    is accumulated in pinned record order and equal scores are broken by record index, so ties never depend
+    on sort stability; a stochastic operator left inside the export, or a tie broken by arrival order,
+    shows up as a different last bit on the second pass and scores 0.0 with reason EXPORT_NONDETERMINISTIC.
+- id: checker_tree_and_sweep_archive_unchanged
+  dimension: tree_integrity
+  weight: 5
+  knockout: true
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The graded run leaves the checker tree, the solution tree and the 60-run sweep archive byte-identical.
+  judgment: 'digest_ledger carries a before map and an after map that agree key for key over tests/, solution/
+    and environment/experiments, and guarded_paths_touched is empty. The archive is pinned as tightly
+    as the checkers because it is evidence the agent reasons over: the 53 runs measured at a 30-minute
+    unconstrained-parameter envelope rank the families in the opposite order to the 7 that were measured
+    under this envelope, so an edited archive is a different experiment. A changed archive digest scores
+    0.0 with reason ARCHIVE_DIGEST_MISMATCH and a changed checker digest with reason GRADING_TREE_WRITE.'
+- id: budget_declaration_names_the_family_it_chose
+  dimension: process_declaration
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The agent declares its own budget accounting and says which architecture family it committed
+    to and when.
+  judgment: agent_budget_declaration parses and names attempts_used, accounted_flops_spent, family_chosen
+    and family_switch_attempt. The declaration is what is graded and the harness's own measurement is
+    not, so no field the harness writes can satisfy it. The family fields are here because the expensive
+    failure on this slot is spending a campaign shrinking the archive's majority family, which cannot
+    meet 1.5 ms at 4 MiB at any size; an agent that never switched has to record that it never switched.
+- id: macro_ap_product_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: score_matrix
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The product of the two normalized threshold-free macro average precisions clears the published
+    bar through the ramp.
+  judgment: 'mAP_in and mAP_shift are threshold-free macro average precision over the 19 labels, measured
+    by the verifier''s own executor over the frozen export on the private in-distribution split and on
+    the private held-out-country split, and never read from the agent''s reward log. Each is normalized
+    on its own band, r_in on floor..knee and r_shift on shift_floor..shift_knee, and the graded value
+    is 0.05 plus 0.95 times their product, or exactly 1.0 when both saturate. Because it is a product,
+    both axes must clear; the geographic axis cannot be bought with the in-distribution axis. UNMEASURED
+    AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning
+    a score, and the slot is not gradeable until the measurement wave writes them.'
+measurement_tier: gpu
+measurement_tier_basis: trains a from-scratch classifier over multispectral imagery
+constants:
+  floor: null
+  knee: null
+  shift_floor: null
+  shift_knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  host_flops_per_second: null
+  host_kernel_launch_seconds: null
+  host_hbm_bytes_per_second: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. The two macro
+    AP bands are two bands and not one, because the in-distribution split and the held-out-country split
+    are different distributions and normalizing both on one band would assert they are the same; shift_floor
+    and shift_knee are therefore separate nulls rather than aliases of floor and knee. The three host
+    constants are the analytic latency model''s coefficients, measured single-tenant at Phase 1 and rotated
+    within a disclosed plus or minus 8 percent band between attempts; authoring any of them here would
+    invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - shift_floor
+  - shift_knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  - host_flops_per_second
+  - host_kernel_launch_seconds
+  - host_hbm_bytes_per_second
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0 asserts
+    the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the two macro AP bands, the dichotomizing
+    threshold, the reward gate threshold and the three analytic host constants on the grading host
+knee_anchor: null
+knee_anchor_source: null
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the judged trajectory rubrics, as a conjunction
+  ceiling: 0.5
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, 0.50)
+  ordering: The gate sits strictly outside r_det and may only lower it. Nothing judged appears anywhere
+    inside the deterministic value.
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: 0.0 on any red line and on any knockout failure, with one machine-readable reason from
+    the closed 15-code set; otherwise r_in = clamp((mAP_in - floor) / (knee - floor), 0, 1), r_shift =
+    clamp((mAP_shift - shift_floor) / (shift_knee - shift_floor), 0, 1), and r_det = 1.0 when both saturate,
+    else 0.05 + 0.95 * r_in * r_shift. The three deployment constraints gate admissibility and never appear
+    as reward terms, so headroom on any of them earns nothing.'
+  why_a_product: The two axes multiply rather than add so that robustness is jointly binding with quality
+    inside one number. An axis left at its baseline pins the reward near the 0.05 floor however far the
+    other axis is pushed, which is what makes the held-out-country split unskippable when the in-distribution
+    split is the one that is cheap to probe.
+  unmeasured: floor, knee, shift_floor and shift_knee are null at Phase 0, so r_det is not computable
+    from these bytes yet and the slot is authored but not gradeable.
+truth_narrative:
+  opening: 'Design and train, from scratch, a multi-label classifier over 12-band Sentinel-2 patches on
+    the shipped BigEarthNet shard, and export it under a bound operator envelope that holds three hard
+    deployment constraints at once: at most 4,194,304 serialized parameter bytes, an analytic batch-1
+    latency estimate of at most 1.50 ms, and a batch-64 activation high-water mark of at most 268,435,456
+    bytes. Training is bounded by 2.304e17 accounted FLOPs rather than by a clock, with a 1800 s wall
+    watchdog behind it. Every patch carries several of 19 labels, so the deliverable is a score matrix
+    of shape (n_graded_patches, 19) written to /submission/preds_a502.npy and an export manifest written
+    to /submission/export_a502.json. The graded quantity is threshold-free macro average precision over
+    the 19 labels, measured twice by the verifier''s own executor: once on a private in-distribution held-out
+    split and once on a private held-out-country split. The two are normalized on their own bands and
+    MULTIPLIED. A violated deployment constraint scores exactly 0.0 with its own reason code rather than
+    degrading.'
+  insight: 'The metric is threshold-free and multi-label, and almost every wrong turn on this slot follows
+    from forgetting one of those two words. Threshold-free means the graded object is a RANKING per label:
+    average precision integrates precision across the whole recall sweep, so a submission that has already
+    chosen a decision threshold has thrown away the quantity being measured and cannot get it back by
+    being well calibrated. Multi-label means there is no argmax and no simplex: each of the 19 columns
+    is its own binary ranking problem, macro averaging weights the rarest label exactly as heavily as
+    the most common, and a per-label average precision is undefined for a label with no positive in the
+    split, so the denominator is the labels present rather than the number 19. Those two facts are what
+    price the two silent failures the slot is built around. Global rather than per-band input normalization
+    runs cleanly and costs about 0.08 macro AP, because the 12 Sentinel-2 bands differ by more than an
+    order of magnitude in dynamic range and one shared scale flattens the narrow ones into noise. A per-tensor
+    quantization scale meets the same 4 MiB as a per-channel one and costs macro AP out of proportion,
+    because the small-magnitude channels that carry the rare labels round to zero first and macro averaging
+    charges a full nineteenth for each label that collapses. Neither raises an error, neither shows in
+    a training curve, and both are visible only in the graded number.'
+  steps:
+  - heading: Read the metric before the model.
+    paragraph: Macro average precision over 19 labels, threshold-free, on two splits, multiplied. Write
+      the evaluator first, on a slice of the shipped shard held out by country, and confirm it accumulates
+      in float64 in pinned record order with ties broken by score descending then record index ascending.
+      An evaluator whose ties depend on sort stability disagrees with itself between two grading passes,
+      which is EXPORT_NONDETERMINISTIC even when the model is deterministic.
+  - heading: Fit twelve band statistics, not one.
+    paragraph: 'Compute the centre and scale per spectral band over the training shard and keep the vectors,
+      12 long each, in the export manifest. The check on this is the ratio of the largest scale to the
+      smallest: a genuine per-band fit on Sentinel-2 spreads by at least an order of magnitude, and 12
+      copies of one number is a global statistic wearing a per-band shape.'
+  - heading: Choose the family against the envelope, not against the archive's majority.
+    paragraph: 53 of the 60 archived runs were measured at a 30-minute unconstrained-parameter envelope
+      and they rank the families in the opposite order to the 7 that were measured under this one. The
+      majority family's best archived configuration lands at an analytic 2.31 ms against a 1.50 ms cap;
+      no amount of width reduction inside that family crosses the boundary, because the cost is kernel
+      count and bytes moved rather than parameters. The 7 envelope-matched runs are individually within
+      noise of each other, so no single run names the answer and the choice has to be made across them.
+  - heading: Price the export analytically before training it.
+    paragraph: latency_est = flops_batch1 / flops_per_second + kernel_count * kernel_launch_seconds +
+      bytes_moved / hbm_bytes_per_second, with the three host constants read from tests/constants.json
+      rather than from the previous attempt. All three terms come from static analysis of the registered
+      graph, so the number is a rational function of integers with no noise term and can be computed before
+      a single step is taken. At batch 1 the kernel-count term dominates for a deep narrow stack, which
+      is the term a parameter-count intuition does not see.
+  - heading: Measure activation where it is graded.
+    paragraph: The gate is the live-tensor high-water mark of a batch-64 forward pass under the pinned
+      topological schedule with no recomputation. Training at batch 256 with gradient checkpointing measures
+      a different quantity on a different schedule; the training-time figure can sit comfortably low while
+      the graded figure is over 256 MiB, and depth added on the strength of the training-time number is
+      how ACTIVATION_MEMORY_EXCEEDED arrives without warning.
+  - heading: Quantize per channel.
+    paragraph: The 4 MiB ceiling is unreachable in fp32 at any useful width, so quantization is mandatory
+      rather than an optimization. Keep one scale per output channel. A per-tensor scale is set by the
+      largest channel in the tensor and rounds the smallest channels to zero; those are the channels that
+      carry the rarest of the 19 labels, and each label that collapses costs a full nineteenth of an unweighted
+      macro mean.
+  - heading: Spend the budget in FLOPs and finish the export inside it.
+    paragraph: 2.304e17 accounted FLOPs, debited from the registered train graph and the launcher's integer
+      step and batch counters, with the launcher refusing the step that would exceed the budget rather
+      than a clock killing the run mid-export. Fixing the work rather than the time is what makes the
+      weights bit-reproducible; the 1800 s wall watchdog behind it is a backstop at more than three times
+      the reference run, and reaching it means the plan did not fit the device.
+  - heading: Train the country axis on purpose.
+    paragraph: The reward is a product of two normalized macro AP values, one in-distribution and one
+      on two held-out countries drawn from four disclosed, deliberately land-cover-disjoint pairs that
+      rotate on a private schedule. The in-distribution axis is the cheap one to probe and pushing it
+      alone to its knee leaves the reward near 0.085. Anything tuned to one country pair -- a per-band
+      affine transform, a class-prior head -- loses about 0.112 macro AP when the pair rotates.
+  - heading: Keep every training target byte from the shipped shard.
+    paragraph: Solving-phase egress is open and grading is network-isolated, so a downloaded geospatial
+      foundation model can generate soft labels that ship as a label file while the small student genuinely
+      trains in budget. That route leaves the export small, the latency clean and the band permutation
+      invariant, and it is caught only by comparing the per-record sha256 of every training-time target
+      against the shipped shard's own label bytes.
+  - heading: Log the attempts that failed a gate.
+    paragraph: Every attempt index appears once, with map_in, map_shift, param_bytes, latency_estimate_ms,
+      activation_peak_bytes and a reason code from the closed 15-code set. The attempts most worth omitting
+      are the ones a deployment gate zeroed, which is exactly why the index sequence is checked for gaps
+      rather than the log checked for plausibility.
+  traps:
+  - The submission is an integer label array or a thresholded 0/1 matrix. Average precision is threshold-free
+    and reads a ranking; a decision has already discarded it, and calibrating a threshold is explicitly
+    not the task.
+  - The macro mean divides by 19 rather than by the labels present in the split, charging a zero for a
+    label whose average precision is undefined; or it is weighted by per-label support, which is a micro
+    average under another name.
+  - Per-band normalization is computed globally, RGB-style, over 12 bands that differ by more than an
+    order of magnitude in dynamic range. It runs cleanly, clears every gate, and caps macro AP roughly
+    0.08 below target.
+  - The 4 MiB ceiling is met by post-training quantization with a single per-tensor scale, which collapses
+    the rarest of the 19 labels and costs macro AP disproportionately under an unweighted macro mean.
+  - The archive's majority family is adopted, and attempts are burned shrinking a family whose batch-1
+    cost is kernel count rather than parameters, so it cannot reach 1.50 ms at any width.
+  - Latency is optimized against the agent's own wall-clock timing loop rather than against the three
+    graph counters the analytic gate reads, or against host constants copied from the previous attempt
+    while they rotate within the disclosed plus or minus 8 percent band.
+  - Depth is added until the batch-64 activation high-water mark exceeds 256 MiB, unmeasured because training
+    ran at batch 256 with checkpointing and reported a much smaller number.
+  - The in-distribution split is pushed to its knee while the held-out-country split stagnates, and the
+    product term keeps the reward near 0.085.
+  - A public geospatial foundation model is fine-tuned instead of an architecture designed. All are orders
+    of magnitude above 4 MiB, none meets the batch-1 gate, the private band permutation invalidates any
+    pretrained band ordering, and grading is network-isolated so the weights must ship and be counted.
+  - The same teacher is used for distillation instead, shipping only soft labels so the student trains
+    in budget and the band permutation moves nothing. Closed by the per-record label digest comparison,
+    which scores 0.0 with reason EXTERNAL_SUPERVISION.
+  - The graded splits are probed across attempts. The sibling in-distribution shard rotates among four
+    pinned partitions and the country pair rotates among four disclosed pairs, so a fit to the observed
+    partition diverges by more than 0.03 and scores 0.0 with reason SHARD_GAP_EXCEEDED.
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `score_columns_span_the_nineteen_labels` (compiled, weight 5, knockout) -- The graded artifact is
+  a score matrix whose second axis is the 19-label nomenclature, one row per graded patch.
+
+
+  2. `scores_are_continuous_not_thresholded` (compiled, weight 5, knockout) -- The submitted scores are
+  the ranking quantity average precision consumes, not decisions a threshold has already been applied
+  to.
+
+
+  3. `every_label_column_is_ranked_not_constant` (compiled, weight 3) -- No label column is constant,
+  so no per-label average precision degenerates to the label prior.
+
+
+  4. `macro_mean_divides_by_labels_present_in_the_split` (compiled, weight 3) -- The declared macro average
+  is an unweighted mean over the labels that are actually scoreable on the split.
+
+
+  5. `per_band_statistics_not_one_global_scale` (compiled, weight 5, knockout) -- Input normalization
+  carries one centre and one scale per spectral band, with the spread a genuine per-band fit has.
+
+
+  6. `quantization_scales_are_per_output_channel` (compiled, weight 5, knockout) -- The parameter budget
+  is met with per-channel quantization scales rather than one scale per tensor.
+
+
+  7. `serialized_parameter_bytes_recounted_from_the_blob` (compiled, weight 5, knockout) -- The 4 MiB
+  ceiling is counted off the shipped parameter bytes, never off the number declared beside them.
+
+
+  8. `analytic_latency_recomputes_from_graph_terms` (compiled, weight 5, knockout) -- The batch-1 latency
+  budget is the analytic estimate recomputed from the export graph, not a stopwatch reading.
+
+
+  9. `sized_against_the_pinned_host_constants` (compiled, weight 2) -- The host constants the export was
+  sized against are the ones in force this attempt.
+
+
+  10. `activation_high_water_taken_at_batch_64` (compiled, weight 5, knockout) -- Peak activation is the
+  live-tensor high-water mark of a batch-64 forward pass with no recomputation.
+
+
+  11. `accounted_flop_debit_within_the_fixed_budget` (compiled, weight 3) -- The training budget is spent
+  in accounted FLOPs and the debit reconciles with the integer step counters.
+
+
+  12. `training_stopped_on_the_flop_budget_not_the_watchdog` (compiled, weight 3) -- The graded run ended
+  because the accounted work was spent, with the export already complete.
+
+
+  13. `supervision_digests_equal_the_shipped_shard_labels` (compiled, weight 5, knockout) -- Every training-time
+  target byte came from the shipped shard''s own labels.
+
+
+  14. `reward_moves_under_second_permutation_by_at_most_tau` (compiled, weight 5, knockout) -- Re-executing
+  the same submission under the second private band and label permutation moves the reward by at most
+  tau.
+
+
+  15. `sibling_shard_gap_within_bound` (compiled, weight 3) -- In-distribution macro AP agrees across
+  the graded shard and its sibling private shard.
+
+
+  16. `reward_is_the_product_of_both_normalized_axes` (compiled, weight 3) -- The reward the campaign
+  reasoned against is the product of both normalized macro AP axes, not either one alone.
+
+
+  17. `every_attempt_appears_in_the_reward_log` (compiled, weight 3) -- No attempt is missing from the
+  campaign log, including the attempts that violated a deployment gate.
+
+
+  18. `reason_codes_come_from_the_closed_zero_set` (compiled, weight 2) -- Every zero the campaign recorded
+  is attributed to one of the published reason codes.
+
+
+  19. `export_operator_list_inside_the_bound_envelope` (compiled, weight 3, knockout) -- The operator
+  list recovered from the export graph carries no symbol outside the bound envelope, and every symbol
+  it does carry is priced.
+
+
+  20. `regrading_the_frozen_export_twice_agrees_bitwise` (compiled, weight 3, knockout) -- Two grading
+  passes over the same frozen export return the same two macro AP values, bit for bit.
+
+
+  21. `checker_tree_and_sweep_archive_unchanged` (compiled, weight 5, knockout) -- The graded run leaves
+  the checker tree, the solution tree and the 60-run sweep archive byte-identical.
+
+
+  22. `budget_declaration_names_the_family_it_chose` (compiled, weight 3) -- The agent declares its own
+  budget accounting and says which architecture family it committed to and when.
+
+
+  23. `macro_ap_product_ramp` (compiled, weight 10, knockout) -- The product of the two normalized threshold-free
+  macro average precisions clears the published bar through the ramp.
+
+
+  Deliverable manifest: /submission/preds_a502.npy (npy), float array of shape (n_graded_patches, 19);
+  and /submission/export_a502.json (json), the export manifest whose schema instruction.md publishes.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - Fine-tuning a public geospatial foundation model (Prithvi, SatMAE, SSL4EO) instead of designing an
+  architecture. -- controlled by: all are orders of magnitude above the 4 MiB parameter ceiling, none
+  satisfies the batch-1 latency gate, the private band permutation invalidates any pretrained band ordering,
+  and the graded run is network-isolated so weights must ship inside the submission and be counted.
+
+
+  - Distilling that same teacher and shipping only its soft labels, so the student trains honestly in-budget.
+  -- controlled by: supervision_digests_equal_the_shipped_shard_labels, which compares the per-record
+  sha256 of every training-time target against the shipped shard''s label bytes; CTRL-DISTILL scores exactly
+  0.0 with reason EXTERNAL_SUPERVISION.
+
+
+  - Reproducing a published BigEarthNet baseline (ResNet-50 at 19 classes) with its published mAP. --
+  controlled by: the published numbers are measured at unconstrained parameters and unbounded training;
+  under the joint 4 MiB, 1.50 ms, 256 MiB and 2.304e17 FLOP envelope no published artifact is admissible,
+  and the gate sits on our own measured reference rather than on a published mean.
+
+
+  - Classical hyperparameter search over the archive''s documented flag space. -- controlled by: CTRL-DECOY-MAJORITY,
+  which measures the majority family''s best archived configuration at an analytic 2.31 ms against the
+  1.50 ms cap, so the whole exposed flag space is bounded away from the pass band and the win requires
+  a family change the archive does not enumerate.
+
+
+  - Reading any one of the 7 envelope-matched archive runs in isolation. -- controlled by: CTRL-SINGLE-CLUE,
+  which measures each of the 7 as individually within noise of its neighbour, so a single run names the
+  second-best family and lands at mAP_in 0.600, mAP_shift 0.512.
+
+
+  - Probing the graded splits across attempts. -- controlled by: sibling_shard_gap_within_bound across
+  four pinned in-distribution partitions, plus the silent rotation of the held-out country pair among
+  four land-cover-disjoint disclosed pairs.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTRL-NOOP` targets the no-op class: submitting the unchanged environment, no training written and
+  no export produced; recorded score 0.
+
+
+  - `CTRL-STARTER-UNCHANGED` targets the no-op class, second half: running the shipped starter unmodified
+  -- the plain stack with global normalization, fp32 weights and no imbalance handling -- which clears
+  all three deployment gates and sits exactly at both baselines; recorded score 0.05.
+
+
+  - `CTRL-STALE-COUNTRY` targets the stale class: tuning to the pre-rotation country pair and being graded
+  after it rotates. The four disclosed pairs are maximally land-cover-disjoint, so a per-band affine transform
+  and class-prior head tuned to one pair lose 0.112 macro AP on the other, landing at mAP_shift 0.480
+  with mAP_in unchanged at 0.678; recorded score 0.348.
+
+
+  - `CTRL-STALE-HOSTCONST` targets the stale class, second: hard-coding the previous attempt''s analytic
+  host constants into the submission''s own sizing while the pinned constants rotate within the disclosed
+  plus or minus 8 percent band, so the kernel count overshoots. Analytic estimate 1.58 ms against the
+  1.50 ms cap; scores exactly 0.0 with reason LATENCY_BUDGET_EXCEEDED; recorded score 0.
+
+
+  - `CTRL-DECOY-MAJORITY` targets the decoy class: the archive''s majority-vote family at its best archived
+  configuration, measured on 53 of the 60 runs at a 30-minute unconstrained-parameter envelope and inverting
+  against the 7 envelope-matched runs. Analytic estimate 2.31 ms; recorded score 0.
+
+
+  - `CTRL-SINGLE-CLUE` targets the decoy class, second: building the reference from any ONE of the 7 envelope-matched
+  runs without cross-run co-coverage. Lands at mAP_in 0.600, mAP_shift 0.512; recorded score 0.359.
+
+
+  - `CTRL-LIST-ALL` targets the list-all class: ensembling every archived family instead of choosing,
+  reaching 11.3 MiB serialized and scoring 0.0 with reason PARAM_BYTES_EXCEEDED; the int4-shrunk variant
+  estimates 3.02 ms and scores 0.0 with reason LATENCY_BUDGET_EXCEEDED; recorded score 0.
+
+
+  - `CTRL-OBVIOUS-WRONG` targets the obvious-wrong class: a classifier that never looks at image structure,
+  a single-band mean-intensity logistic head reaching mAP_in 0.248 and mAP_shift 0.231 on the below-baseline
+  ramp. The degenerate variant, a label-prior constant predictor at the pinned P = 0.21, scores exactly
+  0.0; recorded score 0.005.
+
+
+  - `CTRL-GLOBAL-NORM` targets the PRC1 silent-failure surface: normalization computed globally rather
+  than per band across 12 bands of differing dynamic range. Runs cleanly, raises nothing, clears all three
+  gates, and lands at mAP_in 0.598, mAP_shift 0.518; recorded score 0.376.
+
+
+  - `CTRL-PERTENSOR-QUANT` targets the PRC2 surface: meeting the 4 MiB ceiling with a single per-tensor
+  scale rather than per-channel scales, collapsing the rarest of the 19 labels. Lands at mAP_in 0.622,
+  mAP_shift 0.498; recorded score 0.364.
+
+
+  - `CTRL-IN-DIST-ONLY` targets the product objective: pushing the in-distribution split to target while
+  the held-out-country split stagnates at baseline. Lands at mAP_in 0.678, mAP_shift 0.442, where the
+  product term does the work; recorded score 0.085.
+
+
+  - `CTRL-DISTILL` targets the distillation route: soft labels generated from a downloaded teacher during
+  the open-egress solving phase and shipped as a label file, so the student trains in budget and the band
+  permutation moves nothing. Closed by the per-record label digest comparison; scores exactly 0.0 with
+  reason EXTERNAL_SUPERVISION; recorded score 0.
+
+  '
+provenance:
+  corpus: BigEarthNet-S2 v1.0 (Sumbul et al., bigearth.net), Community Data License Agreement Permissive
+    1.0, over Copernicus Sentinel-2 L2A imagery under the Copernicus open data terms. Acquisition at build
+    time from https://bigearth.net/downloads/BigEarthNet-S2-v1.0.tar.gz with the Zenodo mirror as fallback,
+    pinned by sha256; the shipped training shard is a fixed 80,000-patch subset at 120x120x12 uint16 (approximately
+    2.8 GiB) under the official 19-class nomenclature, with the recommended cloud, shadow and snow exclusions
+    applied. Country attribution is derived from the official patch-to-tile metadata, so the held-out
+    split is a genuine geographic holdout over two of the ten countries rather than a random partition.
+    A fixed private permutation of the 12 spectral band indices and of the 19 label indices is applied
+    identically to the shipped shard and to both graded splits.
+  anchors:
+    knee_anchor: null
+    knee_anchor_source: null
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build time.
+      Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as the task-generating
+      event and never inherits the upstream freeze date, so authoring a date here before the derivation
+      runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: BigEarthNet-S2 v1.0 (Sumbul et al., bigearth.net), Community Data License Agreement
+      Permissive 1.0, over Copernicus Sentinel-2 L2A imagery under the Copernicus open data terms. Acquisition
+      at build time from https://bigearth.net/downloads/BigEarthNet-S2-v1.0.tar.gz with the Zenodo mirror
+      as fallback, pinned by sha256; the shipped training shard is a fixed 80,000-patch subset at 120x120x12
+      uint16 (approximately 2.8 GiB) under the official 19-class nomenclature, with the recommended cloud,
+      shadow and snow exclusions applied. Country attribution is derived from the official patch-to-tile
+      metadata, so the held-out split is a genuine geographic holdout over two of the ten countries rather
+      than a random partition. A fixed private permutation of the 12 spectral band indices and of the
+      19 label indices is applied identically to the shipped shard and to both graded splits.
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or a
+      task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with this
+      named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+canary:
+- AELLO-CANARY-3b3327975975f3583f7cbdc6e718fae3
+- AELLO-CANARY-4bc6b8735e24c5830768ebcb80dc1fec
+- AELLO-CANARY-2df88bfd9e3e974cd904577878b1eb67
+- AELLO-CANARY-589a86ae176206544746296476e19d55
+corpus_layout:
+  status: not_landed
+  status_reason: environment/ carries the Dockerfile and the starter only. The BigEarthNet shard, the
+    60-run sweep archive and the held-out digests are not in the tree, so the paths below are AUTHORED
+    here rather than read off delivered bytes. Nothing under environment/data/ or tests/heldout/ was created
+    or modified by this pass. Every compiled check runs against the submission, the export manifest and
+    the run record, none of which depends on the corpus being present; the checks that would read the
+    corpus directly read the run record's digest ledger instead.
+  paths:
+    training_shard: environment/data/shard/patches.npy
+    training_shard_labels: environment/data/shard/labels.npy
+    training_shard_manifest: environment/data/shard/manifest.json
+    band_index_permutation: environment/data/shard/band_permutation.json
+    sweep_archive: environment/experiments/sweep60/
+    heldout_digests: tests/heldout/digests.json
+  shard_facts:
+    patches: 80000
+    patch_shape:
+    - 120
+    - 120
+    - 12
+    patch_dtype: uint16
+    labels: 19
+    bands: 12
+    countries_held_out: 2
+    disclosed_country_pairs:
+    - - Ireland
+      - Finland
+    - - Portugal
+      - Serbia
+    - - Ireland
+      - Serbia
+    - - Portugal
+      - Finland
+operator_envelope:
+  basis: The analytic latency and activation gates price a closed set of operators. The set is published
+    in instruction.md so the agent can design inside it; an operator outside it has no cost term and would
+    silently remove both gates.
+  operators:
+  - add
+  - avgpool2d
+  - batchnorm2d
+  - clip
+  - concat
+  - conv2d
+  - depthwise_conv2d
+  - dequantize
+  - gemm
+  - globalavgpool2d
+  - hardswish
+  - mul
+  - quantize
+  - relu
+  - reshape
+  - sigmoid
+  - transpose
+zero_reasons:
+- NO_SUBMISSION
+- EXPORT_NONDETERMINISTIC
+- ENVELOPE_OP_REFUSED
+- PARAM_BYTES_EXCEEDED
+- LATENCY_BUDGET_EXCEEDED
+- ACTIVATION_MEMORY_EXCEEDED
+- FLOP_BUDGET_EXCEEDED
+- WATCHDOG_TIMEOUT
+- HELDOUT_DIGEST_MISMATCH
+- ARCHIVE_DIGEST_MISMATCH
+- GRADING_TREE_WRITE
+- SHARD_GAP_EXCEEDED
+- PRECOMPUTED_PARAMS
+- EXTERNAL_SUPERVISION
+- LOG_DIVERGENCE
+envelope_bounds:
+  serialized_parameter_bytes: 4194304
+  analytic_latency_ms: 1.5
+  activation_peak_bytes_at_batch_64: 268435456
+  accounted_training_flops: 2.304e+17
+  wall_clock_watchdog_seconds: 1800
+  graded_activation_batch: 64
+  transfer_null_tau: 0.03
+  sibling_shard_gap_tau: 0.03
+  band_scale_spread_minimum: 10.0
+  minimum_ranked_label_columns: 15
+  bounds_basis: Every bound here is published in instruction.md and is a property of the task envelope,
+    not a measurement of the reference. The four ramp constants and the three host constants are the measured
+    quantities and they stay null.
+
+canary:
+  - AELLO-CANARY-7b162fe9b60213a21fd30c9da15a2253
+  - AELLO-CANARY-8d9e78a1f4db48d5b1fa3795637569cc
+  - AELLO-CANARY-43110090c35dee48e46c8cc99dc5830d
+  - AELLO-CANARY-a9789180a5f53d2358dd783cc17a74a4

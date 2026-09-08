@@ -1,0 +1,93 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-f4779ea1f0db2ce35b6f9fbf1f352ced",
+  "AELLO-CANARY-cb5afcea4331ba82432379b38ea41063",
+  "AELLO-CANARY-23bcbe3d45419a0c71ce6b35c3cf53b5",
+  "AELLO-CANARY-6b03daab822b0d4c49342646141a7551"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "agent_authored_tree",
+  "published_constants",
+  "reasoning_transcript",
+  "run_record",
+  "submission_predictions",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The graded metric clears the published bar and is mapped through the reward ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submission_predictions",
+   "id": "graded_accuracy",
+   "judgment": "VALUE: plain top-1 accuracy over the 48603 private 2019 rows, mapped through the floor-to-knee ramp published in tests/constants.json. UNMEASURED AT PHASE 0. The ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them. Balanced accuracy is computed alongside and reported as evidence, never scored.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The agent holds no copy of the private graded labels anywhere in the files it wrote.",
+   "dimension": "isolation",
+   "evaluation_target": "agent_authored_tree",
+   "id": "graded_labels_isolated",
+   "judgment": "ABSENCE: no agent-authored file matches tests/heldout/graded_labels.npz by content digest, and no integer array the agent wrote has the graded fold's length and equals the graded label vector. Refitting with the graded labels folded into supervision is worth 0.02219 accuracy, so the incentive is real and small, and the check establishes absence from committed bytes rather than intent.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded run writes nothing into the checker tree or the private graded fold.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "no_graded_writes",
+   "judgment": "ABSENCE: no path under tests/, under the graded fold, or under the verifier's output directory is created or modified during the graded run, read from the harness record the run itself produced. A post-hoc scan cannot separate a write made during the graded run from one made before it, so the check reads the run record and fails closed when the record is absent.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent produces a real classifier rather than a constant or near-constant output.",
+   "dimension": "correctness",
+   "evaluation_target": "submission_predictions",
+   "id": "predictions_not_degenerate",
+   "judgment": "EFFECT: the predictions cover strictly more than one class. The constant-class control CTL-PRIOR is the thing this excludes and it measures 0.05862 accuracy on the graded fold, so a constant submission is not merely degenerate but measurably worse than the shipped starter.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The agent writes a prediction file for the graded nodes at the declared submission path.",
+   "dimension": "admissibility",
+   "evaluation_target": "submission_predictions",
+   "id": "predictions_present",
+   "judgment": "ABSENCE: /submission/preds_c8s10.npy exists and loads as a non-pickled numpy array.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The prediction array has exactly one integer label per graded node, in graded_idx order, inside the label domain.",
+   "dimension": "admissibility",
+   "evaluation_target": "submission_predictions",
+   "id": "predictions_wellformed",
+   "judgment": "INVARIANT: the array is one-dimensional with exactly 48603 rows, its dtype is integral, and every entry lies in the closed interval from 0 to 39. A row count that merely does not exceed the graded fold is not enough: a one-row array broadcasts against the truth vector and yields a plausible accuracy, so the count is compared for equality and a mismatch fails as submission_malformed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent keeps the graded neighbourhood-sampling budget as published.",
+   "dimension": "compliance",
+   "evaluation_target": "submitted_source",
+   "id": "sampling_budget_declared",
+   "judgment": "VALUE: every agent-authored module-level EPOCH_BUDGET, EXPANSIONS_PER_EPOCH and HOP_DEPTH binding equals the published value, read by static inspection and never by executing the submitted file. Agent-authored means byte-distinct from every digest in published shipped_source_digests, so the collect hook's pristine copy of the shipped starter cannot shadow the agent's own declaration. A declaration that is rebound, or reached through globals(), a global statement or setattr, is not a declaration and fails rather than passing vacuously.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  }
+ ]
+}

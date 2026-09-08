@@ -1,0 +1,155 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "emitted_vocabulary",
+  "run_record",
+  "stage_manifest",
+  "submitted_artifact"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The declared accounting divides negative log-likelihood by the raw byte total and not by the token total.",
+   "dimension": "process",
+   "evaluation_target": "submitted_artifact",
+   "id": "bits_per_byte_divides_by_bytes_not_tokens",
+   "judgment": "VALUE: bpb_accounting.denominator_basis reads raw_utf8_bytes, and declared_bits_per_byte multiplied by raw_utf8_byte_total reproduces nll_bits_total to 1e-6 relative while the same product over token_total does not, unless the tokenizer is byte-level and the two totals coincide, in which case the distinction is undefined and the identity over the byte total stands alone. The declared number is never read as a score, since graded b comes only from the frozen evaluator; the arithmetic identity is what is graded, and it fails for a pipeline that shrank its token count and called the shrinkage an improvement.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "All 256 byte values stay representable, so no held-out byte can arrive as an unknown token.",
+   "dimension": "deliverable",
+   "evaluation_target": "emitted_vocabulary",
+   "id": "byte_alphabet_fully_covered",
+   "judgment": "INVARIANT: the byte-fallback entries <0x00> through <0xFF> are all present in vocabulary.entries. A vocabulary missing even one of them cannot encode the byte that is missing, yet the raw-byte denominator still charges for that byte, so bits per byte collapses on held-out text while every training log looks ordinary.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Each declared byte count is the raw UTF-8 length of the text as it arrived, before any normalisation the pipeline applies.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_artifact",
+   "id": "byte_denominator_is_raw_not_normalised",
+   "judgment": "VALUE: every fixture's raw_utf8_bytes equals the recomputed len(raw_utf8.encode('utf-8', 'surrogatepass')), and bpb_accounting.raw_utf8_byte_total equals the sum of those recomputed lengths. NFKC folding an Arabic presentation form shortens the encoding, so a denominator taken after normalisation is a smaller number over a different corpus and lowers b without teaching the model anything.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent says where its wall went, split between encoding the corpus and the fixed-step training run.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "encode_and_train_seconds_declared",
+   "judgment": "EFFECT: agent_budget_declaration parses and names vocab_size, encode_seconds, train_seconds and script_sampling. The declaration is what is graded and not the harness's own measurement, so no field the harness writes can satisfy it; an agent that timed encoding outside the graded region in its own experiments has to say so here, where the omission is visible.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded run leaves the frozen trainer, the grading tree and the held-out tree byte-identical.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "frozen_trainer_digest_unchanged",
+   "judgment": "ABSENCE: run_record.frozen_trainer_digests carries a before and an after map that agree key for key, and guarded_paths_touched is empty. Any change scores 0.0 with reason grading-tree-write or frozen-trainer-modified. Both facts are read from the record the run itself produced, never from a scan taken afterwards, which cannot separate a write made during the graded region from one made before it.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The host-measured graded region fits inside the fifteen-minute wall.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "graded_region_within_wall",
+   "judgment": "VALUE: run_record.graded_region_wall_seconds, timed from first touch of the training data rather than from interpreter start, is at most 900. Exceeding it scores 0.0 with reason wallclock-exceeded. A vocabulary inflated toward the 65,536 ceiling pays for the inflation in embedding and softmax cost at every one of the 6,000 steps, which turns a defensible compression choice into an exact zero.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Held-out bits per byte, taken as the worse of the two private shards, clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "held_out_bits_per_byte_ramp",
+   "judgment": "EFFECT: b = max(b_P1, b_P2), where each b is the frozen evaluator's total negative log-likelihood in bits over the encoded held-out stream divided by the total raw UTF-8 byte count of the same held-out text. Because the denominator is raw bytes rather than tokens, a tokenizer that shrinks the token count without improving modelling does not move b at all. Lower b is better, so the ramp descends from floor to knee. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "Re-executing the declared manifest from a fresh checkout rebuilds the same vocabulary artifact.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "manifest_replay_reproduces_vocabulary_digest",
+   "judgment": "EFFECT: run_record.manifest_replay_vocabulary_sha256 equals vocabulary.artifact_sha256. Vocabulary construction is the graded deliverable here rather than a trained model, so the manifest has to reproduce the artifact it claims to have built; a replay that lands on a different digest scores 0.0 with reason manifest-order-divergence.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The submission carries no per-shard bits-per-byte breakdown, no private shard name and no grading constant.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_artifact",
+   "id": "no_per_shard_breakdown_in_submission",
+   "judgment": "ABSENCE: no key and no string anywhere in the submission matches b_p1, b_p2, shard_p1, shard_p2 or heldout, and no submitted number equals a non-null value in tests/constants.json. The agent surface receives one float and at most one reason code; a per-shard breakdown would expose which of the two disjoint shards is the worse one and let the worse-of-two rule be answered one shard at a time.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The round-trip evidence spans every disclosed adversarial class rather than ASCII alone.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "roundtrip_covers_adversarial_classes",
+   "judgment": "EFFECT: roundtrip_fixtures names all five disclosed classes, arabic_presentation_forms, tatweel, tamil_combining, lone_surrogate and nfkc_unstable, and each carries a non-empty raw_utf8. Identity on ASCII establishes nothing about the shards this slot is graded on, which are Arabic, Devanagari and Tamil as well as Latin.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "decode(encode(x)) is byte identity on every fixture the submission carries.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_artifact",
+   "id": "roundtrip_decodes_to_input_bytes",
+   "judgment": "INVARIANT: for each roundtrip_fixtures entry, decoded_utf8 encoded with surrogatepass equals raw_utf8 encoded with surrogatepass, byte for byte. Any difference scores 0.0 with reason roundtrip-not-identity. Losslessness is not a hygiene item here: if encode and decode do not compose to identity, the numerator is measured over a stream that is not the corpus and b is a number about some other text.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The stage order the manifest declares is the stage order the instrumented runner actually executed.",
+   "dimension": "integrity",
+   "evaluation_target": "stage_manifest",
+   "id": "stage_manifest_order_matches_execution",
+   "judgment": "INVARIANT: the stage names of stage_manifest, in declared order, equal run_record.stage_execution_order element for element, every stage carries an entry_point and a sha256, and no stage name repeats. Divergence scores 0.0 with reason manifest-order-divergence, because a manifest that does not describe the run is not a recipe anyone can re-execute.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The pipeline emits its vocabulary, its stage manifest, its round-trip evidence and its byte accounting at the declared submission path.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "vocabulary_artifact_emitted",
+   "judgment": "EFFECT: /submission/c3s1.json parses and carries all four sections: vocabulary, stage_manifest, roundtrip_fixtures and bpb_accounting. A submission missing a section is malformed with reason submission_malformed; it is not a tokenizer that scored badly, it is a tokenizer that was never described.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The 65,536-entry budget is counted off the emitted entry list, never off the number the agent declares beside it.",
+   "dimension": "deliverable",
+   "evaluation_target": "emitted_vocabulary",
+   "id": "vocabulary_entry_count_read_from_entries",
+   "judgment": "VALUE: len(set(vocabulary.entries)) is at most 65536 and equals vocabulary.declared_entry_count. Counting the artifact rather than the declaration is the whole point: a declaration that disagrees with the entries it describes scores 0.0 with reason vocab-budget-exceeded, and so does a truthful declaration of an oversized vocabulary.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  }
+ ]
+}

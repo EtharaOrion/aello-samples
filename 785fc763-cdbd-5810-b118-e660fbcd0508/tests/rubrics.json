@@ -1,0 +1,144 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The graded run wrote nothing into the checker tree or the clean-label staging tree.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "checker_tree_and_clean_split_untouched",
+   "judgment": "EFFECT: No path the run created or modified falls under tests/, under environment/data/clean_labels/ or under the verifier's own output directory. This is red line 2 and it is read from the run's own record of what it touched.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Balanced accuracy over the clean private split clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "clean_split_balanced_accuracy_ramp",
+   "judgment": "EFFECT: Mean per-class recall over the clean CIFAR-100 test fold, chance one hundredth, mapped through the floor-to-knee ramp published in tests/constants.json. UNMEASURED AT PHASE 0: the ramp constants are null, so this check calls require_measured as its FIRST statement and raises ConstantUnmeasured rather than returning a score. Reading the submission first would let a missing artifact raise before the unmeasured signal was ever emitted, and the verifier would then report gradeable true with r_det 0.0 -- asserting the agent scored zero when the truth is that the slot is not yet measurable.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "The graded run never opened a clean label for any training image.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "clean_training_labels_unread",
+   "judgment": "EFFECT: No path in the run's own read log falls under tests/heldout/ or under environment/data/clean_labels/. This is red line 1 and it forbids the READ: the clean CIFAR-100 fine labels for the training images exist and are public, so the thing being controlled is consulting them, not writing anywhere. It is checked against the log the run produced, never against a post-hoc scan, which can neither observe a read nor date one.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "An integer label vector is written to the declared submission path.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "label_vector_lands",
+   "judgment": "EFFECT: /submission/preds_c8s12.npy exists and loads as a numpy array of integer dtype. A float array is not a label vector and is not rounded into one at grading time, an object array is refused outright, and a missing or unreadable file scores zero with reason submission_malformed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Every predicted label is one of the 100 CIFAR-100 fine classes.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "labels_inside_the_hundred_fine_classes",
+   "judgment": "EFFECT: Every entry is an integer in 0..99. There is no ignore value, no abstention and no coarse superclass id in the graded domain -- a submission carrying a value outside the fine label range, including one of the 20 superclass ids, is out of domain and scores zero.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The declared noise model carries the structure real human annotation has.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "noise_model_is_class_conditional_not_symmetric",
+   "judgment": "EFFECT: The declared per-class flip rates cover all 100 fine classes and are not one scalar repeated, and the declared confusion pairs land inside a coarse superclass more often than a uniform off-diagonal model would. The uniform share is computed from the SHIPPED coarse map -- for each pair's source class, the other fine classes in its superclass over the other 99 classes -- so nothing here is an authored fraction. CIFAR-100N's errors are human and concentrate on confusable pairs; a symmetric model is not a weaker estimate of them, it is a different and wrong one.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The graded model did not memorise the human annotation's errors.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "noisy_train_accuracy_below_human_agreement_rate",
+   "judgment": "EFFECT: The declared accuracy of the final model against the noisy training labels over the whole pool is at most the share of that pool whose human annotation agrees with the clean label, counted by the verifier. The bound is exact, not a tolerance: a model that reproduced the clean concept perfectly scores exactly the agreement rate on the noisy labels, so every point above it is a human error the model learned to repeat. This is the trap the differing train and test label distributions set, stated as an inequality rather than as advice.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The submission carries exactly one label for every image of the clean graded split.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "one_label_per_graded_image",
+   "judgment": "EFFECT: The flattened submission length equals the number of clean graded labels the verifier holds. A short vector is not padded and a long one is not truncated into alignment, because either repair would silently re-index every prediction against the wrong image and report a balanced accuracy that belongs to no submission.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The submission's class histogram looks like the clean graded split, not like the noisy training prior.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "prediction_prior_closer_to_balanced_split_than_to_noisy_prior",
+   "judgment": "EFFECT: Two arms, both derived from the delivered priors and neither an authored bar. Total variation distance from the predicted-label histogram to the clean graded split's own class prior is at most its distance to the shipped noisy annotation's prior, which places the submission on the graded side of the gap between the two label distributions; and it is at most the distance BETWEEN those two priors, which requires the submission to be at least as balanced as the human annotation already is and so rules out a histogram collapsed onto a handful of the hundred classes, which sits far from both priors and would otherwise satisfy the first arm by accident. The two priors are different objects -- the graded fold carries every fine class equally, the human annotation does not -- so a model that fitted the noise emits the shape of the training prior and is caught. When the two priors coincide there is no gap to take a side of and the second arm is not applied.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Selection did not discard any of the 100 classes outright.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "retained_set_keeps_every_noisy_class",
+   "judgment": "EFFECT: Every one of the 100 fine classes present in the shipped noisy annotation retains at least one image after selection. The graded axis is a mean over per-class recalls, so a class dropped from training forfeits a whole hundredth of the score rather than a proportional share of it -- this is the second recorded trap, discarding so much of a bound pool that it underfits, measured on the class that vanishes first rather than on an aggregate count.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The retained training subset is not a function of the clean labels.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "retained_subset_not_the_clean_label_ordering",
+   "judgment": "EFFECT: Against the verifier's agreement bitmap, the retained set must contain at least one image whose human annotation disagrees with the clean label whenever the pool's own disagreement rate predicts one or more inside a retained set of that size. CTL-CLEANPEEK selects using the clean labels, reaches purity exactly one, and is rejected here. Enrichment is NOT the statistic and deliberately so -- a good noise-robust selector enriches hard for correctly-labelled images, so a z-test on enrichment rejects the intended solutions; purity at the extreme is what separates a selector from an answer key.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The retained subset is drawn from the bound training pool and from nothing else.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "retention_within_the_bound_train_pool",
+   "judgment": "EFFECT: The declared retained indices are unique, non-empty, every one inside 0..pool-1, and the declared pool size equals the number of rows the shipped noisy annotation actually carries. The training-set size is BOUND on this slot, so this is where extra data would show: an index outside the shipped pool is not a bigger training set, it is a training set the corpus does not contain.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Selection waited for a warm-up and used more than the training loss.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "selection_begins_after_warmup_not_at_step_zero",
+   "judgment": "EFFECT: The declared training schedule names a non-zero warm-up before selection begins, and the declared selection signal names something beyond the loss -- a disagreement between two views, a second model, a prediction margin or an agreement history. Selecting on training loss alone, and doing it early, keeps exactly the mislabelled examples an over-parameterised network fits first; that is the first recorded trap and it is a schedule fact, not an opinion.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  }
+ ]
+}

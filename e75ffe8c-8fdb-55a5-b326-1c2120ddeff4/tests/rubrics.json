@@ -1,0 +1,245 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "exported_recognizer",
+  "graded_hypotheses",
+  "run_record",
+  "submitted_artifact"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "The blank symbol is a reserved index, not an aliased character.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "blank_index_reserved_outside_the_label_vocabulary",
+   "judgment": "INVARIANT: decode.blank_index is an integer that the shipped permuted label vocabulary assigns to no character, and it equals the blank index the harness observed the CTC loss use during training. Aliasing blank onto a real label deletes that character from every hypothesis while the loss curve stays healthy, and under the private label permutation the character it deletes is not the one the agent thought it was reserving.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The 1500 s is measured by the harness from the first read of the corpus, not from process start.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "budget_timer_opens_at_first_data_touch",
+   "judgment": "EFFECT: The harness recorded a first-data-touch instant and an export-complete instant, both present, the second strictly later than the first, and their difference at most 1500 s. The zero of this clock is the first read under environment/data, so unpacking, importing and CUDA warm-up before that read are free and everything after it is charged. An export that first exists after the kill is not an export.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Each attempt carried the previous attempt's measured WER pair forward.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "chk_attempt_order",
+   "judgment": "ORDERING: Recorded attempt indices are strictly increasing and every attempt after the first carries the prior attempt's LibriSpeech and Common Voice WER pair. The ranking taken at a fifth of the budget inverts by the full budget, so an attempt that does not carry the prior pair cannot see the inversion and re-picks whichever family leaves the CTC alignment plateau fastest.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Streaming is proved by perturbation and never read off a claim.",
+   "dimension": "streaming",
+   "evaluation_target": "exported_recognizer",
+   "id": "chk_causality",
+   "judgment": "INVARIANT: For every probe offset the verifier drew this attempt, the harness recorded that replacing the audio beyond that offset's right-context bound left every output frame at or before the offset BIT-IDENTICAL. An offset the record does not cover counts as a violation rather than as an absence. A bidirectional layer or a centred convolution fails at the first offset, scores exactly zero with reason NONCAUSAL_CONTEXT, and receives no partial credit for the WER it reached.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The shards the WER pair was measured on are the pinned ones.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "chk_heldout_digest",
+   "judgment": "INVARIANT: Every entry in the pinned held-out digest table resolves to a file under tests/heldout/ whose sha256 equals the pinned constant, and the digests the harness recorded at verifier start agree with it entry for entry. A table that is itself absent is reported under its own name and never treated as an empty table that trivially passes.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The agent's own log agrees with what the harness measured.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "chk_log_fidelity",
+   "judgment": "DIVERGENCE: The last reward_log.jsonl record's claimed LibriSpeech and Common Voice WER each sit within 0.02 of the harness-measured value, and its claimed seconds within ten percent of the harness-measured first-data-touch-to-export interval. reward_log.jsonl is the agent's channel and run_record.json is the harness's; this is the only check that puts the two side by side.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Every operator the export runs is inside the bound envelope, and the log-mel front end is one of them.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "chk_op_envelope",
+   "judgment": "ABSENCE: Every symbol in graph_ops is a member of the bound operator envelope, and both stft and mel appear in it. An export that consumes precomputed features has moved its frame shift, window length and mel count outside the graded artifact where no probe can reach them, which is the trap this check exists for rather than a preference about op names.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Serialized parameter bytes are counted off the delivered file, never off a declared field.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "chk_param_bytes",
+   "judgment": "VALUE: The parameter file the manifest names measures at most 31457280 bytes on disk, and a declared parameter_bytes field that disagrees with the file's own size is reported rather than believed. The in-export log-mel filterbank counts toward the ceiling because it ships inside the graded artifact. An ensemble that reaches the ceiling only after int4 quantization still pays these bytes and then pays again at the causality probe, where its stacked lookahead lands.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The two sibling speaker-disjoint LibriSpeech partitions agree.",
+   "dimension": "generalisation",
+   "evaluation_target": "graded_hypotheses",
+   "id": "chk_shard_gap",
+   "judgment": "DIVERGENCE: The absolute difference between the harness-measured WER on private_A and the one on private_B is at most 0.02. The four pinned partitions are maximally disjoint in accent, gender balance and recording condition and the drawn pair rotates per attempt, so a front end and a normalization tuned across fifty attempts to one partition surfaces here as a gap rather than as a score.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The parameters were learned from the permuted labels this run read.",
+   "dimension": "generalisation",
+   "evaluation_target": "exported_recognizer",
+   "id": "chk_transfer_null",
+   "judgment": "DIVERGENCE: Re-executing the same frozen export under the second private label permutation moves r_det by at most tau = 0.03. Parameters carrying a public output vocabulary -- a wav2vec2 head, a whisper token table, a lexicon-shaped softmax -- move far more, because the permutation is a bijection the shipped transcripts already carry and a downloaded head has never seen.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Per-layer lookahead adds up, and the bound is on the sum.",
+   "dimension": "streaming",
+   "evaluation_target": "submitted_artifact",
+   "id": "declared_layer_lookahead_sums_within_the_right_context_bound",
+   "judgment": "VALUE: The sum of layer_right_context_frames is at most 32 frames, which is 320 ms at the declared 10 ms shift, and the total right context the harness observed equals that declared sum. Lookahead composes down the stack: eight layers each waiting a single frame is not 10 ms of algorithmic latency but 80 ms, and the stacked-ensemble route reaches 640 ms while every individual layer still reads as local.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The front end that trained the encoder is the front end that ships inside it.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "export_frontend_constants_equal_the_training_frontend_constants",
+   "judgment": "DIVERGENCE: sample_rate, frame_shift_ms, frame_length_ms, n_mels and preemphasis, as the harness observed train.py compute them, equal field for field the values export_manifest declares. A 10 ms training shift reimplemented at 12.5 ms inside the export raises no exception, trains to a healthy loss, exports cleanly, and roughly doubles graded WER. Nothing but this field-by-field comparison sees it, which is why it is a knockout rather than a warning.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded deliverable is a runnable streaming recognizer, not a prediction array.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "export_manifest_binds_parameters_frontend_and_decode",
+   "judgment": "INVARIANT: /submission/export/export_manifest.json exists, parses as a JSON object, and names a parameter file that exists beside it, a frame shift and mel count for the log-mel front end that lives inside the export, an ordered graph_ops list, a per-layer layer_right_context_frames list, and a decode block. The verifier LOADS this export and RUNS it on audio it holds, because a saved prediction array cannot be perturbation-probed for causality and a streaming claim that is never probed is a claim.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The decode path is per-frame argmax and nothing else.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "greedy_argmax_decode_carries_no_beam_lexicon_or_lm",
+   "judgment": "ABSENCE: decode.method is exactly greedy, the decode block carries no beam_width, lm, lexicon or fst key, and neither graph_ops nor the decode symbols the harness observed names a beam, prefix-beam, lexicon, WFST, n-gram or shallow-fusion operator. A beam of width one is still a beam and is refused by name. Greedy decoding is fixed here, so every word of error the agent removes has to come out of the encoder rather than out of the search.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The greedy path emits something other than blank.",
+   "dimension": "measurement",
+   "evaluation_target": "graded_hypotheses",
+   "id": "greedy_path_is_not_all_blank",
+   "judgment": "ABSENCE: On the private LibriSpeech shard the harness recorded a strictly positive non-blank frame fraction and at least one non-empty hypothesis. A CTC model still sitting in the alignment plateau puts all its mass on blank, decodes every utterance to the empty string, reaches WER exactly 1.000 on both shards, and is the worst anchor rather than a merely low score; 1500 s is short enough to leave an agent there.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The graded run wrote nothing under the checker tree or the held-out shards.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "no_graded_writes",
+   "judgment": "ABSENCE: The harness recorded no created or modified path under tests/, tests/heldout/, solution/ or environment/data/ during the graded run. Both sibling LibriSpeech partitions, the Common Voice shard, the probe offsets and the pinned text normalizer all live under tests/heldout/, so a write there is an attempt to move the measurement rather than the recognizer.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Fitting the 30 MiB ceiling by pruning is followed by re-estimating the statistics it invalidated.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "normalization_statistics_reestimated_after_the_last_parameter_edit",
+   "judgment": "ORDERING: If the observed op sequence contains any pruning or quantization op, a normalization-statistic re-estimation op appears strictly after the LAST of them. Pruning shifts every downstream activation distribution while the stored running mean and variance keep describing the dense model; the export then loads, runs, decodes and costs WER without raising anything at all.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "One recognizer is graded, not one per corpus.",
+   "dimension": "generalisation",
+   "evaluation_target": "exported_recognizer",
+   "id": "one_export_decodes_both_corpora",
+   "judgment": "INVARIANT: The parameter digest and the five front-end constants the harness observed while decoding the private Common Voice shard are identical to the ones it observed while decoding the private LibriSpeech shard. A per-corpus branch, a second parameter file, or a resampling front end swapped in for Common Voice is two recognizers, and the reward is a product over the outputs of one.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The CTC collapse merges repeats before it removes blanks.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "repeat_collapse_precedes_blank_removal",
+   "judgment": "ORDERING: decode.collapse lists merge_repeats at a strictly smaller index than remove_blank. Reversing the two merges the pair of l's in hello across the blank frame CTC emits precisely to hold them apart, so every doubled letter silently vanishes from the hypotheses while the training loss keeps falling. The order of those two operations is the entire content of a CTC collapse, not a stylistic choice.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "A replayed graded run reproduces the export and the strings it decoded.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "replay_reproduces_export_and_greedy_hypotheses",
+   "judgment": "INVARIANT: The replay digests the harness recorded for the parameter file, for the export manifest and for the greedy hypothesis strings on private_A each equal the corresponding first-run digest. Greedy decoding is a deterministic function of the export, so a hypothesis digest that moves while the parameter digest holds means the decode path itself carries a random source.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "Supervision came from the shipped permuted transcripts and from nothing else.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "training_transcripts_digest_to_the_shipped_permuted_bytes",
+   "judgment": "INVARIANT: Every transcript digest the harness recorded while train.py read supervision appears in the pinned table of shipped shard transcript digests under the private label permutation. Pseudo-transcripts written by a teacher downloaded during the open-egress phase digest to nothing in that table, so distillation is caught by the bytes the student actually read even though the teacher never ships and the graded run genuinely trains in budget.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "Word error rate is an edit distance over reference words, not an accuracy.",
+   "dimension": "measurement",
+   "evaluation_target": "graded_hypotheses",
+   "id": "wer_divides_edit_operations_by_reference_words",
+   "judgment": "VALUE: For each graded shard the harness recorded substitutions, deletions, insertions and a reference word count, and (S + D + I) / reference_words reproduces the recorded WER to 1e-6 with a strictly positive denominator. The denominator is the reference length, never the hypothesis length and never the longer of the two, so a WER above 1.0 is legal on an insertion-happy decode and a value clipped into the unit interval is evidence of the wrong denominator.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The graded axis: word error rate under greedy CTC decoding on both private shards, mapped through the published ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "graded_hypotheses",
+   "id": "word_error_rate_pair_on_both_private_shards_ramp",
+   "judgment": "VALUE: The binding per-corpus quality 1 - WER, taken as the minimum over the private speaker-disjoint LibriSpeech shard and the private post-2026-04-01 Common Voice shard because the reward map is a product across the two and the worse corpus therefore binds, computed verifier-side from the frozen export's greedy hypotheses under the pinned text normalizer, and mapped through the floor-to-knee ramp published in tests/constants.json. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured before it reads a single hypothesis rather than returning a score, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  }
+ ]
+}

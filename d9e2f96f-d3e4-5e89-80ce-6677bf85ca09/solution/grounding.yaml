@@ -1,0 +1,543 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S11
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled.
+  Every item below reduces to arithmetic over delivered bytes -- the submitted measurement record, the
+  run record the graded run wrote, and the vendored reference the verifier mounts -- so the compiled
+  share is 1.0 and no item is left to a judge.'
+deliverable:
+  path: /submission/kernel_report.json
+  kind: json
+  shape: one measurement record per graded depthwise-separable block shape, keyed by shape id under
+    `shapes`
+  shape_basis: 'The graded artifact is not a prediction. It is the measurement record of a kernel: what
+    was timed, under what methodology, and how far the kernel''s output drifted from the vendored fp32
+    reference on the same activation trace. The kernel itself is re-measured by the harness; this record
+    is what makes the agent''s own measurement legible enough to be checked against that re-measurement.'
+evaluation_target_vocabulary:
+- run_record
+- submitted_artifact
+- submitted_source
+
+# ------------------------------------------------------------------------------------------------
+# ITEMS. Every one of these asserts a fact about timing a depthwise-separable block on vendored
+# activation traces. None of them would mean anything on a classifier, a segmenter or a forecaster:
+# there is no submitted array whose contents are graded here, because the graded object is a kernel
+# and the graded quantity is how long it takes.
+# ------------------------------------------------------------------------------------------------
+items:
+- id: latency_report_lands
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The kernel's measurement record lands at the declared submission path and parses as a
+    per-shape record.
+  judgment: /submission/kernel_report.json exists, parses as a JSON object and carries a non-empty
+    `shapes` mapping keyed by graded block-shape id. A measurement record that will not parse is not
+    a slow kernel; it is no measurement at all, and it scores zero with reason submission_malformed.
+- id: every_graded_block_shape_measured
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: Every pinned depthwise-separable block shape carries a complete record, and no shape
+    outside the graded set is substituted for one inside it.
+  judgment: The report's shape ids are exactly the pinned graded set in corpus_layout.graded_block_shapes,
+    and every record carries every published record key. The three shapes span the reference network's
+    depthwise-separable stages -- 32x32 at 128 channels, 16x16 at 256, 8x8 at 512 -- and their
+    arithmetic intensity differs by an order of magnitude across that span, so a kernel tuned at one
+    spatial extent and left unmeasured at the others is a partial answer reported as a whole one.
+- id: depthwise_and_pointwise_timed_as_separate_stages
+  dimension: deliverable
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Each record separates the depthwise stage from the pointwise stage, or declares the
+    fusion that makes them inseparable.
+  judgment: Every record names a fusion_boundary from the published set. An unfused record carries
+    both depthwise_ms and pointwise_ms and their sum agrees with block_ms to within the published
+    stage tolerance; a fused record carries the fused total and no invented stage split. The two
+    stages do not have the same shape of cost -- the depthwise stage does nine multiply-accumulates
+    per loaded activation and is memory-bound, the pointwise stage does one per channel pair and is
+    compute-bound -- so a single blended millisecond cannot say which stage an optimisation reached,
+    and a stage split that does not add up to the block was not measured.
+- id: warmup_iterations_excluded_from_the_timed_window
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The timed window begins after the declared warmup, and the warmup is large enough to
+    have ended.
+  judgment: Every record declares warmup_iterations at or above the published floor and declares
+    warmup_excluded true. The first launches of a kernel pay JIT compilation, autotune selection and
+    a cold instruction cache, and the harness re-measures in steady state; a number taken from a cold
+    launch, or one whose warmup is folded into the timed window, does not describe the kernel that
+    will be graded.
+- id: reported_latency_is_a_median_not_a_best_of_n
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The reported latency is a median over a declared repetition count, not the best iteration
+    seen.
+  judgment: Every record declares timed_iterations at or above the published repetition floor and a
+    statistic drawn from the admitted set; min, minimum, best, best_of_n and fastest are rejected by
+    name. Best-of-n reports a latency the device delivered once, under a clock-boost and cache state
+    that no repeated measurement reproduces, which is exactly how a kernel that is not faster comes to
+    look faster.
+- id: device_synchronised_clock_not_async_launch_return
+  dimension: process
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The clock source measures the kernel, not the launch call that returns before the kernel
+    runs.
+  judgment: Every record names a clock source from the admitted set -- CUDA event elapsed time, a
+    host counter taken across an explicit device synchronisation, or a CUPTI kernel duration -- and no
+    record names a bare host timer taken around an asynchronous launch. A launch returns to the host
+    before the kernel executes, so a host timer wrapped around it measures enqueue latency and reports
+    microseconds for work that takes milliseconds. This is the measurement error that most flatters a
+    kernel that changed nothing.
+- id: fidelity_envelope_holds_on_every_graded_shape
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Every graded shape's output stays inside the published numerical fidelity envelope.
+  judgment: For every graded shape the record's max_abs_error and max_rel_error against the vendored
+    fp32 reference output on the same trace are finite, non-negative and within the published envelope,
+    and the record's own within_envelope verdict agrees with a recomputation from those two numbers.
+    The envelope gates the speed rather than trading against it -- one shape outside it makes the whole
+    attempt a wrong kernel that happens to be fast, and CTL-UNFAITHFUL targets precisely that and must
+    score 0.
+- id: pinned_trace_seeds_are_the_measured_inputs
+  dimension: integrity
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The kernel was timed on the vendored activation traces at the pinned seeds, not on
+    inputs the run chose for itself.
+  judgment: The run record's declared trace_seeds are exactly the pinned roster and every graded
+    shape's record names the trace seed it consumed. Timing a depthwise-separable block on synthetic
+    zeros, or re-using one small draw across every shape, measures a cache-residency artefact of the
+    input rather than the kernel on the activation distribution the C8-S1 reference actually produces
+    at those seeds.
+- id: vendored_traces_and_checker_tree_unwritten
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The graded run writes nothing into the checker tree or into the recorded activation
+    traces.
+  judgment: No path under tests/ or on the vendored trace archive is created or modified during the
+    graded run -- read from the harness's own record of touched paths, corroborated by the run's
+    declaration, never from a post-hoc scan -- and the trace digest recorded before the first
+    measurement equals the one recorded after the last. This is red line 1, and it exists because
+    shrinking a trace's batch or overwriting it with a cheaper draw makes the kernel look faster by
+    changing the measurement instead of the kernel.
+- id: replay_reproduces_outputs_but_not_timings
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: A second run reproduces the kernel's outputs exactly and its timings only approximately.
+  judgment: The replay recorded for the graded run reproduces every graded shape's output digest
+    bit-for-bit, and its per-shape latencies are not bit-identical to the first run's on every shape.
+    A latency report is the one deliverable in this batch that is not byte-reproducible and must not
+    claim to be -- identical floating-point milliseconds on every shape across two runs is the signature
+    of a copied constant, which is red line 2, and not of a deterministic measurement.
+- id: measurement_budget_declared
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The agent declares the measurement budget it spent, in the terms this task spends it.
+  judgment: The run record carries an agent-authored declaration naming warmup_iterations,
+    timed_iterations and autotune_trials, each a non-negative count. Autotuning is where this slot's
+    wall-clock budget actually goes -- a tiling sweep costs more than the kernel it selects -- and the
+    declaration is what is graded, not the harness's own measurement, so the check cannot be satisfied
+    by a field the harness writes.
+- id: envelope_gated_speedup_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The measured speedup over the vendored reference kernel clears the published bar through
+    the ramp.
+  judgment: 'The geometric-mean speedup of the harness''s own per-shape kernel wall-clock over the
+    vendored reference kernel''s, taken across the pinned block shapes and forced to zero when any
+    shape leaves the fidelity envelope, mapped through the floor-to-knee ramp published in
+    tests/constants.json. The latencies are read from the harness record and never from the submitted
+    report, because red line 2 is reporting a timing the harness did not measure and a metric that
+    read the agent''s own number would be grading the declaration it exists to distrust. UNMEASURED AT
+    PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning
+    a score, and the slot is not gradeable until the measurement wave writes them.'
+
+# ------------------------------------------------------------------------------------------------
+# CORPUS LAYOUT. The trace corpus has NOT LANDED in this tree: environment/data/ and tests/heldout/
+# carry no bytes here yet. The paths, shapes, seeds and methodology parameters the compiled checks
+# read are authored below so the checks are written against a named layout rather than against
+# whatever happens to appear. Every check that needs a file it cannot find reports that it could not
+# find it; none of them passes over an absent corpus.
+# ------------------------------------------------------------------------------------------------
+corpus_layout:
+  corpus_status: not-landed
+  corpus_status_reason: 'seed/build/land_corpora.py has not run for this slot. environment/data/ and
+    tests/heldout/ do not exist in seed/stage/c8s11, so no check here is written against bytes that
+    were inspected. Stated rather than hidden: when the traces land, graded_block_shapes and
+    pinned_trace_seeds below are the roster the landed archive must match, and a disagreement is a
+    corpus-landing failure to be repaired at Phase 1, not a licence to re-pin the graded set after
+    seeing it.'
+  activation_traces: environment/data/c8s1_activation_traces.npz
+  graded_shapes: environment/data/graded_block_shapes.json
+  reference_outputs: tests/heldout/c8s1_reference_outputs.npz
+  reference_latency: tests/heldout/reference_kernel_latency.json
+  run_record: run_record.json
+  run_record_basis: Written by the graded run beside the bundle root and read by the verifier.
+    instruction.md publishes every key the compiled checks read, so no check grades an obligation the
+    agent was never told to carry.
+  split_discipline: 'The activation traces ship agent-visible under environment/data/, because the
+    kernel has to consume them and the agent has to be able to time against the same inputs the
+    harness will. The vendored fp32 reference OUTPUTS and the reference kernel''s measured latency
+    ship only under tests/heldout/, which red line 1 forbids the graded run from touching and which
+    the separate verifier mounts. The reason is specific to a kernel task: if the correct outputs
+    were visible, the fastest conforming submission would be a table lookup with no kernel in it at
+    all, and the fidelity envelope would gate nothing. The agent checks its own fidelity by running
+    the shipped naive baseline on the same trace, which is exactly what the vendored reference is.'
+  graded_block_shapes:
+  - id: dws32_c128
+    batch: 256
+    channels: 128
+    height: 32
+    width: 32
+    depthwise_kernel: 3
+    stride: 1
+    pointwise_out: 128
+    trace_seed: 20260814
+  - id: dws16_c256
+    batch: 256
+    channels: 256
+    height: 16
+    width: 16
+    depthwise_kernel: 3
+    stride: 1
+    pointwise_out: 256
+    trace_seed: 20260815
+  - id: dws8_c512
+    batch: 256
+    channels: 512
+    height: 8
+    width: 8
+    depthwise_kernel: 3
+    stride: 1
+    pointwise_out: 512
+    trace_seed: 20260816
+  graded_block_shapes_basis: 'The three depthwise-separable stages of the C8-S1 reference at
+    CIFAR-100''s 32x32 input: spatial extent halved and channel count doubled at each downsample, a
+    3x3 stride-1 depthwise convolution followed by a 1x1 pointwise projection at every stage. They are
+    authored here and pinned BEFORE any measurement so the graded set cannot be chosen after seeing
+    which shape a kernel happens to win on. The batch is held at 256 across all three so that the
+    working set, and not the batch, is what changes between them.'
+  pinned_trace_seeds:
+  - 20260814
+  - 20260815
+  - 20260816
+  pinned_trace_seeds_basis: One seed per graded shape, continuing the C8-S1 shard seed 20260814 so the
+    lineage of the traces is readable from the seed alone. Distinct seeds per shape, so no shape's
+    trace is another's already-resident copy.
+  record_keys:
+  - block_ms
+  - warmup_iterations
+  - warmup_excluded
+  - timed_iterations
+  - statistic
+  - clock_source
+  - fusion_boundary
+  - max_abs_error
+  - max_rel_error
+  - within_envelope
+  - trace_seed
+  - output_sha256
+  fusion_boundaries:
+  - unfused
+  - fused_pointwise_epilogue
+  - fully_fused
+  unfused_boundary: unfused
+  stage_sum_tolerance_fraction: 0.05
+  warmup_iterations_floor: 25
+  timed_iterations_floor: 100
+  admitted_statistics:
+  - median
+  - p50
+  - quantile_0.50
+  rejected_statistics:
+  - min
+  - minimum
+  - best
+  - best_of_n
+  - fastest
+  admitted_clock_sources:
+  - cuda_event_elapsed_time
+  - device_synchronised_perf_counter
+  - cupti_kernel_duration
+  rejected_clock_sources:
+  - host_perf_counter_no_sync
+  - time_time_around_launch
+  - python_wall_clock_async
+  budget_keys:
+  - warmup_iterations
+  - timed_iterations
+  - autotune_trials
+  fidelity_envelope:
+    max_abs_error: 0.002
+    max_rel_error: 0.005
+  fidelity_envelope_basis: 'Measured against the vendored fp32 reference output on the same activation
+    trace, elementwise, over the pointwise stage''s output. AUTHORED at Phase 0, not measured: it is a
+    published task parameter that instruction.md states to the agent, it is not one of the four ramp
+    constants, and it never enters S_outcome -- it gates it. The pair is chosen to admit a bf16 or tf32
+    pipeline that accumulates in fp32 and to reject one that accumulates in fp16, which is the precision
+    lever this slot means to expose (L5). Its calibration against the landed reference outputs is owed
+    at Phase 1; if the landed reference makes this envelope vacuous or unclearable, the envelope is
+    re-authored there and the change is recorded, not absorbed.'
+  methodology_parameters_basis: 'warmup_iterations_floor, timed_iterations_floor,
+    stage_sum_tolerance_fraction and the admitted statistic and clock rosters are authored Phase 0
+    methodology parameters, published to the agent in instruction.md. They bound HOW a latency may be
+    obtained, never what score it earns, and none of them is a measured quantity: no floor, knee or
+    ablation worth is being invented here.'
+  guarded_writes:
+  - /tests/
+  - c8s1_activation_traces.npz
+  - c8s1_reference_outputs.npz
+  - reference_kernel_latency.json
+  - graded_block_shapes.json
+measurement_tier: gpu
+measurement_tier_basis: grades a GPU kernel's measured latency
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the four constants above on the grading
+    host
+knee_anchor: the vendored reference kernel's published throughput for the same block shape
+knee_anchor_source: an external published figure, fixed before any measurement on this slot
+knee_anchor_status: unsourced-not-attempted
+knee_anchor_status_reason: No source was attempted for this slot's knee anchor at Phase 0.
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; zero when any graded shape leaves
+    the fidelity envelope, before speed is considered at all; otherwise S_outcome = clamp((speedup -
+    floor) / (knee - floor), 0, 1) through the published ramp.'
+  unmeasured: floor and knee are null at Phase 0, so r_det is not computable from these bytes yet and
+    the slot is authored but not gradeable.
+truth_narrative:
+  opening: minimise measured kernel wall-clock for a depthwise-separable block while every output stays
+    inside a bound numerical fidelity envelope. The graded artifact is one measurement record per graded
+    block shape, written to /submission/kernel_report.json. The graded quantity is the geometric-mean
+    speedup of the harness's own per-shape kernel wall-clock over the vendored reference kernel's,
+    across the three pinned shapes, forced to zero when any shape leaves the envelope.
+  insight: 'Nothing here grades an array''s contents. The graded object is a kernel, the graded quantity
+    is how long it takes, and a duration is only as trustworthy as the method that produced it -- so
+    the checks are about measurement methodology first and speed second. Warmup discarded, a repetition
+    count met, a median rather than a best-of-n, a clock that waits for the device instead of for the
+    launch call to return. Get any of those wrong and the number in the report describes something
+    other than the kernel. And speed is gated, not traded: the fidelity envelope is checked before the
+    ramp is read, so a kernel that wins wall-clock by leaving the envelope on one of three shapes scores
+    zero rather than scoring well on two.'
+  steps:
+  - heading: Time the two stages apart before optimising either
+    paragraph: 'A depthwise-separable block is two kernels with opposite cost structure: the 3x3
+      depthwise stage does nine multiply-accumulates per loaded activation and is memory-bound, the 1x1
+      pointwise stage does one per channel pair over a much larger reduction and is compute-bound. The
+      block''s total tells you nothing about which one you are paying for, and at 8x8x512 the answer is
+      not the same as at 32x32x128. Lever L4, the fusion boundary, is the choice this measurement makes
+      legible; its worth is measured on the Phase 2 ladder over the full lever power set, never asserted
+      here.'
+  - heading: Fix the measurement before trusting any speedup
+    paragraph: Warmup that ends before the timed window opens, a repetition count that makes the
+      median stable, a device-synchronised clock, and the pinned traces rather than a convenient draw.
+      A speedup measured with a bare host timer around an asynchronous launch is a measurement of the
+      launch queue, and it improves whenever the kernel gets slower enough to hide behind the next
+      enqueue. Every one of these is a knockout check because none of them costs anything to get right
+      and each of them silently invalidates every number downstream.
+  - heading: Tile against the activation working set, not against the register file
+    paragraph: 'Lever L1. The three graded shapes differ by an order of magnitude in arithmetic
+      intensity and by 16x in spatial extent at the same batch, so one tiling does not sit at the
+      occupancy sweet spot for all three; a tile chosen for 32x32x128 spills at 8x8x512. Its worth is
+      measured on the Phase 2 ladder over the full lever power set, never asserted here.'
+  - heading: Stage through shared memory and widen the loads
+    paragraph: Levers L2 and L3. The depthwise stage re-reads a 3x3 neighbourhood per output and the
+      pointwise stage streams the whole channel axis; staging policy and vectorised load width are the
+      two knobs that decide whether those reads coalesce. Their worth is measured on the Phase 2 ladder
+      over the full lever power set, never asserted here.
+  - heading: Spend precision only where the envelope has room
+    paragraph: Lever L5. Accumulating in a narrower type is the largest single wall-clock lever
+      available and it is the one the fidelity envelope bounds -- fp32 accumulation under bf16 or tf32
+      inputs stays inside 2e-3 absolute and 5e-3 relative on these traces, fp16 accumulation over a
+      512-wide reduction does not. Its worth is measured on the Phase 2 ladder over the full lever power
+      set, never asserted here.
+  traps:
+  - Wins wall-clock by leaving the fidelity envelope and the gate zeroes the attempt -- the envelope is
+    checked before the ramp is read, so two fast conforming shapes do not pay for one that drifted.
+  - Reports best-of-n. The device delivers that latency once, under a clock-boost state the harness's
+    own repeated measurement never reproduces, and the harness is what the score is computed from.
+  - Wraps a host timer around an asynchronous launch and reports microseconds for milliseconds of work.
+  - Tiles for the wrong occupancy and the working set spills every iteration -- and at 8x8x512 it spills
+    for a tile that was optimal at 32x32x128.
+  - Times the block on synthetic zeros or one re-used draw, so the whole working set stays L2-resident
+    and the measured speedup evaporates on the pinned traces.
+  - 'a vendor library kernel would bypass the design entirely Mitigation: the allowlist reaches no
+    package index at solve time and the fidelity gate is checked against the vendored reference outputs'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `measurement_budget_declared` (compiled, weight 3) -- The agent declares the measurement budget
+  it spent, in the terms this task spends it.
+
+  2. `latency_report_lands` (compiled, weight 5, knockout) -- The kernel''s measurement record lands
+  at the declared submission path and parses as a per-shape record.
+
+  3. `every_graded_block_shape_measured` (compiled, weight 5, knockout) -- Every pinned
+  depthwise-separable block shape carries a complete record.
+
+  4. `pinned_trace_seeds_are_the_measured_inputs` (compiled, weight 3) -- The kernel was timed on the
+  vendored activation traces at the pinned seeds.
+
+  5. `warmup_iterations_excluded_from_the_timed_window` (compiled, weight 5, knockout) -- The timed
+  window begins after the declared warmup.
+
+  6. `reported_latency_is_a_median_not_a_best_of_n` (compiled, weight 5, knockout) -- The reported
+  latency is a median over a declared repetition count.
+
+  7. `device_synchronised_clock_not_async_launch_return` (compiled, weight 5, knockout) -- The clock
+  source measures the kernel, not the launch call.
+
+  8. `depthwise_and_pointwise_timed_as_separate_stages` (compiled, weight 3) -- Each record separates
+  the depthwise stage from the pointwise stage, or declares the fusion.
+
+  9. `fidelity_envelope_holds_on_every_graded_shape` (compiled, weight 5, knockout) -- Every graded
+  shape''s output stays inside the published numerical fidelity envelope.
+
+  10. `replay_reproduces_outputs_but_not_timings` (compiled, weight 3) -- A second run reproduces the
+  outputs exactly and the timings only approximately.
+
+  11. `vendored_traces_and_checker_tree_unwritten` (compiled, weight 5, knockout) -- The graded run
+  writes nothing into the checker tree or the recorded traces.
+
+  12. `envelope_gated_speedup_ramp` (compiled, weight 10, knockout) -- The measured speedup over the
+  vendored reference kernel clears the published bar through the ramp.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - a vendor library kernel would bypass the design entirely -- controlled by: the allowlist reaches
+  no package index at solve time and the fidelity gate is checked against the vendored reference outputs
+
+
+  Deliverable manifest: /submission/kernel_report.json (json), one measurement record per graded
+  depthwise-separable block shape, keyed by shape id under `shapes`.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-NOOP` targets the shipped starter kernel verbatim; recorded score None.
+
+  - `CTL-UNFAITHFUL` targets a fast kernel outside the fidelity envelope; must score 0; recorded score
+  None.
+
+  - `CTL-STALE` targets a kernel tuned for a different block shape; recorded score None.
+
+  '
+provenance:
+  corpus: vendored activation traces from the C8-S1 CIFAR-100 reference at pinned seeds
+  anchors:
+    knee_anchor: the vendored reference kernel's published throughput for the same block shape
+    knee_anchor_source: an external published figure, fixed before any measurement on this slot
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: vendored activation traces from the C8-S1 CIFAR-100 reference at pinned seeds
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-741a9ceccad662e7022448e7f797fc44
+  - AELLO-CANARY-521001e5368bb237f8f227a575ae6e33
+  - AELLO-CANARY-b2e27e5644d2d284c7954bf9baaca2d1
+  - AELLO-CANARY-492407b078d8e0821be18962ad1f325f

@@ -1,0 +1,684 @@
+$schema: forge.grounding/v1
+banner: Private derivation source. Every generated canonical artifact descends from this file.
+slot_id: AELLO-C8-S13
+compilation_floor: 1.0
+compilation_floor_basis: 'PRD section 5.6: every deterministically reducible judgment is compiled. Every
+  item below is compiled, and the two that cannot return a score today say so by raising
+  ConstantUnmeasured rather than by dropping to a judged mode: the bar is missing, not the arithmetic.'
+deliverable:
+  path: /submission/confidences.npy
+  kind: npy
+  shape: float array (29000, 100), rows non-negative and summing to 1; rows 0-18999 are the 95-cell
+    corrupted grid in pinned cell order and rows 19000-28999 are the clean graded fold in file order
+
+# The corpus HAS landed. This block records the pinned facts every compiled check reads, so the
+# emitted checker module is derived from this file alone and never from a number typed twice.
+corpus_layout:
+  classes: 100
+  class_domain: CIFAR-100 fine labels, 0 through 99
+  corruptions: 19
+  severities: 5
+  cells: 95
+  rows_per_cell: 200
+  corrupted_rows: 19000
+  clean_graded_rows: 10000
+  corrupted_graded: environment/data/corrupted_graded.npz
+  clean_graded: environment/data/clean_graded.npz
+  labelled_splits:
+    clean_train: 20000 labelled CIFAR-100 rows, agent-visible
+    clean_val: 5000 labelled CIFAR-100 rows, agent-visible
+  heldout:
+    corrupted: tests/heldout/corrupted_graded_labels.npz
+    clean: tests/heldout/clean_graded_labels.npz
+  corruption_names:
+  - brightness
+  - contrast
+  - defocus_blur
+  - elastic_transform
+  - fog
+  - frost
+  - gaussian_blur
+  - gaussian_noise
+  - glass_blur
+  - impulse_noise
+  - jpeg_compression
+  - motion_blur
+  - pixelate
+  - saturate
+  - shot_noise
+  - snow
+  - spatter
+  - speckle_noise
+  - zoom_blur
+  cell_order: >-
+    Lexicographic by (corruption_id, severity), corruption_id indexing corruption_names
+    alphabetically. Row i of the corrupted block therefore has corruption_id i // 1000 and
+    severity (i % 1000) // 200 + 1. The arithmetic is authored here and cross-checked cell for
+    cell against the corruption_id and severity arrays the corpus itself ships.
+  shared_base_images: >-
+    One fixed draw of 200 CIFAR-100 test images is corrupted into every one of the 95 cells, so
+    the 19000-entry private corrupted label vector is 95 tilings of one 200-entry cell vector,
+    and the 95 per-cell calibration errors are 95 measurements of the same image set under
+    different corruptions. Two consequences are load-bearing below: a 200-entry label leak is a
+    complete leak of the corrupted grading labels, and the macro average over cells weights all
+    19 corruptions equally at each of the 5 severities by construction rather than by reweighting.
+
+submission_layout:
+  rows: 29000
+  columns: 100
+  corrupted_block: [0, 19000]
+  clean_block: [19000, 29000]
+  row_sum_tolerance: 1.0e-06
+  row_sum_tolerance_basis: >-
+    A float32 softmax over 100 classes lands within about 1e-07 of unit mass, so 1e-06 admits
+    every honestly normalised artifact. The 1e-03 slack a generic dense-array family uses would
+    admit a deliberately unnormalised vector whose confidence sits a whole bin-width away from
+    where the pinned partition would put it.
+  basis: >-
+    The clean graded fold ships without labels precisely so the clean-accuracy tolerance gate has
+    something to read. A corrupted-only deliverable leaves the gate that the contract names as the
+    mitigation for the uniform-posterior shortcut with no input, and the shortcut is then priced by
+    nothing. Stacking both folds into the one declared artifact is what makes that gate exist.
+  published_in: instruction.md, which carries the row counts, the stacking order and the
+    declaration fields; the pinned bin edges are deliberately NOT published there.
+
+binning_family:
+  bin_counts: [5, 10, 15, 20, 25, 30, 40, 50, 75, 100]
+  members: 21
+  graded_refinement: 10
+  graded_refinement_basis: >-
+    ck_binpin splits each of the 15 pinned bins ten ways and records the calibration error under
+    that refinement as corroborating evidence. It gates nothing, and the reason it cannot is worth
+    keeping: a lookup whose every value equals the accuracy of the rows carrying it is calibrated
+    under every partition that separates those values, so a refinement reveals nothing about it. The
+    coarse-partition reading is decisive on its own.
+  edge_kinds: [equal_width, equal_mass]
+  equal_width_span: >-
+    The observed confidence range of the shared reference record, not [0, 1]. This is what keeps
+    the 15-bin equal-width member from coinciding with the pinned [0, 1] fifteen-bin graded
+    partition, which the contract requires of the twenty alternates: none of them is the graded
+    scheme. The outermost two edges are then widened to cover both candidates so that no row of
+    either candidate falls outside every bin and is silently dropped from its own mean.
+  equal_mass_source: >-
+    Quantiles of CTL-NOOP's confidence vector over the same cells, inputs only, computed once per
+    grading run and applied unchanged to every candidate.
+
+ramp_item: corruption_macro_ece_ramp
+ramp_item_basis: >-
+    solution/recompute.py refuses to emit unless this item's compiled body opens with
+    require_measured("floor", "knee", "dichotomizing_threshold"). A body that read the submission
+    first would let a missing file raise its own error, the verifier would report gradeable true
+    with r_det 0.0, and a declared absence would have been recorded as a measured zero.
+
+declaration_vocabulary:
+  fittable_splits: [clean_train, clean_val]
+  graded_splits: [clean_graded, corrupted_graded]
+
+evaluation_target_vocabulary:
+- run_record
+- submitted_artifact
+- submitted_source
+
+items:
+- id: posterior_file_lands
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The graded run leaves a loadable floating-point posterior at the declared submission path.
+  judgment: >-
+    /submission/confidences.npy exists and loads through numpy with allow_pickle false into an array
+    whose dtype kind is floating. An object dtype, a pickled payload, an unreadable file, or an
+    integer label vector of the kind a classification family would submit all fail here with reason
+    posterior_unloadable, which separates an artifact that cannot be read from one that reads and is
+    wrong. This slot grades a distribution, not a decision, so an integer array is not a degraded
+    submission but a different object.
+
+- id: stacked_block_layout
+  dimension: deliverable
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The array carries the 19000 corrupted graded rows and the 10000 clean graded rows in the
+    one pinned stacking order.
+  judgment: >-
+    The array is two-dimensional with exactly 29000 rows and exactly 100 columns. Rows 0 through 18999
+    are the corruption grid in the corpus's own order, corruption_id equal to the row index divided by
+    1000 and severity equal to the row index modulo 1000 divided by 200 plus one, cross-checked cell
+    for cell against the corruption_id and severity arrays inside
+    environment/data/corrupted_graded.npz; rows 19000 through 28999 are the clean graded fold in
+    environment/data/clean_graded.npz file order. A 19000-row array is the interesting failure and
+    gets its own reason, clean_block_missing: it grades the corruption objective perfectly well and
+    leaves the clean-accuracy tolerance gate nothing to read, which is exactly how the
+    uniform-posterior shortcut would like to be graded. Any other row count fails with reason
+    wrong_row_count and nothing is trimmed or padded to fit; 20 columns, the CIFAR-100 coarse-label
+    domain, fails with reason wrong_class_count.
+
+- id: rows_are_posteriors
+  dimension: deliverable
+  weight: 4
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: Every row is a probability vector over the 100 fine labels, not merely a vector that sums
+    to one.
+  judgment: >-
+    All 29000 rows are finite, carry no negative entry, and sum to 1 within 1e-06. Non-negativity is
+    checked separately from unit mass because the two are separately falsifiable here: a row holding
+    -0.4 beside 1.4 sums to one, and its top-1 confidence of 1.4 lands outside every bin of the pinned
+    partition, so it would be dropped from the calibration error it is supposed to be scored on rather
+    than penalised by it. That case fails with reason negative_mass; a row summing to 1.0004 fails with
+    reason row_mass_out_of_tolerance.
+
+- id: uniform_posterior_rejected
+  dimension: correctness
+  weight: 4
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: 'The compiled rejection of control CTL-UNIFORM: the submission is not the flat 1/100
+    posterior that lowers calibration error by having no prediction left to be wrong about.'
+  judgment: >-
+    CTL-UNIFORM emits 0.01 in every one of the 29000 by 100 entries. Its calibration error is
+    |accuracy - 0.01|, and chance accuracy over 100 fine labels IS 0.01, so it scores a near-zero
+    calibration error while predicting nothing at all; that is why the shortcut is real rather than
+    theoretical. Three facts are checked and all three must hold: the 29000 rows are not all equal to
+    the uniform vector within 1e-09; the top-1 confidence over the 19000 corrupted rows takes at least
+    two distinct values; and the argmax over the 10000 clean rows covers at least two of the 100
+    classes. Any failure reports reason uniform_posterior. This item catches only the degenerate
+    endpoint; the graded near-uniform cases are priced by clean_accuracy_tolerance, which is where the
+    contract puts the mitigation.
+
+- id: pinned_binning_intact
+  dimension: integrity
+  weight: 3
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: The partition the score is read under is the one pinned in the bundle, not one the graded
+    run supplied.
+  judgment: >-
+    tests/graded_bin_edges.npy still hashes to
+    c77dbd3cceaaa09553e163c37b8e8aa01cbeaa48ea2f99626faf4a2c45a3a200 after the graded run, its 16
+    float64 entries are exactly the equal-width partition of [0, 1] into 15 bins, and no path naming
+    graded_bin_edges appears in the run record's guarded_paths_touched. The edges are read from the
+    bundle and never from a submitted file, so a run that rewrote them into a partition its own
+    confidences sit comfortably inside fails with reason pinned_binning_moved rather than quietly
+    changing the axis the ramp is read on. This is the one check in the set that passes at Phase 0,
+    because the pinned instrument is authored and present today while every quantity read through it
+    is not.
+
+- id: graded_fold_boundary
+  dimension: integrity
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The graded run writes into neither the checker tree nor the private label store.
+  judgment: >-
+    The run record's guarded_paths_touched list is empty, and the evidence names any entry falling
+    under tests/, naming tests/heldout/corrupted_graded_labels.npz or
+    tests/heldout/clean_graded_labels.npz, or falling under the verifier's own output directory. The
+    list is read from the harness record the run itself produced and never from a scan taken
+    afterwards, because a post-hoc scan cannot tell a write made during the graded run from one made
+    before it. An absent run record fails closed with reason run_record_absent rather than passing
+    vacuously, which is the only way this check can be wrong in the agent's favour.
+
+- id: heldout_label_isolation
+  dimension: isolation
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: The agent holds no copy of either private label vector, at any of the three lengths a copy
+    can take here.
+  judgment: >-
+    No file collected under agent_src matches tests/heldout/corrupted_graded_labels.npz or
+    tests/heldout/clean_graded_labels.npz by sha256, and no integer array the agent wrote equals the
+    19000-entry corrupted label vector, the 10000-entry clean label vector, or the 200-entry cell
+    vector. That third length is the one that matters and is the reason this check is not the generic
+    label-isolation check: the same 200 CIFAR-100 test images are corrupted into all 95 cells, so the
+    19000-entry vector is 95 tilings of one 200-entry vector and an agent holding 200 integers holds
+    every graded corrupted label there is. A check watching only for a 19000-long array would miss a
+    complete leak 99 percent smaller than the thing it was watching for. Absence is established from
+    committed bytes rather than from intent, and an uncollected agent_src fails closed with reason
+    agent_source_unavailable.
+
+- id: calibration_fit_split_declared
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: run_record
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The agent declares how many graded forward passes it spent and which split it fitted its
+    calibration on, and it is not a split it is graded on.
+  judgment: >-
+    The run record's agent_budget_declaration parses and carries an integer graded_forward_passes of at
+    least one and a calibration_fit_split naming one or both of clean_train and clean_val, the two
+    labelled splits that ship. Naming corrupted_graded or clean_graded fails with reason
+    fit_on_graded_split; that is this slot's second intended failure mode, fitting temperature on the
+    corrupted split it is graded on, written down as something a checker can read. Any other name fails
+    with reason unknown_fit_split. The declaration is what is graded and the harness's own measurement
+    is not, so this cannot be satisfied by a field the harness writes; and a declaration that is false
+    rather than absent is reached by heldout_label_isolation instead, since fitting on a graded split
+    requires that split's labels.
+
+- id: posterior_replay_identity
+  dimension: process
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_source
+  mode: compiled
+  outcome_class: EFFECT
+  criterion: The 29000 by 100 posterior reproduces byte for byte from the recorded seed.
+  judgment: >-
+    The sha256 of /submission/confidences.npy equals replay_artifact_sha256, the digest the run record
+    carries from the agent's own second run under its recorded seed. Byte identity rather than numeric
+    closeness is required because the graded quantity is a binned statistic: a rerun that reorders one
+    reduction and moves a single confidence across one of the 15 pinned edges changes the calibration
+    error it is scored on while looking numerically identical to any tolerance a reviewer would think
+    to apply. An absent digest fails with reason replay_unavailable and a differing one with reason
+    replay_diverged.
+
+- id: ck_binfam
+  dimension: obligation
+  weight: 2
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: INVARIANT
+  criterion: 'Contract checker obligation CK-BINFAM is discharged: the ordering against CTL-NOOP
+    survives every member of the binning family.'
+  judgment: >-
+    Under a binning family fixed by construction -- bin counts 5, 10, 15, 20, 25, 30, 40, 50, 75 and
+    100 crossed with equal-width and equal-mass edges, twenty members, none of which is the graded
+    scheme -- the verifier recomputes ECE for the submission and for CTL-NOOP on every cell of the 19x5
+    grid, and separately under the graded bin edges, which are pinned by sha256 in the bundle's
+    constants and are never read from any submitted file. Equal-mass edges are the quantiles of
+    CTL-NOOP's confidence vector over the same cells (inputs only; no label is consulted to place an
+    edge), computed once per grading run and applied unchanged to every candidate, so no candidate is
+    ever measured under edges fitted to its own outputs and both candidates are always measured under
+    identical partitions. For each of the twenty-one members the verifier forms each candidate's mean
+    ECE over the 95 cells; the sign of (ECE of CTL-NOOP minus ECE of the submission) must be non-zero
+    and identical under all twenty-one, so that the ordering against the control is not an artifact of
+    a single binning. All per-member and per-cell ECEs are written to the verifier record only and are
+    returned to no agent-visible channel, each being a function of the private corrupted labels. The
+    family is derived entirely from the single stored per-sample (confidence, correctness) record of
+    the graded inference pass: it adds no forward pass, no label read beyond the graded one, and no
+    change to the declared budget. Scope: this establishes only that the ordering against CTL-NOOP is
+    binning-independent; it does not discharge the rejection of CTL-GRADEDBINS, which passes this
+    invariant and requires its own obligation. Two implementation facts settle what the wording leaves
+    open. Equal-width members span the observed confidence range of the shared record rather than
+    [0, 1], which is what makes the twenty alternates disjoint from the pinned partition: a 15-bin
+    equal-width member laid over [0, 1] would BE the graded scheme, and the contract requires that none
+    of them is. The two outermost edges of every member are then widened to cover both candidates, so
+    that no row of either falls outside all bins and is dropped from its own mean. The compiled body
+    fails closed with reason control_record_absent when the run record carries no per-sample
+    (confidence, correctness) record for CTL-NOOP, because with no control there is no ordering to be
+    invariant and reporting one would be reporting nothing.
+
+- id: ck_binpin
+  dimension: obligation
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: ABSENCE
+  criterion: 'Control CTL-GRADEDBINS is rejected: the submitted confidences are not a lookup fitted to
+    the private corrupted fold under the pinned graded partition.'
+  judgment: >-
+    Red line 2 forbids fitting calibration on the graded binning scheme and, until this item, nothing
+    enforced it; seed/contract.yaml records the shortfall in checker_obligations_shortfall and this
+    obligation is offered against it. The finding is one measured fact: over the 19000 corrupted rows,
+    the expected calibration error under the PINNED partition is at most 1e-06, meaning every one of
+    the 15 bins has its mean confidence equal to its accuracy to within a millionth. That is not a
+    demanding bar cleared by a good solve, it is a bar no solve can clear. A perfectly calibrated
+    probabilistic model still carries binomial sampling noise, so its bins miss their own accuracy by
+    about the square root of one over the bin count -- of order 0.007 across 19000 rows -- and the
+    shipped starter measures about 0.14 while a ten-bin histogram honestly fitted on the clean fold
+    measures about 0.03. A value below 1e-06 sits four orders of magnitude under the statistical floor
+    and is reachable only by setting each bin's confidence to the accuracy THESE labels give it. The
+    failure reason is calibrated_to_float_precision_on_the_pinned_partition. Two corroborating figures
+    ride in the evidence and gate nothing: the calibration error under a strict refinement of the same
+    partition, each pinned bin split ten ways, and the number of distinct confidence levels. Both were
+    tried as required clauses and both were wrong. A distinct-value count is defeated by arithmetic
+    noise, because renormalising a re-weighted row sums 100 floats in an order that depends on which
+    class holds the mass, so a fifteen-valued lookup emerges carrying thousands of float64 maxima that
+    differ in the last unit in the last place. A refinement clause is worse than brittle, it is
+    unsound: a lookup whose every value equals the accuracy of the rows carrying it is calibrated
+    under EVERY partition that separates its values, so refining the bins reveals nothing at all. That
+    property is why the coarse-partition reading is decisive on its own. Scope, stated rather than
+    overclaimed. Evading the detector means moving off exact calibration under the pinned partition,
+    which is the entire benefit of having fitted to it, so evasion costs the thing it protects -- but a
+    partial fit that surrenders most of that benefit does pass here. And the detector convicts a
+    neighbour of CTL-GRADEDBINS as well as CTL-GRADEDBINS itself: a lookup fitted to the graded fold
+    under the agent's own partition lands at the same signature. That is red line 1, any read of the
+    private corrupted splits' labels, rather than red line 2; catching it here is not a false positive,
+    because both are red lines and both score zero.
+
+- id: per_cell_ece_recorded
+  dimension: outcome
+  weight: 3
+  knockout: false
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: All 95 per-cell calibration errors are computed and the worst cell is named, so one
+    catastrophic corruption cannot hide inside an average.
+  judgment: >-
+    The verifier forms one expected calibration error per (corruption, severity) cell over that cell's
+    200 rows under the pinned 15-bin partition. The check passes when all 95 are finite and the record
+    names the worst cell by corruption name and severity -- glass_blur at severity 5, say -- beside the
+    macro average and the pooled 19000-row figure. Macro and pooled differ, and the difference is the
+    point: the calibration error takes an absolute value inside each bin, so it does not commute with
+    averaging across cells, and a submission well calibrated on 94 cells and catastrophically
+    overconfident on the 95th is closer to the fleet average in the pooled figure than in the macro
+    one. The ramp reads the macro figure and the pooled figure travels beside it so the gap is visible
+    rather than assumed away. Because one fixed draw of 200 test images is corrupted into every cell,
+    the 95 numbers are 95 readings of the same image set and the macro average weights all 19
+    corruptions equally at each severity without any reweighting.
+
+- id: clean_accuracy_tolerance
+  dimension: outcome
+  weight: 5
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: Clean accuracy stays inside the bound tolerance, which is what makes a flattened posterior
+    fail rather than win.
+  judgment: >-
+    Top-1 accuracy of the clean block -- rows 19000 through 28999 argmaxed against the 10000 private
+    clean labels -- must be at least clean_accuracy_floor. UNMEASURED AT PHASE 0: clean_accuracy_floor
+    is null because the tolerance is a band around the reference model's own clean accuracy, which the
+    Phase 2 wave measures on the grading host and which Phase 0 must not invent; the body calls
+    require_measured first and raises ConstantUnmeasured rather than returning a score. This is the
+    gate seed/contract.yaml names as the mitigation for the uniform-posterior shortcut, and it is the
+    only place the price can be charged: a uniform posterior genuinely does lower expected calibration
+    error, so nothing in the corrupted objective punishes it and the corrupted objective cannot be
+    hardened into punishing it. The clean fold ships unlabelled to the agent for exactly this reason.
+
+- id: corruption_macro_ece_ramp
+  dimension: outcome
+  weight: 10
+  knockout: true
+  evaluation_target: submitted_artifact
+  mode: compiled
+  outcome_class: VALUE
+  criterion: The macro-averaged corrupted calibration error clears the published bar and maps through
+    the reward ramp.
+  judgment: >-
+    The mean of the 95 per-cell expected calibration errors over the private corrupted labels, computed
+    under the pinned 15-bin equal-width partition, mapped to the higher-is-better axis as 1 minus that
+    mean and then through the floor-to-knee ramp published in tests/constants.json. UNMEASURED AT
+    PHASE 0: floor, knee and dichotomizing_threshold are null, so require_measured is this body's FIRST
+    statement and it raises ConstantUnmeasured before the submission is opened at all. The ordering is
+    load-bearing rather than stylistic. Reading the submission first would let a missing file raise its
+    own error, the verifier would report gradeable true with r_det 0.0, and "not yet measurable" would
+    have been written down as "the agent scored zero" -- which is the one distinction the whole
+    null-constant convention exists to keep, and which seed/build/freeze_batch.py refuses to freeze
+    around. The per-cell vector and the worst cell travel in the verifier record only; each is a
+    function of the private corrupted labels and none reaches any agent-visible channel.
+
+measurement_tier: gpu
+measurement_tier_basis: trains a neural net over an image, audio or dense-label corpus
+constants:
+  floor: null
+  knee: null
+  dichotomizing_threshold: null
+  reward_gate_pass_threshold: null
+  clean_accuracy_floor: null
+  clean_accuracy_floor_reason: 'Null on the same convention as the ramp: the clean-accuracy tolerance
+    is a band around the reference model''s measured clean accuracy on the grading host, so authoring
+    it at Phase 0 would invent the measurement it is a tolerance around. tests/test_output.py''s
+    clean_accuracy_tolerance check calls require_measured on it and raises rather than scoring.'
+  measured_values_reason: 'Null by seed/contract.yaml''s own convention: every quantity recorded null
+    is measured at Phase 1 build time on the grading host and never authored at Phase 0. Authoring a
+    floor, knee or ablation worth here would invent a measurement the bytes have not earned.'
+  graded_bin_edges_file: tests/graded_bin_edges.npy
+  graded_bin_edges_sha256: c77dbd3cceaaa09553e163c37b8e8aa01cbeaa48ea2f99626faf4a2c45a3a200
+  graded_bin_count: 15
+  graded_binning_basis: 'Authored, not measured: an equal-width partition of [0,1] fixed before any
+    graded run, so CK-BINFAM''s alternate-binning family has a pinned reference to compare against and
+    CTL-GRADEDBINS has a concrete object to be rejected for fitting to.'
+gradeable:
+  value: false
+  basis: constants_unmeasured
+  unmeasured_constants:
+  - floor
+  - knee
+  - dichotomizing_threshold
+  - reward_gate_pass_threshold
+  - clean_accuracy_floor
+  distinction: 'a declared absence is not a measured zero: r_det is null here, not 0.0, because 0.0
+    asserts the agent failed and null asserts the slot is not yet measurable'
+  becomes_gradeable_when: the Phase 2 measurement wave writes the constants above on the grading
+    host
+knee_anchor: published CIFAR-100-C calibration error at the same severity mix
+knee_anchor_source: an external published figure, fixed before any measurement on this slot
+knee_anchor_status: unsourced-at-bound-mix
+knee_anchor_status_reason: 'No published CIFAR-100-C expected-calibration-error figure exists at this
+  slot''s bound mix of 19 corruptions x 5 severities. Hendrycks & Dietterich 2019, which defines the
+  corpus and which this slot''s dataset field names, reports no calibration metric at all and section
+  4.2 declines probability-based measures explicitly. Ovadia et al. 2019 is MNIST/CIFAR-10/ImageNet
+  and contains no CIFAR-100. AugMix and PixMix report calibration only for CIFAR-10-C or clean CIFAR-100.
+  Two near matches were rejected: Stickland & Murray averages 15 corruptions not 19, and Wang et al.
+  ICCV 2021 is at 19 but publishes only a bar chart with no numeric table. Two 2026 preprints match
+  the mix and were declined as anchor-shopping, since knee_anchor_source requires the figure be fixed
+  BEFORE any measurement on this slot. Three structural blockers outlive the search: the [0,1] higher-better
+  mapping a knee would live on is null at Phase 0; "same severity mix" has no pinned referent so no
+  source could be SHOWN to match; and ECE is not backbone-free, so an imported figure describes another
+  classifier under another binning. A fourth is now local to this bundle: the graded quantity is the
+  MACRO average over 95 cells, not the pooled figure every candidate source reports, so even a matching
+  mix would be a different statistic. The knee stays null as an earned refusal. Per knee_anchor_rule a
+  self-measured ceiling is forbidden, and since the knee no longer appears in any ablation denominator
+  this blocks the reward ramp only -- a Phase 1 obligation, not a Phase 0 blocker.'
+reward_gate:
+  applies_to: the judged rubrics in tests/rubrics.json, as a conjunction
+  ceiling: 0.05
+  composition: r_final = r_det if every judged rubric passes, else min(r_det, ceiling)
+reward_map:
+  full_reward: 1.0
+  shape: 'r_det: zero on any red line and on any knockout failure; otherwise S_outcome = clamp((metric
+    - floor) / (knee - floor), 0, 1) through the published ramp, where metric is 1 minus the macro
+    average of the 95 per-cell calibration errors.'
+  unmeasured: floor, knee and clean_accuracy_floor are null at Phase 0, so r_det is not computable from
+    these bytes yet and the slot is authored but not gradeable.
+truth_narrative:
+  opening: minimise expected calibration error on private corrupted splits while holding clean accuracy
+    inside a bound tolerance. The graded artifact is a float array of 29000 rows by 100 columns written
+    to /submission/confidences.npy, rows non-negative and summing to 1, the first 19000 rows covering
+    the 95-cell corruption grid in pinned order and the last 10000 covering the clean graded fold. The
+    graded quantity is the macro average of the 95 per-cell expected calibration errors, mapped to
+    [0,1] higher-better as 1 minus that mean.
+  insight: >-
+    Calibration is the one objective an agent can improve by giving up. Flatten every posterior toward
+    1/100 and the expected calibration error falls, because a predictor that is never confident is
+    never overconfident; the limit of that strategy is CTL-UNIFORM, which scores a near-zero
+    calibration error while predicting nothing. Nothing inside the corrupted objective punishes it, and
+    no amount of hardening the corrupted objective can, because the shortcut is not a defect in the
+    metric but a property of it. That is why this slot grades two blocks in one array and why the clean
+    fold ships unlabelled: the price for flattening is charged on clean accuracy or it is not charged
+    at all. The second thing that matters is that the score is a macro average over 95 cells rather
+    than a pooled figure over 19000 rows, so one catastrophic corruption cannot be diluted by the 94
+    that went well.
+  steps:
+  - heading: Temperature-scaling fit set composition
+    paragraph: >-
+      Only clean_train and clean_val carry labels, and the run record must name which of them the
+      calibration was fitted on. A temperature fitted on clean data is applied to corrupted data whose
+      confidence distribution has moved, so the composition of the fit set is a real choice and not a
+      formality. The contract records it as separately ablatable; its worth is measured on the Phase 2
+      ladder over the full lever power set and never asserted here.
+  - heading: Severity-aware recalibration policy
+    paragraph: >-
+      The grid is 19 corruptions by 5 severities and the severity of each graded row is shipped in the
+      corpus, so a single global temperature is a choice rather than a necessity. Whether conditioning
+      on severity, or on a severity estimated from the image alone, is worth its variance is exactly
+      the kind of thing the macro average over cells rewards differently from a pooled figure. The
+      contract records it as separately ablatable; its worth is measured on the Phase 2 ladder and
+      never asserted here.
+  - heading: Ensemble or MC-dropout variance signal
+    paragraph: >-
+      A confidence built from the spread of several forward passes is a different estimator from the
+      softmax maximum of one, and it degrades differently under corruption. It also costs forward
+      passes, which the declaration must account for. The contract records it as separately ablatable;
+      its worth is measured on the Phase 2 ladder and never asserted here.
+  - heading: Clean-accuracy guard against over-smoothing confidence
+    paragraph: >-
+      The lever that decides whether the flattening shortcut is taken deliberately or by accident. Any
+      recalibration that is not argmax-preserving trades clean accuracy for calibration, and the
+      tolerance gate prices that trade; a solve that never measures its own clean accuracy will not
+      know which side of the gate it is on. The contract records it as separately ablatable; its worth
+      is measured on the Phase 2 ladder and never asserted here.
+  - heading: Binning scheme used to fit, distinct from the graded binning
+    paragraph: >-
+      The graded partition is pinned in the checker tree and is deliberately not published. Fitting a
+      histogram to a guessed copy of it is red line 2, and it is detectable because such a fit lands at
+      a calibration error under the pinned partition that binomial noise alone forbids; ck_binpin is the
+      obligation that detects it. The lever is the choice of a fitting binning that is genuinely the
+      agent's own, fitted on data the agent is allowed to hold labels for. The contract records it as
+      separately ablatable; its worth is measured on the Phase 2 ladder and never asserted here.
+  traps:
+  - Buys calibration by flattening confidence and fails the accuracy tolerance.
+  - Fits temperature on the corrupted split it is graded on.
+  - Submits only the 19000 corrupted rows, which grades the stated objective and silently removes the
+    one gate that prices the flattening shortcut.
+  - Optimises the pooled 19000-row calibration error and lets one catastrophic corruption hide inside
+    an average the ramp does not read.
+  - Fits a lookup to the private corrupted fold, which shows up as a calibration error under the
+    pinned partition four orders of magnitude below the binomial noise floor any honest solve carries.
+  - 'emitting a uniform posterior trivially lowers calibration error Mitigation: CTL-UNIFORM is a
+    compiled control and the clean-accuracy tolerance gate rejects any submission that buys calibration
+    with accuracy'
+truth_annex: 'Ordered path through instruction.md, with the checker identifier each step satisfies:
+
+
+  1. `posterior_file_lands` (compiled, weight 5, knockout) -- The graded run leaves a loadable
+  floating-point posterior at the declared submission path.
+
+  2. `stacked_block_layout` (compiled, weight 5, knockout) -- The array carries the 19000 corrupted
+  graded rows and the 10000 clean graded rows in the one pinned stacking order.
+
+  3. `rows_are_posteriors` (compiled, weight 4, knockout) -- Every row is a probability vector over the
+  100 fine labels, not merely a vector that sums to one.
+
+  4. `calibration_fit_split_declared` (compiled, weight 3) -- The agent declares how many graded
+  forward passes it spent and which split it fitted its calibration on.
+
+  5. `heldout_label_isolation` (compiled, weight 5, knockout) -- The agent holds no copy of either
+  private label vector, at any of the three lengths a copy can take here.
+
+  6. `graded_fold_boundary` (compiled, weight 5, knockout) -- The graded run writes into neither the
+  checker tree nor the private label store.
+
+  7. `pinned_binning_intact` (compiled, weight 3, knockout) -- The partition the score is read under is
+  the one pinned in the bundle.
+
+  8. `uniform_posterior_rejected` (compiled, weight 4) -- The compiled rejection of control
+  CTL-UNIFORM.
+
+  9. `ck_binpin` (compiled, weight 5, knockout) -- Control CTL-GRADEDBINS is rejected.
+
+  10. `ck_binfam` (compiled, weight 2) -- Contract checker obligation CK-BINFAM is discharged.
+
+  11. `posterior_replay_identity` (compiled, weight 3) -- The posterior reproduces byte for byte from
+  the recorded seed.
+
+  12. `per_cell_ece_recorded` (compiled, weight 3) -- All 95 per-cell calibration errors are computed
+  and the worst cell is named.
+
+  13. `clean_accuracy_tolerance` (compiled, weight 5, knockout) -- Clean accuracy stays inside the bound
+  tolerance. Raises ConstantUnmeasured while clean_accuracy_floor is null.
+
+  14. `corruption_macro_ece_ramp` (compiled, weight 10, knockout) -- The macro-averaged corrupted
+  calibration error clears the published bar. Raises ConstantUnmeasured while the ramp is null.
+
+
+  Rejected routes, each bound to the control that measures it wrong:
+
+
+  - emitting a uniform posterior trivially lowers calibration error -- controlled by: CTL-UNIFORM is
+  a compiled control and the clean-accuracy tolerance gate rejects any submission that buys calibration
+  with accuracy. The compiled half is `uniform_posterior_rejected`; the priced half is
+  `clean_accuracy_tolerance`.
+
+  - fitting calibration on the graded binning scheme -- controlled by: CTL-GRADEDBINS, which
+  seed/contract.yaml requires be REJECTED and which had no enforcing obligation. `ck_binpin` is that
+  obligation, authored here against the recorded checker_obligations_shortfall. The contract still
+  carries the shortfall paragraph until it is amended outside this bundle, so the gap is closed in the
+  checker before it is closed in the record.
+
+
+  Deliverable manifest: /submission/confidences.npy (npy), float array of 29000 rows by 100 columns,
+  rows non-negative and summing to 1, corrupted block first.
+
+
+  Control obligations recorded in seed/contract.yaml:
+
+
+  - `CTL-NOOP` targets the shipped starter verbatim; recorded score None.
+
+  - `CTL-UNIFORM` targets emit a uniform posterior everywhere; recorded score None.
+
+  - `CTL-GRADEDBINS` targets fit on the graded binning; must be rejected; recorded score None.
+
+  '
+provenance:
+  corpus: CIFAR-100-C (Hendrycks & Dietterich 2019), 19 corruptions at 5 severities
+  anchors:
+    knee_anchor: published CIFAR-100-C calibration error at the same severity mix
+    knee_anchor_source: an external published figure, fixed before any measurement on this slot
+  shards: null
+  narrative: solution/provenance_notes.md
+  supersedes: null
+  upstream_record:
+    origin: derived
+    provenance_date: null
+    provenance_date_reason: The derivation date is stamped by solution/recompute.py at Phase 1 build
+      time. Under requirements/aello-prd.md section 5.17 the task carries its own derivation date as
+      the task-generating event and never inherits the upstream freeze date, so authoring a date here
+      before the derivation runs would assert a fact no byte supports.
+    source_kind: public_repository
+    upstream_identity: CIFAR-100-C (Hendrycks & Dietterich 2019), 19 corruptions at 5 severities
+    licence: null
+    licence_reason: Named per slot in the dataset field and resolved by the Phase 1 licence audit. Gap
+      F07 keeps an unresolved licence a blocker rather than a footnote, and Phase 1 item 6 fails closed
+      on an uncertain licence.
+    modifications: null
+    canonical_repository_identity: null
+    fork_ancestry_snapshot_digest: null
+    base_commit_sha: null
+    task_generating_event_timestamp: null
+    ancestry_attestation_digest: null
+    ancestry_attestation_signer: null
+    event_attestation_digest: null
+    event_attestation_signer: null
+    attestation_state: attestation-unavailable
+    attestation_reason: The pod holds no signed platform attestation for a fork-ancestry snapshot or
+      a task-generating-event timestamp. FORGE.md Phase 0 item 9a.1 caps at HOLD:PILOT_REQUIRED with
+      this named reason rather than accepting the declaration on trust. Gap F05.
+  reward_composition: r_det alone defines full reward; the judged rubrics gate it.
+  screening_interval_days: 30
+  screening_detector_version: aello.screen/v1
+  derivation_instant: null
+  screening_roots: null
+  empty_submission_result: 0.0
+  resolved_closure: null
+  applicability: in_batch
+
+canary:
+  - AELLO-CANARY-61cc355fac243dd3dad4afc3b9a84a97
+  - AELLO-CANARY-a107ee07d664b4b1f66d41dffb3ee882
+  - AELLO-CANARY-306614f257370612315448f37e23f919
+  - AELLO-CANARY-21d137251a71485a1d61069e01973a95

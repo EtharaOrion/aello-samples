@@ -1,0 +1,156 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "emitted_corpus",
+  "frozen_grading_tree",
+  "mixture_manifest",
+  "run_record",
+  "source_manifest"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "Deduplication is declared at both scopes, and no surviving document-level duplicate is attributed to two different domains.",
+   "dimension": "dedup",
+   "evaluation_target": "mixture_manifest",
+   "id": "cross_domain_duplicates_charged_to_one_domain",
+   "judgment": "INVARIANT: mixture_manifest.dedup names a granularity for within_domain and for across_domain, the across-domain granularity is document level, and the verifier reports zero document-granularity duplicate groups whose surviving copies carry more than one domain label. Web and encyclopedic overlap by construction -- encyclopedic text is mirrored throughout any web crawl -- so a build that deduplicates only inside each domain keeps both copies, charges one to web and one to encyclopedic, and realises a web share above the one it declared while every within-domain duplicate rate still reads clean. The granularities differ on purpose: paragraph level inside a domain keeps near-duplicate boilerplate from crowding out the domain's own long tail, and document level across domains is what stops the same article being bought twice.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "All four domains reach the trainer with at least one token, and the check names any domain that did not.",
+   "dimension": "domain_coverage",
+   "evaluation_target": "emitted_corpus",
+   "id": "every_domain_receives_a_nonzero_token_share",
+   "judgment": "INVARIANT: each of the four realised per-domain token counts, recomputed by the verifier from the emitted spans rather than from the manifest, is strictly positive. Zeroing a domain is not a trade the aggregation can absorb: the domain is still evaluated, its bits per byte is then whatever a model that never read it scores, and it becomes the argmax by construction. seed/contract.yaml records CTL-C-OBVIOUSWRONG, the 100 percent web mixture, at b_worst = 1.884 against b_rand = 1.641, so the informative ramp has already clamped to zero before anything about mixture quality is examined. The empty domains are reported by name, because a build that dropped the mathematical minority and one that dropped the scientific minority are different mistakes.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The emission order puts all four domains in front of the trainer throughout its one pass, not one domain after another.",
+   "dimension": "curriculum",
+   "evaluation_target": "emitted_corpus",
+   "id": "four_domains_interleaved_across_the_single_pass",
+   "judgment": "ORDERING: the harness-recorded consumption order equals the emitted order over exactly one pass, and each of the eight equal consecutive blocks of the emitted record order contains at least one record from each of the four domains. The trainer, optimizer, schedule, seed and architecture are all frozen and the corpus is consumed once, so the emission curriculum is one of the few remaining levers and it is a lever with a sharp failure mode: four domains concatenated in blocks means the last steps before evaluation see one domain only, and the three the schedule left behind are the three that decay -- which, under a max over four, is the whole score. The blocks are reported individually so a corpus that interleaves for the first half and blocks for the second says where it stopped.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The graded run leaves the frozen trainer, the frozen tokenizer, the four private per-domain held-out shards and the fingerprint file byte-identical and untouched.",
+   "dimension": "integrity",
+   "evaluation_target": "frozen_grading_tree",
+   "id": "frozen_tokenizer_trainer_and_four_heldout_shards_unmoved",
+   "judgment": "ABSENCE: the before and after digest maps name the same paths -- the frozen trainer, the frozen tokenizer, tests/heldout/web.bin, tests/heldout/encyclopedic.bin, tests/heldout/scientific.bin, tests/heldout/mathematical.bin and environment/decontam/heldout_fingerprints.bin -- and agree digest for digest, and the harness's own record of paths touched during the graded run is empty. Both facts come from the record the run produced, never from a scan taken afterwards, which cannot separate a write made inside the graded region from one made before it. The four shards are named one by one because they are disjoint partitions that rotate on a private schedule and each one is a different domain's evaluation: reading exactly one of them is how a run would learn which domain is currently the worst, which is the single fact the returned float is built to withhold. A touched path scores 0.0 with reason heldout-touched; a moved digest scores 0.0 with reason frozen-trainer-modified.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "No normalised 13-gram of the emitted corpus is in the held-out fingerprint set, and the count is zero in each of the four domains separately.",
+   "dimension": "leakage",
+   "evaluation_target": "emitted_corpus",
+   "id": "heldout_thirteen_grams_absent_in_every_domain",
+   "judgment": "ABSENCE: the scan is the verifier's own over the whole emitted corpus, at n-gram width exactly 13 and under the bound normalisation, against environment/decontam/heldout_fingerprints.bin, and it reports zero hits for web, zero for encyclopedic, zero for scientific and zero for mathematical. Per domain rather than as one rate over the corpus, because the graded value is a max: a hit count that rounds to nothing corpus-wide can sit entirely inside the one domain whose bits per byte is about to be selected, and that is precisely the domain where fitting the evaluation would pay. The fingerprint set covers a rotating private superset of the graded shards, so a clean scan recorded on an earlier attempt is not evidence about this one. Any hit scores 0.0 with reason eval-leak.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Re-executing the mixture manifest from a fresh checkout rebuilds the same corpus and the same four per-domain token counts, as exact integers.",
+   "dimension": "replay",
+   "evaluation_target": "run_record",
+   "id": "manifest_replay_reproduces_the_corpus_and_the_four_integer_counts",
+   "judgment": "EFFECT: the verifier's re-execution declares fresh_checkout true, its corpus sha256 equals the submitted corpus_sha256, and its four per-domain token counts are integers equal to the four realised counts exactly rather than within a tolerance. Integers and not proportions, because the two ways to realise a weight vector are not equally reproducible: allocating against a floating-point proportion target while a running total accumulates lands on a different fourth-domain count when the source iteration order shifts by one document, which reproduces the digest nowhere and surfaces as recipe-corpus-divergence long after the mixture decision that caused it. Exact integer accounting is also what lets the weight comparison above compare integers.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The agent declares the mixture it applied and where its wall went, and both host-measured regions sit inside their own ceiling.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "mixture_and_dual_wall_accounting_declared",
+   "judgment": "VALUE: run_record.agent_budget_declaration parses and names build_seconds, train_seconds, per_domain_weights, repetition_epochs and emission_curriculum; its per_domain_weights equal mixture_manifest.weights key for key; and the host-measured build and train regions, each timed from first touch of the data, are at most 1200 and 900 seconds. The declaration is what is graded and not the harness's own measurement, so no field the harness writes can satisfy it. The two ceilings are exact-zero cliffs and never slopes, which is what makes the build ceiling the binding one here: a per-domain marginal-value estimation pass has to fit inside it, so it is bound as a fixed step count rather than a slice of the remaining time, or it expands under contention and takes the whole attempt to zero.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The mixture manifest declares one sampling weight for each of the four disclosed domains and for no other label.",
+   "dimension": "mixture",
+   "evaluation_target": "mixture_manifest",
+   "id": "mixture_manifest_declares_the_four_disclosed_domains",
+   "judgment": "INVARIANT: mixture_manifest.weights carries exactly the keys web, encyclopedic, scientific and mathematical, every value is a finite number in [0,1], and the four sum to 1 within 1e-9. A fifth label names a domain the frozen evaluator never scores, and a missing label is not a domain the build declined to use: all four are evaluated whatever the manifest says, so an undeclared domain leaves the realised-count comparison with nothing to compare against and the one number that would have exposed it -- that domain's share -- is the one nobody wrote down. Divergence scores 0.0 with reason declared-mixture-divergence.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Each declared weight is that domain's share of the post-deduplication token total, not its share of documents and not its share of the pre-deduplication pool.",
+   "dimension": "mixture",
+   "evaluation_target": "mixture_manifest",
+   "id": "per_domain_weights_are_post_dedup_token_shares",
+   "judgment": "VALUE: for every domain the absolute difference between the declared weight and realised_tokens / total_realised_tokens is at most the disclosed tolerance of 0.005, the realised counts being recomputed by tracing every emitted span to its source document digest, and mixture_manifest.weight_basis reads post_dedup_tokens. When the declared vector misses that comparison the same comparison is run against the per-domain document share and the pre-dedup token share and the report names whichever one it does match, because that is the diagnosis: a weight computed over documents ships a mixture whose token shares are set by mean document length per domain -- peS2o documents are long and open-web-math documents are short -- and a weight computed before deduplication ships one whose shares are set by how duplicated each source happened to be. Neither raises an error anywhere in the build. Divergence scores 0.0 with reason declared-mixture-divergence.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "A span emitted k times is charged k times against the 1.0B cap and k times toward its domain's realised weight.",
+   "dimension": "repetition",
+   "evaluation_target": "emitted_corpus",
+   "id": "repeated_spans_charged_to_the_budget_each_time",
+   "judgment": "VALUE: the four realised per-domain token counts sum exactly to the verifier's own consumed token count, and for every domain whose declared repetition_epochs exceeds 1 the realised token count strictly exceeds that domain's distinct-span token count. Controlled repetition on the smallest domain is a legitimate alternative to downsampling the largest, and this slot's reference recipe uses it, but only a repetition that is paid for is a repetition: a build that counts a twice-emitted document once has both understated its consumption against a hard cap and overstated the distinct coverage behind its declared weight, and the two errors point the same way -- toward believing the minority domain received more real text than it did.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "The weight and selection decision rests on a measurement the run made here, not only on the two real reference artifacts the environment ships.",
+   "dimension": "measurement",
+   "evaluation_target": "run_record",
+   "id": "selection_policy_rests_on_its_own_measurement",
+   "judgment": "VALUE: run_record.selection_evidence names, for each of the four domains, at least one measurement the run itself performed -- an estimator, a positive count of tokens scored, and the path of the artifact it wrote -- and its cited_sources are not confined to the shipped per-document quality-classifier score file and the upstream dataset cards. Both of those are real, unaltered and true about other setups, and both endorse the same web-and-encyclopedic-heavy top-percentile selection that strips mathematical and scientific text: seed/contract.yaml records CTL-C-DECOY-QC at b_worst = 1.577 and CTL-C-DECOY-CARDS at 1.548, against a starter at 1.489. Two genuine artifacts agreeing is corroboration of a prior, not evidence about this objective at this budget, and citing them is allowed. Citing only them is the failure this check names, with reason prior-asserted-over-measurement.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 4
+  },
+  {
+   "criterion": "A span's domain is the domain its source document carries in the shipped four-corpus manifest, never a label the submission asserts for it.",
+   "dimension": "attribution",
+   "evaluation_target": "source_manifest",
+   "id": "span_domain_read_from_the_source_manifest",
+   "judgment": "INVARIANT: every emitted span triple (source_id, offset, length) resolves to a source_id the shipped source manifest names, its domain is read from that manifest, and where the submission also carries a per-span domain label the two agree. An unresolvable source_id is content from outside the four provided corpora and scores 0.0 with reason foreign-content; a span whose asserted label disagrees with the manifest scores 0.0 with reason declared-mixture-divergence. Self-labelling is the cheapest possible attack on this objective: calling web spans mathematical raises the declared mathematical share, satisfies every arithmetic check that compares declared weights to counted tokens, and puts not one mathematical token in front of the trainer -- and mathematical is the domain the max most often selects.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The consumed token count is the verifier's own encode of the emitted corpus under the frozen tokenizer, and it is at most 1,000,000,000.",
+   "dimension": "budget",
+   "evaluation_target": "emitted_corpus",
+   "id": "token_budget_counted_under_the_frozen_tokenizer",
+   "judgment": "VALUE: the verifier's count is at most 1000000000, the submitted consumed_tokens equals that count rather than standing in for it, and the frozen tokenizer's sha256 is identical before and after the graded run. The cap is a hard literal rather than a band, so it is not a figure to approach by declaration, and the count and the tokenizer are checked in one place because under a fixed cap the cheapest way to buy budget is to change what a token is -- merge the frequent pairs, and the same bytes cost fewer tokens without a single curation decision having been made. The tokenizer is the one lever this slot does not grant. Over the cap scores 0.0 with reason token-budget-exceeded; a moved tokenizer digest scores 0.0 with reason frozen-trainer-modified.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The worst of the four per-domain held-out bits-per-byte values clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "emitted_corpus",
+   "id": "worst_domain_bits_per_byte_ramp",
+   "judgment": "EFFECT: b_worst = max(b_web, b_encyclopedic, b_scientific, b_mathematical), each the frozen evaluator's own negative log-likelihood in bits over that domain's private held-out shard divided by the same shard's raw UTF-8 byte count, reduced by max in that fixed domain order so the argmax tie-break is deterministic. All four values are required: taking the max over whichever domains happen to have been reported would let a three-domain report become a graded value, and the entire objective is that lifting three domains while sinking the fourth is worth nothing. Lower is better, so the ramp is read in the descending direction, from a floor that is the larger bits-per-byte value to a knee that is the smaller. Only the reduced float leaves the verifier; the four values and the identity of the argmax domain never do, which is why the mixture cannot be steered one domain at a time. UNMEASURED AT PHASE 0: floor, knee and the dichotomizing threshold are null, so this check raises ConstantUnmeasured before it reads a submitted byte, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  }
+ ]
+}

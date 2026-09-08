@@ -1,0 +1,140 @@
+{
+ "$schema": "forge.rubric/v1",
+ "banner": "GENERATED SECTION. DO NOT HAND-EDIT.",
+ "canary": [
+  "AELLO-CANARY-741a9ceccad662e7022448e7f797fc44",
+  "AELLO-CANARY-521001e5368bb237f8f227a575ae6e33",
+  "AELLO-CANARY-b2e27e5644d2d284c7954bf9baaca2d1",
+  "AELLO-CANARY-492407b078d8e0821be18962ad1f325f"
+ ],
+ "compilation_floor": 1.0,
+ "compiled_weight_share": 1.0,
+ "evaluation_target_vocabulary": [
+  "run_record",
+  "submitted_artifact",
+  "submitted_source"
+ ],
+ "generator": "solution/recompute.py",
+ "items": [
+  {
+   "criterion": "Each record separates the depthwise stage from the pointwise stage, or declares the fusion that makes them inseparable.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "depthwise_and_pointwise_timed_as_separate_stages",
+   "judgment": "INVARIANT: Every record names a fusion_boundary from the published set. An unfused record carries both depthwise_ms and pointwise_ms and their sum agrees with block_ms to within the published stage tolerance; a fused record carries the fused total and no invented stage split. The two stages do not have the same shape of cost -- the depthwise stage does nine multiply-accumulates per loaded activation and is memory-bound, the pointwise stage does one per channel pair and is compute-bound -- so a single blended millisecond cannot say which stage an optimisation reached, and a stage split that does not add up to the block was not measured.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The clock source measures the kernel, not the launch call that returns before the kernel runs.",
+   "dimension": "process",
+   "evaluation_target": "submitted_artifact",
+   "id": "device_synchronised_clock_not_async_launch_return",
+   "judgment": "INVARIANT: Every record names a clock source from the admitted set -- CUDA event elapsed time, a host counter taken across an explicit device synchronisation, or a CUPTI kernel duration -- and no record names a bare host timer taken around an asynchronous launch. A launch returns to the host before the kernel executes, so a host timer wrapped around it measures enqueue latency and reports microseconds for work that takes milliseconds. This is the measurement error that most flatters a kernel that changed nothing.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The measured speedup over the vendored reference kernel clears the published bar through the ramp.",
+   "dimension": "outcome",
+   "evaluation_target": "submitted_artifact",
+   "id": "envelope_gated_speedup_ramp",
+   "judgment": "VALUE: The geometric-mean speedup of the harness's own per-shape kernel wall-clock over the vendored reference kernel's, taken across the pinned block shapes and forced to zero when any shape leaves the fidelity envelope, mapped through the floor-to-knee ramp published in tests/constants.json. The latencies are read from the harness record and never from the submitted report, because red line 2 is reporting a timing the harness did not measure and a metric that read the agent's own number would be grading the declaration it exists to distrust. UNMEASURED AT PHASE 0: the ramp constants are null, so this check raises ConstantUnmeasured rather than returning a score, and the slot is not gradeable until the measurement wave writes them.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 10
+  },
+  {
+   "criterion": "Every pinned depthwise-separable block shape carries a complete record, and no shape outside the graded set is substituted for one inside it.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "every_graded_block_shape_measured",
+   "judgment": "EFFECT: The report's shape ids are exactly the pinned graded set in corpus_layout.graded_block_shapes, and every record carries every published record key. The three shapes span the reference network's depthwise-separable stages -- 32x32 at 128 channels, 16x16 at 256, 8x8 at 512 -- and their arithmetic intensity differs by an order of magnitude across that span, so a kernel tuned at one spatial extent and left unmeasured at the others is a partial answer reported as a whole one.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "Every graded shape's output stays inside the published numerical fidelity envelope.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_artifact",
+   "id": "fidelity_envelope_holds_on_every_graded_shape",
+   "judgment": "INVARIANT: For every graded shape the record's max_abs_error and max_rel_error against the vendored fp32 reference output on the same trace are finite, non-negative and within the published envelope, and the record's own within_envelope verdict agrees with a recomputation from those two numbers. The envelope gates the speed rather than trading against it -- one shape outside it makes the whole attempt a wrong kernel that happens to be fast, and CTL-UNFAITHFUL targets precisely that and must score 0.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The kernel's measurement record lands at the declared submission path and parses as a per-shape record.",
+   "dimension": "deliverable",
+   "evaluation_target": "submitted_artifact",
+   "id": "latency_report_lands",
+   "judgment": "EFFECT: /submission/kernel_report.json exists, parses as a JSON object and carries a non-empty `shapes` mapping keyed by graded block-shape id. A measurement record that will not parse is not a slow kernel; it is no measurement at all, and it scores zero with reason submission_malformed.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The agent declares the measurement budget it spent, in the terms this task spends it.",
+   "dimension": "process",
+   "evaluation_target": "run_record",
+   "id": "measurement_budget_declared",
+   "judgment": "EFFECT: The run record carries an agent-authored declaration naming warmup_iterations, timed_iterations and autotune_trials, each a non-negative count. Autotuning is where this slot's wall-clock budget actually goes -- a tiling sweep costs more than the kernel it selects -- and the declaration is what is graded, not the harness's own measurement, so the check cannot be satisfied by a field the harness writes.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The kernel was timed on the vendored activation traces at the pinned seeds, not on inputs the run chose for itself.",
+   "dimension": "integrity",
+   "evaluation_target": "run_record",
+   "id": "pinned_trace_seeds_are_the_measured_inputs",
+   "judgment": "EFFECT: The run record's declared trace_seeds are exactly the pinned roster and every graded shape's record names the trace seed it consumed. Timing a depthwise-separable block on synthetic zeros, or re-using one small draw across every shape, measures a cache-residency artefact of the input rather than the kernel on the activation distribution the C8-S1 reference actually produces at those seeds.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "A second run reproduces the kernel's outputs exactly and its timings only approximately.",
+   "dimension": "process",
+   "evaluation_target": "submitted_source",
+   "id": "replay_reproduces_outputs_but_not_timings",
+   "judgment": "INVARIANT: The replay recorded for the graded run reproduces every graded shape's output digest bit-for-bit, and its per-shape latencies are not bit-identical to the first run's on every shape. A latency report is the one deliverable in this batch that is not byte-reproducible and must not claim to be -- identical floating-point milliseconds on every shape across two runs is the signature of a copied constant, which is red line 2, and not of a deterministic measurement.",
+   "knockout": false,
+   "mode": "compiled",
+   "weight": 3
+  },
+  {
+   "criterion": "The reported latency is a median over a declared repetition count, not the best iteration seen.",
+   "dimension": "process",
+   "evaluation_target": "submitted_artifact",
+   "id": "reported_latency_is_a_median_not_a_best_of_n",
+   "judgment": "INVARIANT: Every record declares timed_iterations at or above the published repetition floor and a statistic drawn from the admitted set; min, minimum, best, best_of_n and fastest are rejected by name. Best-of-n reports a latency the device delivered once, under a clock-boost and cache state that no repeated measurement reproduces, which is exactly how a kernel that is not faster comes to look faster.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The graded run writes nothing into the checker tree or into the recorded activation traces.",
+   "dimension": "integrity",
+   "evaluation_target": "submitted_source",
+   "id": "vendored_traces_and_checker_tree_unwritten",
+   "judgment": "ABSENCE: No path under tests/ or on the vendored trace archive is created or modified during the graded run -- read from the harness's own record of touched paths, corroborated by the run's declaration, never from a post-hoc scan -- and the trace digest recorded before the first measurement equals the one recorded after the last. This is red line 1, and it exists because shrinking a trace's batch or overwriting it with a cheaper draw makes the kernel look faster by changing the measurement instead of the kernel.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  },
+  {
+   "criterion": "The timed window begins after the declared warmup, and the warmup is large enough to have ended.",
+   "dimension": "process",
+   "evaluation_target": "submitted_artifact",
+   "id": "warmup_iterations_excluded_from_the_timed_window",
+   "judgment": "INVARIANT: Every record declares warmup_iterations at or above the published floor and declares warmup_excluded true. The first launches of a kernel pay JIT compilation, autotune selection and a cold instruction cache, and the harness re-measures in steady state; a number taken from a cold launch, or one whose warmup is folded into the timed window, does not describe the kernel that will be graded.",
+   "knockout": true,
+   "mode": "compiled",
+   "weight": 5
+  }
+ ]
+}

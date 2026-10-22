@@ -1,0 +1,1 @@
+- [CIFAR-100 budget task](cifar100-budget-task.md) — val sits ~1.9% above the graded score; capacity is the lever, aug/reg is not.

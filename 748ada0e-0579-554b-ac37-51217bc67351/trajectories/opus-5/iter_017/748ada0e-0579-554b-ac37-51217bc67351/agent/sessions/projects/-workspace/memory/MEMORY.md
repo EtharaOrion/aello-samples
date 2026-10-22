@@ -1,0 +1,2 @@
+- [CIFAR-100 fixed-budget levers](cifar100-fixed-budget-levers.md) — what actually moved accuracy under the 8000-step budget, and the tricks that were neutral-to-negative.
+- [CIFAR-100 val-split selection guards](cifar100-budget-val-selection.md) — the 2000-image val split has sd ~0.01; don't promote sub-0.008 wins.

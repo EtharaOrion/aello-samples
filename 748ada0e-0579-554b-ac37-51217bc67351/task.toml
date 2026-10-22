@@ -1,0 +1,183 @@
+# Harbor delivery unit for C8-S1.
+#
+# schema_version is TOP LEVEL, which is where harness/src/harbor/models/task/config.py
+# declares it: TaskConfig.schema_version, default "1.4", with a before-validator mapping a
+# legacy `version` key forward. 1.4 is the value tested against the pinned harness source,
+# not against documentation and not a floating latest.
+schema_version = "1.4"
+
+# Every graded deliverable is declared so its bytes are snapshotted out of the environment
+# before teardown, and re-materialized inside the separate verifier container at the same
+# absolute paths. AGENT-SIDE artifacts only: /logs/verifier/* exists in the verifier
+# container, not in main, and Harbor collects the verifier's own output through its
+# verifier path, not through this list.
+artifacts = [
+  "/workspace/agent_src",
+  "/submission/preds_i20k.npy",
+]
+
+[task]
+name = "c8-s1-cifar100-step-budget"
+description = "Improve a CIFAR-100 training pipeline to maximise balanced accuracy at a fixed 8000-step budget."
+keywords = ["optimization", "bounded-continuous", "vision", "image-classification", "training-recipe"]
+version = "1.1.0"
+
+[metadata]
+slot_id = "C8-S1"
+scoring_engine = "aello-eval"
+# The engine is NOT vendored as a file. It is built to a wheel at image-build time by
+# harness/scaffold/deliver.py:_stage_aello_eval_wheel and deleted by that function's cleanup
+# callback, so NO .whl ships in this bundle. The container then keeps only the deterministic
+# surface: environment/Dockerfile strips the council files after install.
+universal_scoring_engine_location = "harness/packages/aello-eval/"
+# The score this bundle's verifier writes is r_det, the DETERMINISTIC score (Bucket D).
+# The judged trajectory rubrics in tests/rubrics.jsonl are graded by the harness's LLM
+# trajectory grader AFTER r_det and may only lower the composed result. No judged term participates in the number written to /logs/verifier/reward.txt.
+score_formula = "r_det = GATE_det * S_outcome * RubricFactor_det; judged rubrics compose downstream and only reduce"
+archetype = "AR6"
+category = "image-classification"
+
+tags = ["optimization", "bounded-continuous"]
+# max_timeout in HOURS, with an attempt cap at or below one hundred. The run ends at
+# whichever bound trips first.
+max_timeout = 1.0
+max_timeout_units = "hours"
+# Wall-clock envelope one attempt should fit inside (6 h / 50 attempts). It is stated to
+# the agent as the budget its training run must respect. It is corroborated by the judged
+# honest_step_budget rubric and by tests/envelope.py; it is not yet enforced by a timer in
+# the verifier, and that residual is recorded in solution/TRUTH.md rather than hidden.
+per_attempt_seconds = 432.0
+
+final_selection = "best"
+final_selection_basis = "The score is bounded, monotone and higher-is-better, so the best attempt is well defined and picking it does not reward a late lucky seed over a real improvement."
+graded_step_budget = 8000
+# The budget is stated to the agent as: at most 8000 optimizer updates AND at most
+# 1,024,000 training-sample presentations (8000 x the starter's batch of 128), so a larger
+# batch buys fewer steps rather than free compute. instruction.md carries the same words.
+graded_sample_budget = 1024000
+graded_axis = "accuracy_at_budget"
+compute_envelope = "one H100"
+score_schema = "one float on the closed interval from zero to one, higher is better"
+upstream = "CIFAR-100"
+
+[environment]
+build_timeout_sec = 1800.0
+# docker_image is pinned to a LOCAL tag, not a registry path. This is load-bearing and is
+# not the mistake the previous revision made: an earlier pin of 127.0.0.1:5000/... could be
+# pulled by no machine but the authoring host. This tag is never pulled -- the scaffold
+# builds it from environment/Dockerfile when absent (harness/scaffold/deliver.py
+# _ensure_env_image), so the environment stays reconstructible from bytes inside the bundle.
+#
+# WHY IT IS PINNED AT ALL: Harbor decides whether to upload tests/ into the separate
+# verifier by exactly this field -- harbor/trial/trial.py:626,
+# `skip_tests_upload = env_config.docker_image is None`. Left unset, Harbor assumes the
+# verifier image already carries /tests, which is what the now-deleted tests/Dockerfile
+# provided. Set, Harbor uploads tests/ into the separate verifier container at grade time
+# and one Dockerfile (environment/) serves both containers.
+#
+# RESIDUAL, reported rather than worked around: a bare `docker build` outside the aello
+# scaffold will not create this tag, and Harbor will then try to resolve it and fail. The
+# bundle is reconstructible from its own bytes, but only through the scaffold's build path.
+docker_image = "aello/c8-s1-cifar100-env:1.1.0"
+cpus = 8
+memory_mb = 65536
+storage_mb = 131072
+gpus = 1
+gpu_types = ["H100"]
+workdir = "/workspace"
+# NETWORK POLICY, and the layer matters. [environment] is the BASELINE policy and covers
+# trial SETUP (image build + coding-agent install); [agent] is the solve-phase override.
+
+
+# AN HONEST LIMIT, reported rather than worked around: the solving agent runs INSIDE this
+# container and must reach its model API to think at all, so "no egress while solving"
+# cannot be implemented as an agent-phase no-network without disabling the agent. What is
+# enforceable is that the allowlist carries agent infrastructure and NO dataset or
+# model-zoo host, so the agent cannot fetch CIFAR-100, pretrained weights, or any corpus.
+# The residual intent is carried by the trajectory rubrics no_external_data and
+# no_pretrained_weights, which is judged evidence and not a mechanical guarantee.
+network_mode = "allowlist"
+# openrouter.ai is the muse spark model endpoint. astral.sh redirects to releases.astral.sh,
+# which pulls the uv installer binary. github.com and *.githubusercontent.com handle the
+# python-build-standalone release asset redirects. None of these carry CIFAR-100, a model
+# zoo, or pretrained vision weights, so the no-dataset/no-pretrained-weights intent of this
+# allowlist is unchanged.
+allowed_hosts = ["172.17.0.1", "pypi.org", "files.pythonhosted.org", "archive.ubuntu.com",
+                 "security.ubuntu.com", "developer.download.nvidia.com",
+                 "downloads.claude.ai", "*.claude.ai", "registry.npmjs.org",
+                 "registry.yarnpkg.com", "deb.nodesource.com", "api.anthropic.com",
+                 "nodejs.org", "openrouter.ai", "astral.sh", "releases.astral.sh",
+                 "github.com", "*.github.com", "*.githubusercontent.com"]
+
+[environment.env]
+SLOT = "C8-S1"
+BUDGET_STEPS = "8000"
+
+[agent]
+# 1800 raw x scaffold timeout_multiplier 2.0 = 3600s (1h) of agent phase.
+# Was 21600 (6h = 50 attempts x 432s), which made each iteration take most of a day.
+# max_attempts and instruction.md were cut to 8 in the same edit so the agent plans
+# for the deadline it actually gets instead of being killed two-thirds of the way in.
+timeout_sec = 1800.0
+# Phase override, narrower than the baseline: the agent needs its own bootstrap and the
+# model API, not the apt or nvidia mirrors the IMAGE BUILD needed. Hosts for the client's
+# named solver cohort are included so a non-Anthropic agent can reach its API. The muse
+# spark endpoint is openrouter.ai, which resolves the open item previously recorded here.
+network_mode = "allowlist"
+allowed_hosts = ["172.17.0.1", "downloads.claude.ai", "*.claude.ai", "registry.npmjs.org",
+                 "registry.yarnpkg.com", "api.anthropic.com", "pypi.org",
+                 "files.pythonhosted.org", "api.openai.com", "chatgpt.com",
+                 "openrouter.ai"]
+
+[verifier]
+timeout_sec = 1800.0
+# SEPARATE verifier, and it stays separate. There is ONE Dockerfile in this bundle, under
+# environment/; the verifier does not get a second one. [verifier.environment] below re-points
+# that same built image with a grading-appropriate resource envelope.
+#
+# The isolation property is structural, not timing-based: tests/ (graded labels included) is
+# uploaded into the separate verifier container at grade time, which the agent never runs in,
+# so the labels are never present in the agent's container. Harbor's own note at
+# trial.py:623-625 says the same. Do NOT "simplify" this to environment_mode = "shared";
+# shared mode uploads tests/ into the AGENT's container and puts the graded labels there.
+#
+# What sharing the image DOES cost: the agent can read whatever the verifier needs installed.
+# environment/Dockerfile answers that by stripping the council surface (judges.yaml, council.py,
+# creds.py) after install, leaving only the deterministic scoring path.
+#
+# The submitted predictions and the agent's code snapshot arrive through the artifacts list
+# above, re-materialized at their original absolute paths.
+environment_mode = "separate"
+# Grading is integer comparison over submitted predictions. Nothing to fetch, ever.
+# Declared explicitly because G-DEL-PIN checks [agent] and [verifier] for this key, and
+# because the vocabulary is no-network/public/allowlist -- there is no "none".
+network_mode = "no-network"
+
+# The verifier reuses the AGENT'S image (same tag, one Dockerfile under environment/) but
+# NOT the agent's resource envelope. Without this block Harbor deep-copies [environment]
+# for the verifier (verifier_mode.py:60-64), which would reserve an H100 to compare
+# integers. Pointing docker_image at the same tag also keeps _ensure_env_image's second
+# branch a no-op: the tag is already present from the [environment] build, so it never
+# tries to build a separate verifier image from tests/ -- which is why no tests/Dockerfile
+# exists. And a non-None docker_image is what makes Harbor UPLOAD tests/ into this
+# container at grade time (trial.py:626), so the graded labels reach the verifier and
+# only the verifier.
+[verifier.environment]
+docker_image = "aello/c8-s1-cifar100-env:1.1.0"
+network_mode = "no-network"
+gpus = 0
+cpus = 4
+memory_mb = 16384
+
+# Snapshot every file the agent authored, BEFORE environment teardown, into two places:
+#   /logs/agent/agent_code/  bind-mounted to <trial_dir>/agent and read by the host-side
+#       council, so it grades the agent's REAL code rather than a starved excerpt.
+#   /workspace/agent_src/    collected as an artifact and re-uploaded into the separate
+#       verifier, so the deterministic scan sees every file the agent wrote.
+# Broad capture: any filename the agent chose. Best-effort, never fails the trial.
+[[verifier.collect]]
+command = '''mkdir -p /logs/agent/agent_code /workspace/agent_src && cd /workspace && find . -type f \( -name '*.py' -o -name '*.sh' -o -name '*.md' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' -o -name '*.txt' -o -name '*.ipynb' \) -not -path './environment/data/*' -not -path './agent_src/*' -exec cp --parents {} /logs/agent/agent_code/ \; -exec cp --parents {} /workspace/agent_src/ \; ; true'''
+timeout_sec = 60.0
+
+[solution.env]
+ORACLE = "1"

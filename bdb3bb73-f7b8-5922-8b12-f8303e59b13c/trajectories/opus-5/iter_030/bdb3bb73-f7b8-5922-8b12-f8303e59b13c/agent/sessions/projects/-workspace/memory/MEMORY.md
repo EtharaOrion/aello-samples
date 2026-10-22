@@ -1,0 +1,1 @@
+- [/dev/shm is 64 MB in this container](workspace-dev-shm-64mb.md) — DataLoader workers die with a misleading "No space left on device"; use num_workers=0.

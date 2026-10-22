@@ -1,0 +1,216 @@
+import os, time, shutil, glob, random
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision.transforms as transforms
+from torchvision.datasets import ImageFolder
+from torch.utils.data import DataLoader, TensorDataset
+import numpy as np
+from PIL import Image
+
+DATA_ROOT = "/workspace/data/cifar10"
+CKPT_DIR = "/workspace/scratch_ckpt"
+BATCH = 512
+EPOCHS = 30
+DEVICE = "cuda"
+
+os.makedirs(CKPT_DIR, exist_ok=True)
+for f in os.listdir(CKPT_DIR):
+    try: os.remove(os.path.join(CKPT_DIR, f))
+    except: pass
+
+mean = (0.4914, 0.4822, 0.4465)
+std = (0.2470, 0.2435, 0.2616)
+
+# Preload data into RAM as uint8 tensors
+print("Preloading train data...")
+train_root = os.path.join(DATA_ROOT, "train")
+classes = sorted(os.listdir(train_root))
+class_to_idx = {c:i for i,c in enumerate(classes)}
+train_images = []
+train_labels = []
+for cls in classes:
+    idx = class_to_idx[cls]
+    d = os.path.join(train_root, cls)
+    for fname in sorted(os.listdir(d)):
+        p = os.path.join(d, fname)
+        img = Image.open(p).convert('RGB')
+        # store as numpy uint8 32x32x3
+        arr = np.array(img, dtype=np.uint8)  # 32x32x3
+        train_images.append(arr)
+        train_labels.append(idx)
+train_images = np.stack(train_images)  # 50000,32,32,3
+train_labels = np.array(train_labels, dtype=np.int64)
+print(f"Train loaded {train_images.shape} {train_labels.shape}")
+
+print("Preloading test data...")
+test_root = os.path.join(DATA_ROOT, "test")
+test_images = []
+test_labels = []
+for cls in classes:
+    idx = class_to_idx[cls]
+    d = os.path.join(test_root, cls)
+    for fname in sorted(os.listdir(d)):
+        p = os.path.join(d, fname)
+        img = Image.open(p).convert('RGB')
+        arr = np.array(img, dtype=np.uint8)
+        test_images.append(arr)
+        test_labels.append(idx)
+test_images = np.stack(test_images)
+test_labels = np.array(test_labels, dtype=np.int64)
+print(f"Test loaded {test_images.shape}")
+
+# Convert to tensors on GPU? Keep on CPU and augment on GPU via Kornia or simple
+# We'll do augmentation on CPU via transforms but with preloaded data we can use num_workers=0 and fast collate
+
+# Create a dataset that does augmentation on the fly from numpy
+import torchvision.transforms.functional as TF
+
+class RAMDataset(torch.utils.data.Dataset):
+    def __init__(self, images, labels, train=True):
+        self.images = images
+        self.labels = labels
+        self.train = train
+    def __len__(self):
+        return len(self.labels)
+    def __getitem__(self, idx):
+        img = self.images[idx]  # 32x32x3 uint8
+        # PIL-like augmentations using numpy/torch
+        # Convert to PIL for transforms
+        pil = Image.fromarray(img)
+        if self.train:
+            # RandomCrop with padding 4
+            pil = transforms.RandomCrop(32, padding=4)(pil)
+            if random.random() < 0.5:
+                pil = transforms.RandomHorizontalFlip(p=1)(pil)
+            # AutoAugment CIFAR10
+            # Use torchvision AutoAugment
+            pil = transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10)(pil)
+        # ToTensor + Normalize
+        t = transforms.ToTensor()(pil)
+        t = transforms.Normalize(mean, std)(t)
+        return t, self.labels[idx]
+
+train_set = RAMDataset(train_images, train_labels, train=True)
+test_set = RAMDataset(test_images, test_labels, train=False)
+
+train_loader = DataLoader(train_set, batch_size=BATCH, shuffle=True, num_workers=0, pin_memory=True)
+test_loader = DataLoader(test_set, batch_size=512, shuffle=False, num_workers=0, pin_memory=True)
+
+# Benchmark
+import time as tm
+t0=tm.time()
+for i,(x,y) in enumerate(train_loader):
+    if i>=5: break
+    x=x.to(DEVICE, non_blocking=True)
+    pass
+print(f"DataLoader benchmark 6 batches {tm.time()-t0:.2f}s")
+
+class Block(nn.Module):
+    def __init__(self, in_c, out_c, stride):
+        super().__init__()
+        self.bn1 = nn.BatchNorm2d(in_c)
+        self.conv1 = nn.Conv2d(in_c, out_c, 3, stride, 1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_c)
+        self.conv2 = nn.Conv2d(out_c, out_c, 3, 1, 1, bias=False)
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_c != out_c:
+            self.shortcut = nn.Conv2d(in_c, out_c, 1, stride, bias=False)
+    def forward(self, x):
+        out = F.relu(self.bn1(x))
+        out = self.conv1(out)
+        out = F.relu(self.bn2(out))
+        out = self.conv2(out)
+        out += self.shortcut(x)
+        return out
+
+class WideResNet(nn.Module):
+    def __init__(self, depth=28, widen=10, num_classes=10):
+        super().__init__()
+        n = (depth - 4) // 6
+        k = widen
+        self.conv1 = nn.Conv2d(3, 16, 3, 1, 1, bias=False)
+        self.layer1 = self._make(16, 16*k, n, 1)
+        self.layer2 = self._make(16*k, 32*k, n, 2)
+        self.layer3 = self._make(32*k, 64*k, n, 2)
+        self.bn = nn.BatchNorm2d(64*k)
+        self.fc = nn.Linear(64*k, num_classes)
+    def _make(self, in_c, out_c, n, stride):
+        layers = [Block(in_c, out_c, stride)]
+        for _ in range(1, n):
+            layers.append(Block(out_c, out_c, 1))
+        return nn.Sequential(*layers)
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = F.relu(self.bn(out))
+        out = F.adaptive_avg_pool2d(out, 1)
+        out = out.view(out.size(0), -1)
+        return self.fc(out)
+
+model = WideResNet(28, 10).to(DEVICE)
+model = model.to(memory_format=torch.channels_last)
+torch.backends.cudnn.benchmark = True
+torch.set_float32_matmul_precision('high')
+
+criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.4, momentum=0.9, weight_decay=5e-4, nesterov=True)
+scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.4, epochs=EPOCHS, steps_per_epoch=len(train_loader), pct_start=0.3, anneal_strategy='cos', div_factor=10, final_div_factor=50)
+scaler = torch.amp.GradScaler('cuda')
+
+start = time.time()
+for epoch in range(1, EPOCHS+1):
+    model.train()
+    for x, y in train_loader:
+        x, y = x.to(DEVICE, non_blocking=True), y.to(DEVICE, non_blocking=True)
+        x = x.to(memory_format=torch.channels_last)
+        optimizer.zero_grad(set_to_none=True)
+        with torch.amp.autocast('cuda', dtype=torch.float16):
+            out = model(x)
+            loss = criterion(out, y)
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+        scheduler.step()
+    model.eval()
+    correct=0; total=0
+    with torch.no_grad():
+        for x,y in test_loader:
+            x,y=x.to(DEVICE,non_blocking=True),y.to(DEVICE,non_blocking=True)
+            x=x.to(memory_format=torch.channels_last)
+            with torch.amp.autocast('cuda', dtype=torch.float16):
+                out=model(x)
+            correct+=(out.argmax(1)==y).sum().item()
+            total+=y.size(0)
+    acc=correct/total
+    elapsed=time.time()-start
+    print(f"Epoch {epoch}/{EPOCHS} acc={acc:.4f} time={elapsed:.1f}s lr={optimizer.param_groups[0]['lr']:.5f}", flush=True)
+    sm = WideResNet(28,10).to(DEVICE)
+    sm.load_state_dict(model.state_dict())
+    sm.eval()
+    scripted=torch.jit.script(sm)
+    path=os.path.join(CKPT_DIR, f"ckpt_epoch_{epoch:04d}.pt")
+    scripted.save(path)
+    print(f"  saved {path}", flush=True)
+
+total_time=time.time()-start
+print(f"Done time {total_time:.1f}s")
+for p in sorted(glob.glob(os.path.join(CKPT_DIR,"*.pt"))):
+    m=torch.jit.load(p, map_location="cpu")
+    m.eval()
+    with torch.no_grad():
+        o=m(torch.randn(2,3,32,32))
+    assert o.shape==(2,10)
+print("verified")
+ckpts=sorted(glob.glob(os.path.join(CKPT_DIR,"ckpt_epoch_*.pt")))
+m=torch.jit.load(ckpts[-1], map_location=DEVICE).eval()
+correct=0; total=0
+with torch.no_grad():
+    for x,y in test_loader:
+        x,y=x.to(DEVICE),y.to(DEVICE)
+        x=x.to(memory_format=torch.channels_last)
+        correct+=(m(x).argmax(1)==y).sum().item()
+        total+=y.size(0)
+print(f"final acc {correct/total:.4f}")

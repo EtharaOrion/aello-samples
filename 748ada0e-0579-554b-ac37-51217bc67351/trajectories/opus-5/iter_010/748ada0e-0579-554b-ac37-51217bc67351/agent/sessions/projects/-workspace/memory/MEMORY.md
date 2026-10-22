@@ -1,0 +1,3 @@
+- [CIFAR-100 budget task: cutout is the big win](cifar100-budget-cutout-win.md) — cutout +2%, EMA-as-ensemble-member +0.9%, mixup and shift-TTA are duds
+- [Marginal balancing for balanced accuracy](cifar100-marginal-balancing.md) — Sinkhorn per-class bias at tau~1.5 is a free +0.5-0.8%
+- [AELLO val split noise](cifar100-budget-eval-noise.md) — 2000 imbalanced val images, sigma ~0.5-0.6%; ignore sub-1% single-run deltas

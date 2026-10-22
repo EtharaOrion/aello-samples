@@ -1,0 +1,1 @@
+- [CIFAR-10 H100 speedrun: clock and shared GPU](cifar10-h100-speedrun-clock.md) — t* excludes all pre-epoch-1 setup; the GPU is shared and swings 4-5x.

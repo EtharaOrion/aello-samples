@@ -1,0 +1,2 @@
+- [CIFAR-100 i20k tuning dead ends](cifar100-i20k-tuning-deadends.md) — augmentation/EMA/budget-split levers already measured and lost; skip them
+- [CIFAR-100 i20k val noise](cifar100-i20k-val-noise.md) — val_public cannot resolve differences below ~1.5%

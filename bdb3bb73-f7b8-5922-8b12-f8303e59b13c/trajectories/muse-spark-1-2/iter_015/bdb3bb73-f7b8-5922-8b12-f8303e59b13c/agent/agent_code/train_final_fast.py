@@ -1,0 +1,167 @@
+import os, time, shutil, random, json
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from PIL import Image
+import numpy as np
+
+DATA_ROOT="/workspace/data/cifar10"
+CKPT_DIR="/workspace/scratch_final"
+CLASSES=["airplane","automobile","bird","cat","deer","dog","frog","horse","ship","truck"]
+CLS_TO_IDX={c:i for i,c in enumerate(CLASSES)}
+
+def preload(root, split):
+    base=os.path.join(root,split)
+    imgs=[]; labels=[]
+    for cls in CLASSES:
+        d=os.path.join(base,cls)
+        for fname in sorted(os.listdir(d)):
+            arr=np.array(Image.open(os.path.join(d,fname)).convert("RGB"))
+            imgs.append(arr); labels.append(CLS_TO_IDX[cls])
+    imgs=np.stack(imgs)
+    imgs=torch.from_numpy(imgs).permute(0,3,1,2).contiguous()
+    labels=torch.tensor(labels,dtype=torch.long)
+    perm=torch.randperm(len(labels))
+    return imgs[perm], labels[perm]
+
+class Block(nn.Module):
+    def __init__(self, c_in, c_out, stride):
+        super().__init__()
+        self.conv1=nn.Conv2d(c_in,c_out,3,stride,1,bias=False)
+        self.bn1=nn.BatchNorm2d(c_out)
+        self.conv2=nn.Conv2d(c_out,c_out,3,1,1,bias=False)
+        self.bn2=nn.BatchNorm2d(c_out)
+        self.shortcut=nn.Identity() if c_in==c_out and stride==1 else nn.Sequential(nn.Conv2d(c_in,c_out,1,stride,bias=False), nn.BatchNorm2d(c_out))
+    def forward(self,x):
+        out=F.relu(self.bn1(self.conv1(x)))
+        out=self.bn2(self.conv2(out))
+        out+=self.shortcut(x)
+        return F.relu(out)
+
+class FastNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1=nn.Conv2d(3,64,3,1,1,bias=False)
+        self.bn1=nn.BatchNorm2d(64)
+        self.layer1=nn.Sequential(Block(64,128,1), Block(128,128,1))
+        self.layer2=nn.Sequential(Block(128,256,2), Block(256,256,1))
+        self.layer3=nn.Sequential(Block(256,512,2), Block(512,512,1))
+        self.fc=nn.Linear(512,10)
+        for m in self.modules():
+            if isinstance(m,nn.Conv2d): nn.init.kaiming_normal_(m.weight,mode='fan_out',nonlinearity='relu')
+            elif isinstance(m,nn.BatchNorm2d): m.weight.data.fill_(1); m.bias.data.zero_()
+    def forward(self,x):
+        x=F.relu(self.bn1(self.conv1(x)))
+        x=self.layer1(x)
+        x=self.layer2(x)
+        x=self.layer3(x)
+        x=F.adaptive_avg_pool2d(x,1).flatten(1)
+        return self.fc(x)
+
+def run(BATCH, EPOCHS, MAX_LR, CKPT_DIR):
+    t0=time.time()
+    device=torch.device("cuda")
+    torch.backends.cudnn.benchmark=True
+    torch.set_float32_matmul_precision('high')
+    train_imgs, train_labels = preload(DATA_ROOT,"train")
+    test_imgs, test_labels = preload(DATA_ROOT,"test")
+    MEAN=torch.tensor([0.4914,0.4822,0.4465],device=device).view(1,3,1,1)
+    STD=torch.tensor([0.2470,0.2435,0.2616],device=device).view(1,3,1,1)
+    test_gpu=test_imgs.to(device).float().div(255.0)
+    test_gpu=(test_gpu-MEAN)/STD
+    test_gpu=test_gpu.to(memory_format=torch.channels_last)
+    test_labels_gpu=test_labels.to(device)
+    N=len(train_labels)
+    model=FastNet().to(device).to(memory_format=torch.channels_last)
+    optimizer=torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4, nesterov=True)
+    scheduler=torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=MAX_LR, epochs=EPOCHS, steps_per_epoch=(N+BATCH-1)//BATCH, pct_start=0.3, anneal_strategy='cos', div_factor=10, final_div_factor=100)
+    criterion=nn.CrossEntropyLoss(label_smoothing=0.1)
+    scaler=torch.amp.GradScaler('cuda')
+    import torchvision.transforms.v2 as Tv2
+    aug=Tv2.Compose([Tv2.RandomCrop(32, padding=4, padding_mode='reflect'), Tv2.RandomHorizontalFlip(p=0.5)])
+    if os.path.exists(CKPT_DIR):
+        shutil.rmtree(CKPT_DIR)
+    os.makedirs(CKPT_DIR, exist_ok=True)
+    best=0
+    for epoch in range(1, EPOCHS+1):
+        model.train()
+        t_epoch=time.time()
+        perm=torch.randperm(N)
+        for i in range(0,N,BATCH):
+            idx=perm[i:i+BATCH]
+            x=train_imgs[idx].to(device, non_blocking=True).float().div(255.0)
+            y=train_labels[idx].to(device, non_blocking=True)
+            x=aug(x)
+            x=(x-MEAN)/STD
+            x=x.to(memory_format=torch.channels_last)
+            if random.random()<0.5:
+                if random.random()<0.5:
+                    lam=np.random.beta(0.2,0.2)
+                    perm2=torch.randperm(x.size(0), device=device)
+                    x_mixed=lam*x + (1-lam)*x[perm2]
+                    y_a=y; y_b=y[perm2]
+                    with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+                        out=model(x_mixed)
+                        loss=lam*criterion(out,y_a)+(1-lam)*criterion(out,y_b)
+                else:
+                    lam=np.random.beta(1.0,1.0)
+                    perm2=torch.randperm(x.size(0), device=device)
+                    W=32; H=32
+                    cut_rat=(1-lam)**0.5
+                    cut_w=int(W*cut_rat); cut_h=int(H*cut_rat)
+                    cx=np.random.randint(W); cy=np.random.randint(H)
+                    bbx1=np.clip(cx-cut_w//2,0,W); bby1=np.clip(cy-cut_h//2,0,H)
+                    bbx2=np.clip(cx+cut_w//2,0,W); bby2=np.clip(cy+cut_h//2,0,H)
+                    x[:, :, bby1:bby2, bbx1:bbx2]=x[perm2, :, bby1:bby2, bbx1:bbx2]
+                    lam2=1-((bbx2-bbx1)*(bby2-bby1)/(32*32))
+                    y_a=y; y_b=y[perm2]
+                    with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+                        out=model(x)
+                        loss=lam2*criterion(out,y_a)+(1-lam2)*criterion(out,y_b)
+            else:
+                with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+                    out=model(x)
+                    loss=criterion(out,y)
+            optimizer.zero_grad(set_to_none=True)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            scheduler.step()
+        model.eval()
+        correct=0; total=0
+        with torch.no_grad():
+            with torch.amp.autocast('cuda', dtype=torch.bfloat16):
+                for i in range(0,len(test_labels),2048):
+                    x=test_gpu[i:i+2048]
+                    y=test_labels_gpu[i:i+2048]
+                    out=model(x)
+                    pred=out.argmax(1)
+                    correct+=(pred==y).sum().item()
+                    total+=y.size(0)
+        acc=correct/total
+        best=max(best,acc)
+        dt=time.time()-t_epoch
+        tot=time.time()-t0
+        print(f"Epoch {epoch:02d}/{EPOCHS} acc={acc*100:.2f}% best={best*100:.2f}% lr={optimizer.param_groups[0]['lr']:.4f} epoch_time={dt:.2f}s total={tot:.1f}s")
+        model.eval()
+        try:
+            scripted=torch.jit.script(model)
+            path=os.path.join(CKPT_DIR, f"ckpt_epoch_{epoch:04d}.pt")
+            scripted.save(path)
+        except Exception as e:
+            try:
+                ex=torch.randn(1,3,32,32, device=device).to(memory_format=torch.channels_last)
+                traced=torch.jit.trace(model, ex)
+                path=os.path.join(CKPT_DIR, f"ckpt_epoch_{epoch:04d}.pt")
+                traced.save(path)
+            except: pass
+        model.train()
+    wall=time.time()-t0
+    print(f"Done BATCH={BATCH} EPOCHS={EPOCHS} MAX_LR={MAX_LR} wall={wall:.1f}s best={best*100:.2f}%")
+    with open(os.path.join(CKPT_DIR, "metrics.json"),"w") as f:
+        json.dump({"accuracy":best,"wall_clock_sec":wall,"batch":BATCH,"epochs":EPOCHS,"max_lr":MAX_LR},f)
+    return best, wall
+
+if __name__=="__main__":
+    # Try 25 epochs, batch 1024, max_lr 1.0
+    run(1024, 25, 1.0, "/workspace/scratch_final")

@@ -1,0 +1,2 @@
+- [CIFAR-100 budget recipe](cifar100-budget-recipe.md) — what actually moved val: TrivialAugment yes, stacking it with high weight decay no.
+- [CIFAR-100 val noise](cifar100-budget-val-noise.md) — the 2000-image val split has ~1.0% bootstrap sd; don't chase sub-2% gaps.

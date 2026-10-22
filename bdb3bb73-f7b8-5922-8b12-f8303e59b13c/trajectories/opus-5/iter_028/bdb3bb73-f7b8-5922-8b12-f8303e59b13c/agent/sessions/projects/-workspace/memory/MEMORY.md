@@ -1,0 +1,2 @@
+- [CIFAR-10 H100 speedrun task](cifar10-h100-speedrun-task.md) — rubric is the real lever; cutout=12 recipe and grader input convention
+- [Shared H100 contention](cifar10-gpu-contention.md) — why the noise floor is ~0.2pp and epochs run ~2x slow

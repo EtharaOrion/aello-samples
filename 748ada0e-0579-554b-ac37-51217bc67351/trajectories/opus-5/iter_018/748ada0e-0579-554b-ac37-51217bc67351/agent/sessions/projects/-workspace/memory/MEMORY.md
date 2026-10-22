@@ -1,0 +1,1 @@
+- [CIFAR-100 budget-task levers](cifar100-budget-levers.md) — what actually moved val: shift-TTA +1.1%, CutMix -1.0%, EMA hurts, noise floor ~0.01

@@ -1,0 +1,78 @@
+schema_version = "1.4"
+
+artifacts = [
+  "/workspace/checkpoint.pt",
+  "/workspace/agent_reported_metrics.json",
+  "/workspace/agent_src",
+  "/workspace/verifier_checkpoint_mtimes.jsonl",
+  "/workspace/verifier_container_launch.ts",
+  "/workspace/verifier_agent_had_test.txt",
+  "/workspace/verifier_output",
+  "/workspace/periodic_checkpoints",
+]
+
+[task]
+name = "aello/cifar10-94pct-1xh100"
+description = "Train from scratch to reach 94% top-1 on CIFAR-10 test split within the wall-clock budget on 1xH100. Score = GATE * S_outcome * RubricFactor with S_outcome = normalized time-to-accuracy from LOADABLE periodic checkpoints."
+keywords = ["optimization", "bounded-continuous", "image_classification", "cifar10", "time_to_accuracy"]
+
+[metadata]
+score_protocol_version = "normalized_time_to_accuracy"
+universal_scoring_version = "universal_scoring"
+scoring_engine = "aello_eval"
+target_hardware = "1xH100-SXM5-80GB"
+universal_scoring_engine_location = "harness/packages/aello-eval/"
+
+[solution]
+# Solution environment variables passed to solve.sh.
+
+[environment]
+# SHARED PREBUILT IMAGE. The SEPARATE verifier's env identity is content-hashed from
+# its build context (tests/), which differs from the agent's (environment/), so it
+# would NOT reuse the agent's Dockerfile-built image -- it would try to build from
+# tests/ (no Dockerfile) and lack torch/CIFAR/wheel. Pinning docker_image makes BOTH
+# the agent AND the separate verifier use the SAME image built from
+# environment/Dockerfile, so the verifier can re-evaluate on GPU. The one Dockerfile
+# stays in environment/; build+tag it once before running (scaffold/deliver.py does
+# this automatically): docker build -t aello-bdb3bb73-env environment/
+docker_image = "aello-bdb3bb73-env"
+gpus = 1
+gpu_types = ["H100"]
+network_mode = "allowlist"
+
+allowed_hosts = ["pypi.org", "files.pythonhosted.org", "archive.ubuntu.com", "security.ubuntu.com", "developer.download.nvidia.com", "downloads.claude.ai", "*.claude.ai", "registry.npmjs.org", "registry.yarnpkg.com", "deb.nodesource.com", "api.anthropic.com", "nodejs.org", "openrouter.ai", "astral.sh", "releases.astral.sh", "github.com", "*.github.com", "*.githubusercontent.com"]
+build_timeout_sec = 900
+workdir = "/workspace"
+env = { PYTHONUNBUFFERED = "1", TZ = "UTC" }
+
+[agent]
+timeout_sec = 1800
+network_mode = "allowlist"
+
+allowed_hosts = ["downloads.claude.ai", "*.claude.ai", "registry.npmjs.org", "registry.yarnpkg.com", "api.anthropic.com", "pypi.org", "files.pythonhosted.org", "openrouter.ai"]
+
+[verifier]
+timeout_sec = 300
+environment_mode = "separate"
+# P1.5: the verifier re-evaluates checkpoints on the GPU (batched); without this it
+# runs on CPU and times out.
+gpus = 1
+gpu_types = ["H100"]
+# The verifier (and ONLY the verifier) may fetch the held-out eval set. The agent's
+# [agent] allowlist excludes this host, so the agent cannot obtain the eval data.
+network_mode = "allowlist"
+allowed_hosts = ["s3.amazonaws.com", "pypi.org", "files.pythonhosted.org"]
+
+# Snapshot every file the agent authored under /workspace (excluding the dataset
+# and checkpoint binaries) into TWO places, BEFORE environment teardown:
+#   /logs/agent/agent_code/ -> bind-mounted to <trial_dir>/agent on the host, read
+#       by the host-side council (scaffold/evaluate.py) to grade the agent's REAL
+#       code + reasoning instead of a starved excerpt.
+#   /workspace/agent_src/   -> collected via the `/workspace/agent_src` artifact and
+#       re-uploaded into the SEPARATE verifier container, so the deterministic
+#       no_verifier_gaming scan sees ALL agent code (not a hardcoded train.py).
+# Broad capture: any filename the agent chose is included. Runs in the agent (main)
+# container. Best-effort (|| true).
+[[verifier.collect]]
+command = '''mkdir -p /logs/agent/agent_code /workspace/agent_src && cd /workspace && find . -type f \( -name '*.py' -o -name '*.sh' -o -name '*.txt' -o -name '*.md' -o -name '*.json' -o -name '*.yaml' -o -name '*.yml' -o -name '*.ipynb' \) -not -path './data/*' -not -path './periodic_checkpoints/*' -not -path './agent_src/*' -exec cp --parents {} /logs/agent/agent_code/ \; -exec cp --parents {} /workspace/agent_src/ \; ; cp /logs/container_launch.ts /workspace/verifier_container_launch.ts 2>/dev/null || true; { [ -e /workspace/data/cifar10/test ] && echo present || echo absent; } > /workspace/verifier_agent_had_test.txt; : > /workspace/verifier_checkpoint_mtimes.jsonl; for f in /workspace/periodic_checkpoints/*.pt; do [ -e "$f" ] && printf '{"ckpt":"%s","mtime":%s}\n' "$(basename "$f")" "$(stat -c %Y "$f")" >> /workspace/verifier_checkpoint_mtimes.jsonl; done; true'''
+timeout_sec = 60.0

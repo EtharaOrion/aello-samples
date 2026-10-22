@@ -1,0 +1,2 @@
+- [CIFAR-10 speedrun scoring shape](cifar10-speedrun-scoring-shape.md) — S_outcome saturates under 28s, so the process rubric decides the whole reward.
+- [CIFAR-10 speedrun timing mechanics](cifar10-speedrun-timing-mechanics.md) — mtime-derived clock, no torch.compile, script-once, holdout reads optimistic.

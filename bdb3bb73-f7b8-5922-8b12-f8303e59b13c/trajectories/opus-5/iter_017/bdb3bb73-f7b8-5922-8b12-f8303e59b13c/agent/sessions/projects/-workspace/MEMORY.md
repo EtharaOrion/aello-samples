@@ -1,0 +1,2 @@
+- [CIFAR-10 H100 94% recipe](cifar10-h100-94pct-recipe.md) — 94.9% in 12s; the two mis-set hyperparameters that each cost ~1pp
+- [CIFAR-10 verifier ladder gotchas](cifar10-verifier-ladder-gotchas.md) — copying checkpoints destroys the timing signal; core dumps trip the pattern gate

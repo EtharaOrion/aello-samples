@@ -1,0 +1,38 @@
+## Refinement Loop - Attempt 2
+This is attempt number 2. 1 attempt(s) have been made before this one.
+
+## Best Attempt So Far
+- Iter 1 | Reward: 0.9709 | Trained a compact convnet with frozen whitening, wide residual groups, and on-device augmentation, optimized via hyperparameter sweep on a held-out train split.
+
+### Best Approach (carry forward and refine)
+**What was attempted:**
+The agent built an airbench-lineage convolutional architecture with several efficiency-oriented design choices: a frozen 2×2 whitening convolution (initialized from training-set covariance eigenvectors), three progressively wider conv-pool-BN-GELU blocks (128→384→512 channels), and a bias-free linear head. All 50k training images were pre-loaded onto GPU as a single fp16 tensor, with augmentation (±2px translation via gather, horizontal flip, cutout) performed in-place during training. The pipeline used bf16 precision, channels-last layout, `torch.compile`, Nesterov SGD with warmup and linear decay, and label smoothing. Crucially, the verifier's flip-TTA was baked into the model's `forward` method to avoid verification overhead.
+
+**What worked:**
+The approach delivered strong results: 94.35% accuracy at epoch 24 (8.10 s wall-clock), final accuracy 94.94% at epoch 28, well above the 94% threshold. The checkpoint ladder was constructed cleanly — 28 scripted TorchScript checkpoints with genuine timestamps, written in a single training run. The agent validated the checkpoint against three input normalizations ([0,1], [0,255], standardized) and confirmed the verifier's exact pipeline before promotion. The hyperparameter sweep on a 5k held-out training split successfully reduced initially excessive learning rate and weight decay, yielding the final tuning.
+
+**What failed or fell short:**
+Technically nothing failed, but the design reveals a choice: the agent prioritized accuracy margin over speed. An earlier 6.2 s run already achieved 94.05%, saturating the `S_outcome` metric. Rather than optimize for speed beyond that point, the agent widened the network (64/256/256 → 128/384/512), trading 0.15 s/epoch for ~0.9% absolute accuracy gain. This conservative stance left execution time well below budget (9.46 s vs. 28 s reference, 70 s baseline), suggesting the speed constraint was not binding.
+
+**Root cause & recommendations:**
+The iteration succeeded because it combined domain knowledge (airbench architecture, frozen whitening, on-device augmentation) with disciplined validation (held-out tuning set, checkpoint ladder verification, multi-normalization testing). For the next iteration:
+1. **Test whether speed can be the primary objective:** revert to the faster architecture (64/256/256) and explore sub-6 s training while maintaining 94%+ accuracy through augmentation strength, learning rate schedules, or mixed-precision tuning.
+2. **Validate the whitening assumption:** ablate the frozen whitening layer to confirm it is still beneficial at current width; it may become negligible with stronger augmentation.
+3. **Push accuracy further if needed:** the current 0.94% margin over 94% is comfortable, but if future iterations tighten the threshold, explore deeper architectures, skip connections, or stronger regularization.
+4. **Confirm TTA overhead:** measure the cost of flip-TTA in the verifier's measurement to ensure baking it into `forward` was justified.
+
+## Prior Attempts (bounded digest: top 3 scored + last 3)
+### Iteration 1 | Reward: 0.9709
+- Approach: Trained a compact convnet with frozen whitening, wide residual groups, and on-device augmentation, optimized via hyperparameter sweep on a held-out train split.
+- Measured: reward 0.9709; gate 1; S_outcome 1.0000; t* 8.10s first crossing ckpt_epoch_0024.pt verifier re-eval acc 0.9435; rubric factor 0.9709
+- What happened: **What was attempted:** The agent built an airbench-lineage convolutional architecture with several efficiency-oriented design choices: a frozen 2×2 whitening convolution (initialized from training-set covariance eigenvectors), three progressively wider conv-pool-BN-GELU blocks (128→384→512 channels), and a bias-free linear head. All 50k training images were pre-loaded onto GPU as a single fp16 tensor, with augmentation (±2px translation via gather, horizontal flip, cutout) performed in-place during training. The pipeline used bf16 precision, channels-last layout, `torch.compile`, Nesterov SGD with warmup and linear decay, and label smoothing. Crucially, the verifier's flip-TTA was baked into the model's `forward` method to avoid verification overhead. **What worked:** The approach delivered strong results: 94.35% accuracy at epoch 24 (8.10 s wall-clock), final accuracy 94.94% at epoch 28, well above the 94% threshold. The checkpoint ladder was constructed cleanly — 28 scripted TorchScript checkpoints with genuine timestamps, written in a single training run. The agent validated the checkpoint against three input normalizations ([0,1], [0,255], standardized) and confirmed the verifier's exact pipeline before promotion. The hyperparameter sweep on a 5k held-out training split successfully reduced initially excessive learning rate and weight decay, yielding the final tuning. **What failed or fell short:** Technically nothing failed, but the design reveals a choice: the agent prioritized accuracy margin over speed. An earlier 6.2 s run already achieved 94.05%, saturating the `S_outcome` metric. Rather than optimize for speed beyond that point, the agent widened the network (64/256/256 → 128/384/512), trading 0.15 s/epoch for ~0.9% absolute accuracy gain. This conservative stance left execution time well below budget (9.46 s vs. 28 s reference, 70 s baseline), suggesting the speed constraint was not binding. **Root cause & recommendations:** The iteration succeeded because it combined domain knowledge (airbench architecture, frozen whitening, on-device augmentation) with disciplined validation (held-out tuning set, checkpoint ladder verification, multi-normalization testing). For the next iteration: 1. **Test whether speed can be the primary objective:** revert to the faster architecture (64/256/256) and explore sub-6 s training while maintaining 94%+ accuracy through augmentation strength, learning rate schedules, or mixed-precision tuning. 2. **Validate the whitening assumption:** ablate the frozen whitening layer to confirm it is still beneficial at current width; it may become negligible with stronger augmentation. 3. **Push accuracy further if needed:** the current 0.94% margin over 94% is comfortable, but if future iterations tighten the threshold, explore deeper architectures, skip connections, or stronger regularization. 4. **Confirm TTA overhead:** measure the cost of flip-TTA in the verifier's measurement to ensure baking it into `forward` was justified.
+
+## Untried Ideas
+- Try a materially different approach than the ones already tried above.
+- Tighten the current best solution locally instead of restarting from scratch.
+- Increase search effort or iterations within the wall-clock budget.
+- Look for redundant steps in the best attempt and drop them.
+- Verify correctness first, then optimize; a failing solution scores zero.
+
+## Guidance for This Attempt
+Consider exploring approaches not yet tried, or building on the best-performing attempt above. Focus on improving the reward score. Do not repeat strategies that plateaued.

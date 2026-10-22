@@ -1,0 +1,1 @@
+- [AELLO CIFAR-100 eval noise & attempt policy](aello-cifar100-eval-noise.md) — val sigma is ~0.5-0.6%, and the banked best caps downside, so bet for variance

@@ -1,0 +1,1 @@
+- [CIFAR-10 H100 speedrun recipe](cifar10-h100-speedrun-recipe.md) — tuned 8.9 s recipe, and why speed past ~15 s earns nothing

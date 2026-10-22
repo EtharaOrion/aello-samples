@@ -1,0 +1,4 @@
+- [CIFAR-10 speedrun reward shape](cifar10-speedrun-reward-shape.md) — S_outcome saturates at t*<=28s, so reward is really just the process rubric.
+- [Ladder timestamps are the clock](cifar10-ladder-timestamps-are-the-clock.md) — train the final run directly into the graded dir; a deleted ladder cannot be restored.
+- [Noise floor across processes](noise-floor-across-processes.md) — cudnn autotuning makes within-process seed variance understate the real noise floor ~2x.
+- [Shared GPU: check tenancy first](shared-gpu-check-tenancy-first.md) — the /workspace H100 runs ~4x below spec; microbenchmark before budgeting time.

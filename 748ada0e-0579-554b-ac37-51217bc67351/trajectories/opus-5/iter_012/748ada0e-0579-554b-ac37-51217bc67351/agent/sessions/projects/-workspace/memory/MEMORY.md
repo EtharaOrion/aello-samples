@@ -1,0 +1,3 @@
+- [CIFAR-100 budget recipe](cifar100-budget-recipe.md) — the ResNet-34/w160/res48 config that reproduces ~0.732 val; workspace resets every attempt.
+- [What doesn't help on the CIFAR-100 budget task](cifar100-budget-what-doesnt-help.md) — measured gains vs. dead ends, so runs aren't wasted re-testing.
+- [Val-split noise on the CIFAR-100 budget task](cifar100-budget-eval-noise.md) — 2000 images means ~1% SE; don't rank configs on sub-1% differences.

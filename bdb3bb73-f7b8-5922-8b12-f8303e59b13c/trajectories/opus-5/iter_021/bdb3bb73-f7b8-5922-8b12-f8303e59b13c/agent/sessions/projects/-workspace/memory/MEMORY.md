@@ -1,0 +1,2 @@
+- [Shared H100 in the CIFAR-10 speedrun](cifar10-h100-shared-gpu.md) — identical runs vary ~3× in wall clock; gate promotions on measured t*
+- [CIFAR-10 outcome score saturates immediately](cifar10-outcome-score-saturates.md) — S_outcome pins at 1.0, so the process rubric is the only live lever

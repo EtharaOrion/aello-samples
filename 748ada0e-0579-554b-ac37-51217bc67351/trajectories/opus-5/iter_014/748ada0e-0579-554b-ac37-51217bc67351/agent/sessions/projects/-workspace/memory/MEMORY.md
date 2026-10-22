@@ -1,0 +1,2 @@
+- [CIFAR-100 shift TTA win](cifar100-shift-tta-win.md) — shift5+flip TTA is +0.6%; prior_pow tuning is noise.
+- [CIFAR-100 budget: what fails](cifar100-budget-what-fails.md) — 2000-img val has ~1% noise; post-hoc tuning overfits and costs reward.

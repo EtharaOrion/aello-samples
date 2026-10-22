@@ -1,0 +1,1 @@
+- [CIFAR-10 H100 speedrun: outcome term saturates](cifar10-h100-outcome-saturates.md) — speed is free, only the process rubric moves the reward

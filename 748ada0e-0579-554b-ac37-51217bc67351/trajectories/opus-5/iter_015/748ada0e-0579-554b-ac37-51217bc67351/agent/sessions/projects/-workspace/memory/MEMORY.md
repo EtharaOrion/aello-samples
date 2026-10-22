@@ -1,0 +1,2 @@
+- [CIFAR-100 budget recipe](cifar100-budget-recipe.md) — best config + measured dead ends; workspace resets each attempt, so rebuild first and probe second.
+- [CIFAR-100 budget val noise](cifar100-budget-val-noise.md) — 2000-image val has ±0.0095 noise; never tune post-processing on it, never force uniform marginals.

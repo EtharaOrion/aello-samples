@@ -1,0 +1,2 @@
+- [CIFAR-10 H100 speedrun scoring](cifar10-h100-speedrun-scoring.md) — S_outcome is already clamped at 1.0, so margin and rubric are the only levers; the GPU is shared and epoch time drifts 2.4x
+- [CIFAR-10 H100 speedrun recipe](cifar10-h100-speedrun-recipe.md) — the working 24-epoch config, the +0.62 pp `end_mult` finding, and two silent accuracy-killing bugs

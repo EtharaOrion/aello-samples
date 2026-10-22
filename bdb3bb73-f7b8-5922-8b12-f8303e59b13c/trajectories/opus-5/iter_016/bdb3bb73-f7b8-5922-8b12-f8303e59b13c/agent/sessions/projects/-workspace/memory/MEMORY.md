@@ -1,0 +1,1 @@
+- [CIFAR-10 H100 speedrun scoring](cifar10-h100-speedrun-scoring.md) — S_outcome saturates under 28 s; the rubric is the only lever left

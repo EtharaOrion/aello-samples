@@ -12,14 +12,14 @@
 
 The curated lane of this corpus: at most 30 Harbor task bundles, every anchor seated first and every other bundle in seal order. Bundles past that ceiling live in `delivery/`.
 
-Each bundle is one Harbor task in a directory named by its content-derived uuid5, so the name doubles as an integrity check. This page is rendered from the resident bundles on every reconcile; a value a bundle does not carry reads `absent`, and the page never fills one in. On 2026-10-22 the previous 30 resident bundles were retired to `shelf/`, and the two resident bundles below were seated from the Infinity and Beluga source corpora.
+Each bundle is one Harbor task in a directory named by its content-derived uuid5, so the name doubles as an integrity check. This page is rendered from the resident bundles on every reconcile; a value a bundle does not carry reads `absent`, and the page never fills one in.
 
 ## Summary
 
 | Property | Value |
 | --- | --- |
 | Bundles | 2 of 30 |
-| Sealed | 0 of 30 |
+| Sealed | 0 of 2 |
 | Registrations | unregistered (2) |
 | Audit verdicts | none (2) |
 | Harbor schema | 1.4 (2) |
@@ -43,9 +43,9 @@ The verdict is the audit outcome recorded at the sealed digest, and `none` means
 | --- | --- |
 | bounded-continuous | 2 |
 | optimization | 2 |
+| cifar10 | 1 |
 | image-classification | 1 |
 | image_classification | 1 |
-| cifar10 | 1 |
 | time_to_accuracy | 1 |
 | training-recipe | 1 |
 | vision | 1 |
@@ -66,6 +66,10 @@ flowchart LR
     bundle --> n2["environment/<br/>agent sandbox image"]
     bundle --> n3["tests/<br/>verifier, hidden from the agent"]
     bundle --> n4["solution/<br/>private oracle"]
+    bundle --> n5["README.md"]
+    bundle --> n6["inspector.html"]
+    bundle --> n7["plots/"]
+    bundle --> n8["trajectories/"]
 ```
 
 ```mermaid
